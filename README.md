@@ -13,7 +13,7 @@ complete backend setup for skintel — express api + fastapi facial landmarks mi
 ### prereqs
 
 * docker + docker compose
-* at least 8gb ram (dlib is kinda hungry)
+* at least 8gb ram (dlib is kinda hungry, as it seems)
 
 ### spin it up
 
