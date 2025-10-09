@@ -1,0 +1,34 @@
+# Node.js
+skintel-backend/node_modules
+skintel-backend/dist
+skintel-backend/.env
+skintel-backend/src/generated
+
+# Python
+skintel-facial-landmarks/__pycache__
+skintel-facial-landmarks/*.pyc
+skintel-facial-landmarks/venv
+skintel-facial-landmarks/.env
+
+# Git
+.git
+.gitignore
+
+# Documentation
+*.md
+CLAUDE.md
+SYSTEM_DESIGN.md
+
+# IDE
+.vscode
+.idea
+
+# Logs
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Model files (will be downloaded)
+skintel-facial-landmarks/shape_predictor_68_face_landmarks.dat*
