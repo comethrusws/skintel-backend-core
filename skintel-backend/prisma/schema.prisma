@@ -1,0 +1,142 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DATABASE_URL")
+}
+
+model AnonymousSession {
+  id                String             @id @default(cuid())
+  sessionId         String             @unique @map("session_id")
+  sessionToken      String             @unique @map("session_token")
+  deviceId          String             @map("device_id")
+  deviceInfo        Json               @map("device_info")
+  createdAt         DateTime           @default(now()) @map("created_at")
+  expiresAt         DateTime           @map("expires_at")
+  mergedToUserId    String?            @map("merged_to_user_id")
+  answers           OnboardingAnswer[]
+  onboardingSession OnboardingSession?
+
+  @@map("anonymous_sessions")
+}
+
+model User {
+  id                String             @id @default(cuid())
+  userId            String             @unique @map("user_id")
+  email             String?            @unique
+  passwordHash      String?            @map("password_hash")
+  ssoProvider       String?            @map("sso_provider")
+  ssoId             String?            @map("sso_id")
+  createdAt         DateTime           @default(now()) @map("created_at")
+  updatedAt         DateTime           @updatedAt @map("updated_at")
+  refreshTokens     RefreshToken[]
+  answers           OnboardingAnswer[]
+  onboardingSession OnboardingSession?
+  facialLandmarks   FacialLandmarks[]
+
+  @@unique([ssoProvider, ssoId])
+  @@map("users")
+}
+
+model RefreshToken {
+  id        String   @id @default(cuid())
+  token     String   @unique
+  userId    String   @map("user_id")
+  user      User     @relation(fields: [userId], references: [userId], onDelete: Cascade)
+  createdAt DateTime @default(now()) @map("created_at")
+  expiresAt DateTime @map("expires_at")
+
+  @@map("refresh_tokens")
+}
+
+model OnboardingAnswer {
+  id         String       @id @default(cuid())
+  answerId   String       @unique @map("answer_id")
+  sessionId  String?      @map("session_id")
+  userId     String?      @map("user_id")
+  screenId   String       @map("screen_id")
+  questionId String       @map("question_id")
+  type       AnswerType
+  value      Json
+  status     AnswerStatus
+  savedAt    DateTime     @default(now()) @map("saved_at")
+
+  session         AnonymousSession? @relation(fields: [sessionId], references: [sessionId], onDelete: Cascade)
+  user            User?             @relation(fields: [userId], references: [userId], onDelete: Cascade)
+  FacialLandmarks FacialLandmarks?
+
+  @@map("onboarding_answers")
+}
+
+model OnboardingSession {
+  id         String   @id @default(cuid())
+  sessionId  String?  @map("session_id")
+  userId     String?  @map("user_id")
+  allAnswers Json     @map("all_answers") // Combined JSON of all answers
+  status     String   @default("in_progress") // in_progress, completed, skipped
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  session AnonymousSession? @relation(fields: [sessionId], references: [sessionId], onDelete: Cascade)
+  user    User?             @relation(fields: [userId], references: [userId], onDelete: Cascade)
+
+  @@unique([sessionId])
+  @@unique([userId])
+  @@map("onboarding_sessions")
+}
+
+model IdempotencyKey {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  response  Json
+  createdAt DateTime @default(now()) @map("created_at")
+  expiresAt DateTime @map("expires_at")
+
+  @@map("idempotency_keys")
+}
+
+model FacialLandmarks {
+  id          String         @id @default(cuid())
+  answerId    String         @unique @map("answer_id")
+  userId      String?        @map("user_id")
+  landmarks   Json
+  status      LandmarkStatus @default(PROCESSING)
+  processedAt DateTime?      @map("processed_at")
+  error       String?
+  createdAt   DateTime       @default(now()) @map("created_at")
+
+  answer OnboardingAnswer @relation(fields: [answerId], references: [answerId], onDelete: Cascade)
+  user   User?            @relation(fields: [userId], references: [userId], onDelete: Cascade)
+
+  @@map("facial_landmarks")
+}
+
+enum AnswerType {
+  single
+  multi
+  slider
+  image
+  boolean
+  derived
+}
+
+enum AnswerStatus {
+  answered
+  skipped
+}
+
+enum LandmarkStatus {
+  PROCESSING
+  COMPLETED
+  FAILED
+}

@@ -1,0 +1,16 @@
+node_modules/
+CLAUDE.md
+.env
+.DS_Store
+dist/
+build/
+coverage/           
+
+.vscode/
+.idea/
+*.log
+*.tmp
+
+*.swp
+SYSTEM_DESIGN.md
+/src/generated/prisma

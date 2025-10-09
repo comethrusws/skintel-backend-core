@@ -1,0 +1,128 @@
+export const VALID_QUESTION_IDS = [
+  'q_skin_concerns',
+  'q_skin_sensitivity', 
+  'q_skin_type',
+  'q_goal',
+  'q_profile_gender',
+  'q_age',
+  'q_profile_ethnicity',
+  'q_profile_sun_exposure',
+  'q_profile_weather_conditions',
+  'q_regime_product',
+  'q_medical_conditions',
+  'q_hormone_factors',
+  'q_face_photo_front',
+  'q_face_photo_left',
+  'q_face_photo_right',
+  'q_skin_closeup',
+  'q_onboarding_complete',
+  'q_onboarding_status'
+] as const;
+
+export const QUESTION_TYPES = {
+  q_skin_concerns: 'multi',
+  q_skin_sensitivity: 'single',
+  q_skin_type: 'single',
+  q_goal: 'single',
+  q_profile_gender: 'single',
+  q_age: 'slider',
+  q_profile_ethnicity: 'single',
+  q_profile_sun_exposure: 'single',
+  q_profile_weather_conditions: 'single',
+  q_regime_product: 'multi',
+  q_medical_conditions: 'multi',
+  q_hormone_factors: 'multi',
+  q_face_photo_front: 'image',
+  q_face_photo_left: 'image',
+  q_face_photo_right: 'image',
+  q_skin_closeup: 'image',
+  q_onboarding_complete: 'boolean',
+  q_onboarding_status: 'derived'
+} as const;
+
+// Specific valid values for each question
+export const VALID_VALUES = {
+  q_skin_concerns: [
+    'acne', 'dark_spots', 'wrinkles', 'fine_lines', 'dryness', 'oiliness',
+    'large_pores', 'uneven_texture', 'redness', 'sensitivity', 'dullness',
+    'hyperpigmentation', 'blackheads', 'whiteheads', 'scarring'
+  ],
+  q_skin_sensitivity: ['Very sensitive', 'somewhat sensitive', 'not sensitive', 'not sure'],
+  q_skin_type: ['oily', 'dry', 'combination', 'normal'],
+  q_goal: [
+    'clear_skin', 'hydration', 'anti_aging', 'brightening', 'oil_control',
+    'pore_minimizing', 'acne_treatment', 'even_skin_tone', 'sun_protection'
+  ],
+  q_profile_gender: ['female', 'male', 'nonbinary', 'prefer_not_to_say'],
+  q_profile_ethnicity: [
+    'asian', 'black', 'hispanic', 'white', 'middle_eastern', 'native_american',
+    'pacific_islander', 'mixed', 'prefer_not_to_say'
+  ],
+  q_profile_sun_exposure: ['high', 'medium', 'low', 'minimal'],
+  q_profile_weather_conditions: ['hot', 'temperate', 'cold'],
+  q_regime_product: [
+    'cleanser', 'toner', 'serum', 'moisturizer', 'sunscreen', 'exfoliant',
+    'face_mask', 'eye_cream', 'spot_treatment', 'oil', 'mist', 'retinoid'
+  ],
+  q_medical_conditions: [
+    'eczema', 'psoriasis', 'rosacea', 'dermatitis', 'melasma', 'vitiligo',
+    'keratosis_pilaris', 'seborrheic_dermatitis', 'none', 'other'
+  ],
+  q_hormone_factors: [
+    'pregnancy', 'menopause', 'pms', 'puberty', 'hormonal_acne',
+    'birth_control', 'hormone_therapy', 'high_stress', 'none'
+  ]
+} as const;
+
+export const AGE_RANGE = { min: 13, max: 99 };
+
+export const isValidQuestionId = (questionId: string): boolean => {
+  return VALID_QUESTION_IDS.includes(questionId as any);
+};
+
+export const getExpectedType = (questionId: string): string | null => {
+  return QUESTION_TYPES[questionId as keyof typeof QUESTION_TYPES] || null;
+};
+
+export const getValidValues = (questionId: string): readonly string[] | null => {
+  return VALID_VALUES[questionId as keyof typeof VALID_VALUES] || null;
+};
+
+export const validateQuestionValue = (questionId: string, value: any): boolean => {
+  const expectedType = getExpectedType(questionId);
+  if (!expectedType) return false;
+
+  switch (expectedType) {
+    case 'single': {
+      if (typeof value !== 'string') return false;
+      const validValues = getValidValues(questionId);
+      return validValues ? validValues.includes(value) : true;
+    }
+    case 'multi': {
+      if (!Array.isArray(value)) return false;
+      const validValues = getValidValues(questionId);
+      if (!validValues) return value.every(v => typeof v === 'string');
+      return value.every(v => typeof v === 'string' && validValues.includes(v));
+    }
+    case 'slider': {
+      if (typeof value !== 'number') return false;
+      if (questionId === 'q_age') {
+        return value >= AGE_RANGE.min && value <= AGE_RANGE.max;
+      }
+      return Number.isInteger(value) && value >= 0;
+    }
+    case 'image': {
+      return typeof value === 'object' && value !== null && 
+             typeof value.image_id === 'string' && value.image_id.startsWith('img_');
+    }
+    case 'boolean': {
+      return typeof value === 'boolean';
+    }
+    case 'derived': {
+      // Derived values are set by server, so we accept strings
+      return typeof value === 'string';
+    }
+    default:
+      return false;
+  }
+};
