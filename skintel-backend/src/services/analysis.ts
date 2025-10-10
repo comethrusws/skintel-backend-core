@@ -1,8 +1,9 @@
 import { prisma } from '../lib/prisma';
 import type { Prisma } from '../generated/prisma';
+import OpenAI from 'openai';
 
-const OPENAI_API_URL = 'https://api.openai.com/v1/chat/completions';
 const OPENAI_MODEL = process.env.OPENAI_MODEL || 'gpt-4o-mini';
+const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 function getImageUrl(imageId: string): string {
   return `http://localhost:3000/images/${imageId}`;
@@ -57,13 +58,10 @@ export async function analyzeSkin(answerId: string) {
 
   const prompt = buildPrompt();
 
-  const body = {
+  const completion = await openai.chat.completions.create({
     model: OPENAI_MODEL,
     messages: [
-      {
-        role: 'system',
-        content: prompt
-      },
+      { role: 'system', content: prompt },
       {
         role: 'user',
         content: [
@@ -75,24 +73,9 @@ export async function analyzeSkin(answerId: string) {
     ],
     temperature: 0.2,
     response_format: { type: 'json_object' }
-  } as const;
-
-  const response = await fetch(OPENAI_API_URL, {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify(body)
   });
 
-  if (!response.ok) {
-    const text = await response.text();
-    throw new Error(`OpenAI error ${response.status}: ${text}`);
-  }
-
-  const data = await response.json();
-  const content = data?.choices?.[0]?.message?.content ?? '';
+  const content = completion.choices?.[0]?.message?.content ?? '';
 
   let parsed: unknown;
   try {
