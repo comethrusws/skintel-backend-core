@@ -130,15 +130,6 @@ async function testSaveOnboardingAnswers() {
         value: ['acne', 'dark_spots'],
         status: 'answered',
         saved_at: new Date().toISOString()
-      },
-      {
-        answer_id: faceAnswerId,
-        screen_id: 'screen_face_photo',
-        question_id: 'q_face_photo_front',
-        type: 'image',
-        value: { image_id: TEST_IMAGE_URL },
-        status: 'answered',
-        saved_at: new Date().toISOString()
       }
     ],
     screen_completed: true

@@ -6,7 +6,7 @@ const OPENAI_MODEL = process.env.OPENAI_MODEL || 'gpt-4o-mini';
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 function getImageUrl(imageId: string): string {
-  return `http://localhost:3000/images/${imageId}`;
+  return `https://static.vecteezy.com/system/resources/previews/012/942/981/large_2x/young-asian-woman-worry-about-her-face-when-she-has-problems-with-skin-on-her-face-in-a-natural-background-problems-with-acne-and-scar-on-the-female-skin-problem-skincare-and-health-concept-photo.jpg`;
 }
 
 function buildPrompt(): string {
