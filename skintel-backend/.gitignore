@@ -1,5 +1,4 @@
 node_modules/
-CLAUDE.md
 .env
 .DS_Store
 dist/

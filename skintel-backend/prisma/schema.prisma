@@ -110,6 +110,7 @@ model FacialLandmarks {
   answerId    String         @unique @map("answer_id")
   userId      String?        @map("user_id")
   landmarks   Json
+  analysis    Json?
   status      LandmarkStatus @default(PROCESSING)
   processedAt DateTime?      @map("processed_at")
   error       String?

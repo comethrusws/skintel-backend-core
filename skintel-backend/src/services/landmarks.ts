@@ -1,4 +1,6 @@
 import { LandmarkResponse, LandmarkProcessingResult } from '../types';
+import type { Prisma } from '../generated/prisma';
+import { analyzeSkin } from './analysis';
 
 const LANDMARK_SERVICE_URL = process.env.LANDMARK_URL || 'http://localhost:8000';
 const LANDMARK_ENDPOINT = '/api/v1/landmarks';
@@ -89,7 +91,7 @@ export async function processLandmarksAsync(answerId: string, imageId: string): 
       data: {
         answerId,
         userId: answer.userId, // set userId if the answer belongs to a user
-        landmarks: {},
+        landmarks: {} as Prisma.InputJsonValue,
         status: 'PROCESSING'
       }
     });
@@ -100,13 +102,20 @@ export async function processLandmarksAsync(answerId: string, imageId: string): 
       await prisma.facialLandmarks.update({
         where: { answerId },
         data: {
-          landmarks: result.data,
+          landmarks: result.data as unknown as Prisma.InputJsonValue,
           status: 'COMPLETED',
           processedAt: new Date()
         }
       });
       
       console.log(`Landmarks processed successfully for answer: ${answerId}`);
+
+      try {
+        const analysis = await analyzeSkin(answerId);
+        console.log('Skin analysis completed:', analysis);
+      } catch (analysisError) {
+        console.error('Skin analysis failed:', analysisError);
+      }
     } else {
       await prisma.facialLandmarks.update({
         where: { answerId },
@@ -129,7 +138,7 @@ export async function processLandmarksAsync(answerId: string, imageId: string): 
         create: {
           answerId,
           userId: answer?.userId || null,
-          landmarks: {},
+          landmarks: {} as Prisma.InputJsonValue,
           status: 'FAILED',
           error: error instanceof Error ? error.message : 'db error',
           processedAt: new Date()
