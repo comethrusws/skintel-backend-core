@@ -4,14 +4,17 @@ import { analyzeSkin } from './analysis';
 
 const LANDMARK_SERVICE_URL = process.env.LANDMARK_URL || 'http://localhost:8000';
 const LANDMARK_ENDPOINT = '/api/v1/landmarks';
-const REQUEST_TIMEOUT = 30000; // 30 seconds
+const REQUEST_TIMEOUT = 30000; 
 
 /**
  * convert image_id to accessible URL (temp)
  * todo; implementing acc logic with s3 storage
  */
 function getImageUrl(imageId: string): string {
-  // a dummy placeholder for now  
+  // allow passing full URLs directly for testing/microservice
+  if (imageId.startsWith('http://') || imageId.startsWith('https://')) {
+    return imageId;
+  }
   return `http://localhost:3000/images/${imageId}`;
 }
 

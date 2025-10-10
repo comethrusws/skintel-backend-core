@@ -3,6 +3,7 @@ const http = require('http');
 const { v4: uuidv4 } = require('uuid');
 
 const BASE_URL = 'http://localhost:3000';
+const TEST_IMAGE_URL = 'https://static.vecteezy.com/system/resources/previews/012/942/981/large_2x/young-asian-woman-worry-about-her-face-when-she-has-problems-with-skin-on-her-face-in-a-natural-background-problems-with-acne-and-scar-on-the-female-skin-problem-skincare-and-health-concept-photo.jpg';
 const colors = {
   green: '\x1b[32m',
   red: '\x1b[31m',
@@ -106,6 +107,7 @@ async function testCreateAnonymousSession() {
 async function testSaveOnboardingAnswers() {
   const answerId1 = `ans_${uuidv4()}`;
   const answerId2 = `ans_${uuidv4()}`;
+  const faceAnswerId = `ans_${uuidv4()}`;
   
   // Test with multiple question types
   const response = await makeRequest('PUT', '/v1/onboarding', {
@@ -128,6 +130,15 @@ async function testSaveOnboardingAnswers() {
         value: ['acne', 'dark_spots'],
         status: 'answered',
         saved_at: new Date().toISOString()
+      },
+      {
+        answer_id: faceAnswerId,
+        screen_id: 'screen_face_photo',
+        question_id: 'q_face_photo_front',
+        type: 'image',
+        value: { image_id: TEST_IMAGE_URL },
+        status: 'answered',
+        saved_at: new Date().toISOString()
       }
     ],
     screen_completed: true
@@ -138,6 +149,8 @@ async function testSaveOnboardingAnswers() {
 
   assertEquals(response.status, 200, 'Should save answers with 200');
   assertEquals(response.data.saved, true, 'Should indicate answers were saved');
+  // wait for async landmarking + analysis to complete server-side
+  await new Promise(r => setTimeout(r, 6000));
 }
 
 async function testInvalidQuestionValues() {
@@ -258,7 +271,7 @@ async function runAllTests() {
   try {
     await test('Health Check', testHealthCheck);
     await test('Create Anonymous Session', testCreateAnonymousSession);
-    await test('Save Onboarding Answers', testSaveOnboardingAnswers);
+    await test('Save Onboarding Answers + Landmark + Analysis', testSaveOnboardingAnswers);
     await test('Get Onboarding State', testGetOnboardingState);
     await test('User Signup', testUserSignup);
     await test('Refresh Token', testRefreshToken);
