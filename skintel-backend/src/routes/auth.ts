@@ -406,7 +406,20 @@ router.post('/logout', authenticateUser, async (req: AuthenticatedRequest, res: 
 
 async function mergeSessionToUser(sessionId: string, userId: string): Promise<boolean> {
   try {
+    // capture ansID belonging to this session before we null out apna seshID
+    const answers = await prisma.onboardingAnswer.findMany({
+      where: { sessionId },
+      select: { answerId: true },
+    });
+    const answerIds = answers.map(a => a.answerId);
+
     await prisma.$transaction([
+      // this will make surefacial landmarks for these answers are linked to the user
+      prisma.facialLandmarks.updateMany({
+        where: { answerId: { in: answerIds } },
+        data: { userId }
+      }),
+
       prisma.onboardingAnswer.updateMany({
         where: { sessionId },
         data: { 
@@ -414,15 +427,8 @@ async function mergeSessionToUser(sessionId: string, userId: string): Promise<bo
           sessionId: null,
         },
       }),
-      
-      prisma.facialLandmarks.updateMany({
-        where: { 
-          answer: { sessionId }
-        },
-        data: { userId }
-      }),
-      
-      // maarking session as merged
+
+      // marking session as merged
       prisma.anonymousSession.update({
         where: { sessionId },
         data: { mergedToUserId: userId },
