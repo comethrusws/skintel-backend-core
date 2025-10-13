@@ -136,20 +136,19 @@ router.put('/', idempotencyMiddleware, authenticateSession, async (req: Authenti
         });
       }
 
-      // Process facial landmarks for image questions
+      // process facial landmarks for image questions
       if (answer.type === 'image' && answer.status === 'answered' && 
           typeof answer.value === 'object' && answer.value !== null && 
           'image_id' in answer.value) {
         
         const imageValue = answer.value as { image_id: string };
         
-        // Check if this is a face photo question that needs landmark processing
+        // check if this is a face photo question that needs landmark processing
         const facePhotoQuestions = ['q_face_photo_front', 'q_face_photo_left', 'q_face_photo_right'];
         
         if (facePhotoQuestions.includes(answer.question_id)) {
           console.log(`Triggering landmark processing for ${answer.question_id}: ${imageValue.image_id}`);
           
-          // Process landmarks asynchronously (don't await)
           processLandmarksAsync(answer.answer_id, imageValue.image_id).catch(error => {
             console.error('Async landmark processing error:', error);
           });
@@ -163,7 +162,6 @@ router.put('/', idempotencyMiddleware, authenticateSession, async (req: Authenti
       });
     }
 
-    // Update the combined onboarding session with all answers
     await updateOnboardingSession(sessionId, null, screen_completed);
 
     const totalAnswers = await prisma.onboardingAnswer.count({

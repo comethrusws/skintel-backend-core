@@ -12,4 +12,5 @@ coverage/
 
 *.swp
 SYSTEM_DESIGN.md
+CLAUDE.md
 /src/generated/prisma
