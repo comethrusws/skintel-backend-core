@@ -216,7 +216,7 @@ async function testGetUserLandmarksAfterSignup() {
   }
   if (response.data.landmarks.length === 0) {
     log('No landmarks found yet (processing may still be running). Waiting 5s and retrying...', 'yellow');
-    await new Promise(r => setTimeout(r, 5000));
+    await new Promise(r => setTimeout(r, 10000));
     const retry = await makeRequest('GET', '/v1/landmarks/user', null, {
       'Authorization': `Bearer ${accessToken}`
     });
