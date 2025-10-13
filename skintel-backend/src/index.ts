@@ -7,6 +7,7 @@ import { onboardingRouter } from './routes/onboarding';
 import { authRouter } from './routes/auth';
 import { landmarksRouter } from './routes/landmarks';
 import { prisma } from './lib/prisma';
+import { vanalyseRouter } from './routes/vanalyse';
 import { specs, swaggerUi } from './lib/swagger';
 
 dotenv.config();
@@ -23,6 +24,7 @@ app.use('/v1/sessions', sessionsRouter);
 app.use('/v1/onboarding', onboardingRouter);
 app.use('/v1/auth', authRouter);
 app.use('/v1/landmarks', landmarksRouter);
+app.use('/v1/vanalyse', vanalyseRouter);
 
 // Swagger documentation
 app.use('/docs', swaggerUi.serve, swaggerUi.setup(specs));

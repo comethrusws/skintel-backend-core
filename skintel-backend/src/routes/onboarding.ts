@@ -4,7 +4,7 @@ import { authenticateSession, AuthenticatedRequest } from '../middleware/auth';
 import { idempotencyMiddleware } from '../middleware/idempotency';
 import { onboardingRequestSchema } from '../lib/validation';
 import { prisma } from '../lib/prisma';
-import { processLandmarksAsync } from '../services/landmarks';
+import { processLandmarksAsync, processLandmarksForAnswerWithUrl } from '../services/landmarks';
 
 const router = Router();
 
@@ -136,23 +136,26 @@ router.put('/', idempotencyMiddleware, authenticateSession, async (req: Authenti
         });
       }
 
-      // Process facial landmarks for image questions
+      // process facial landmarks for image questions
       if (answer.type === 'image' && answer.status === 'answered' && 
           typeof answer.value === 'object' && answer.value !== null && 
-          'image_id' in answer.value) {
-        
-        const imageValue = answer.value as { image_id: string };
-        
-        // Check if this is a face photo question that needs landmark processing
+          ('image_id' in answer.value || 'image_url' in answer.value)) {
+
         const facePhotoQuestions = ['q_face_photo_front', 'q_face_photo_left', 'q_face_photo_right'];
-        
         if (facePhotoQuestions.includes(answer.question_id)) {
-          console.log(`Triggering landmark processing for ${answer.question_id}: ${imageValue.image_id}`);
-          
-          // Process landmarks asynchronously (don't await)
-          processLandmarksAsync(answer.answer_id, imageValue.image_id).catch(error => {
-            console.error('Async landmark processing error:', error);
-          });
+          if ('image_id' in (answer.value as any)) {
+            const imageValue = answer.value as { image_id: string };
+            console.log(`Triggering landmark processing for ${answer.question_id}: ${imageValue.image_id}`);
+            processLandmarksAsync(answer.answer_id, imageValue.image_id).catch(error => {
+              console.error('Async landmark processing error:', error);
+            });
+          } else if ('image_url' in (answer.value as any)) {
+            const urlValue = answer.value as { image_url: string };
+            console.log(`Triggering URL-based landmark processing for ${answer.question_id}: ${urlValue.image_url}`);
+            processLandmarksForAnswerWithUrl(answer.answer_id, urlValue.image_url).catch(error => {
+              console.error('Async url landmark processing error:', error);
+            });
+          }
         }
       }
 
@@ -163,7 +166,6 @@ router.put('/', idempotencyMiddleware, authenticateSession, async (req: Authenti
       });
     }
 
-    // Update the combined onboarding session with all answers
     await updateOnboardingSession(sessionId, null, screen_completed);
 
     const totalAnswers = await prisma.onboardingAnswer.count({

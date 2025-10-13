@@ -17,12 +17,12 @@ export const anonymousSessionRequestSchema = z.object({
   device_info: deviceInfoSchema,
 });
 
-// Enhanced validation for answer values
 export const answerValueSchema = z.union([
   z.string(),
   z.array(z.string()),
   z.number().int(),
   z.object({ image_id: z.string().startsWith('img_') }),
+  z.object({ image_url: z.string().url() }),
   z.boolean(),
 ]);
 
@@ -40,20 +40,19 @@ export const onboardingAnswerSchema = z.object({
     z.boolean(),
     z.array(z.string()),
     z.object({ image_id: z.string() }),
+    z.object({ image_url: z.string() }),
   ]) as z.ZodSchema<OnboardingAnswerValue>,
   status: z.enum(['answered', 'skipped']),
   saved_at: z.string().datetime(),
 }).refine(
-  // Validate that type matches question_id expected type
   (data) => {
     const expectedType = getExpectedType(data.question_id);
     return expectedType === data.type;
   },
   { message: "Answer type doesn't match expected type for question_id" }
 ).refine(
-  // Validate that value is appropriate for the question
   (data) => {
-    if (data.status === 'skipped') return true; // Skip validation for skipped questions
+    if (data.status === 'skipped') return true; // skipc validation for skipped questions
     return validateQuestionValue(data.question_id, data.value);
   },
   { message: "Invalid value for question_id" }

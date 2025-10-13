@@ -1,5 +1,4 @@
 node_modules/
-CLAUDE.md
 .env
 .DS_Store
 dist/
@@ -13,4 +12,5 @@ coverage/
 
 *.swp
 SYSTEM_DESIGN.md
+CLAUDE.md
 /src/generated/prisma

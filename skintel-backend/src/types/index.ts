@@ -20,7 +20,7 @@ export interface OnboardingAnswer {
   screen_id: string;
   question_id: string;
   type: 'single' | 'multi' | 'slider' | 'image' | 'boolean' | 'derived';
-  value: string | string[] | number | { image_id: string } | boolean;
+  value: string | string[] | number | { image_id: string } | { image_url: string } | boolean;
   status: 'answered' | 'skipped';
   saved_at: string;
   landmarks?: {
@@ -126,7 +126,7 @@ export type OnboardingAnswerValue =
   | number 
   | boolean 
   | string[] 
-  | { image_id: string };
+  | { image_id: string } | { image_url: string };
 
 export interface LandmarkPoint {
   x: number;

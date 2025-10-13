@@ -1,15 +1,20 @@
 import { LandmarkResponse, LandmarkProcessingResult } from '../types';
+import type { Prisma } from '../generated/prisma';
+import { analyzeSkin, analyzeWithLandmarks } from './analysis';
 
 const LANDMARK_SERVICE_URL = process.env.LANDMARK_URL || 'http://localhost:8000';
 const LANDMARK_ENDPOINT = '/api/v1/landmarks';
-const REQUEST_TIMEOUT = 30000; // 30 seconds
+const REQUEST_TIMEOUT = 30000; 
 
 /**
  * convert image_id to accessible URL (temp)
  * todo; implementing acc logic with s3 storage
  */
 function getImageUrl(imageId: string): string {
-  // a dummy placeholder for now  
+  // allow passing full URLs directly for testing/microservice
+  if (imageId.startsWith('http://') || imageId.startsWith('https://')) {
+    return imageId;
+  }
   return `http://localhost:3000/images/${imageId}`;
 }
 
@@ -89,7 +94,7 @@ export async function processLandmarksAsync(answerId: string, imageId: string): 
       data: {
         answerId,
         userId: answer.userId, // set userId if the answer belongs to a user
-        landmarks: {},
+        landmarks: {} as Prisma.InputJsonValue,
         status: 'PROCESSING'
       }
     });
@@ -100,13 +105,20 @@ export async function processLandmarksAsync(answerId: string, imageId: string): 
       await prisma.facialLandmarks.update({
         where: { answerId },
         data: {
-          landmarks: result.data,
+          landmarks: result.data as unknown as Prisma.InputJsonValue,
           status: 'COMPLETED',
           processedAt: new Date()
         }
       });
       
       console.log(`Landmarks processed successfully for answer: ${answerId}`);
+
+      try {
+        const analysis = await analyzeSkin(answerId);
+        console.log('Skin analysis completed:', analysis);
+      } catch (analysisError) {
+        console.error('Skin analysis failed:', analysisError);
+      }
     } else {
       await prisma.facialLandmarks.update({
         where: { answerId },
@@ -129,7 +141,92 @@ export async function processLandmarksAsync(answerId: string, imageId: string): 
         create: {
           answerId,
           userId: answer?.userId || null,
-          landmarks: {},
+          landmarks: {} as Prisma.InputJsonValue,
+          status: 'FAILED',
+          error: error instanceof Error ? error.message : 'db error',
+          processedAt: new Date()
+        },
+        update: {
+          status: 'FAILED',
+          error: error instanceof Error ? error.message : 'db error',
+          processedAt: new Date()
+        }
+      });
+    } catch (dbError) {
+      console.error('Failed to update landmark processing status:', dbError);
+    }
+  }
+}
+
+/**
+ * process landmarks for a direct image URL and persist analysis for an answer
+ */
+export async function processLandmarksForAnswerWithUrl(answerId: string, imageUrl: string): Promise<void> {
+  const { prisma } = await import('../lib/prisma');
+
+  let answer: { userId: string | null; sessionId: string | null } | null = null;
+
+  try {
+    answer = await prisma.onboardingAnswer.findUnique({
+      where: { answerId },
+      select: { userId: true, sessionId: true }
+    });
+
+    if (!answer) {
+      console.error(`Answer not found for landmark processing: ${answerId}`);
+      return;
+    }
+
+    await prisma.facialLandmarks.create({
+      data: {
+        answerId,
+        userId: answer.userId,
+        landmarks: {} as Prisma.InputJsonValue,
+        status: 'PROCESSING'
+      }
+    });
+
+    const result = await processLandmarks(imageUrl);
+
+    if (result.success && result.data) {
+      await prisma.facialLandmarks.update({
+        where: { answerId },
+        data: {
+          landmarks: result.data as unknown as Prisma.InputJsonValue,
+          status: 'COMPLETED',
+          processedAt: new Date()
+        }
+      });
+
+      try {
+        const analysis = await analyzeWithLandmarks(imageUrl, result.data);
+        await prisma.facialLandmarks.update({
+          where: { answerId },
+          data: ({ analysis: analysis as Prisma.InputJsonValue } as unknown) as any
+        });
+      } catch (analysisError) {
+        console.error('Skin analysis failed:', analysisError);
+      }
+    } else {
+      await prisma.facialLandmarks.update({
+        where: { answerId },
+        data: {
+          status: 'FAILED',
+          error: result.error,
+          processedAt: new Date()
+        }
+      });
+      console.error(`landmark processing failed for answer: ${answerId}, error: ${result.error}`);
+    }
+  } catch (error) {
+    console.error('Error in url-based landmark processing:', error);
+    try {
+      await prisma.facialLandmarks.upsert({
+        where: { answerId },
+        create: {
+          answerId,
+          userId: answer?.userId || null,
+          landmarks: {} as Prisma.InputJsonValue,
           status: 'FAILED',
           error: error instanceof Error ? error.message : 'db error',
           processedAt: new Date()
