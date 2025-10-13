@@ -6,7 +6,9 @@ const OPENAI_MODEL = process.env.OPENAI_MODEL || 'gpt-4o-mini';
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 function getImageUrl(imageId: string): string {
-  return `https://static.vecteezy.com/system/resources/previews/012/942/981/large_2x/young-asian-woman-worry-about-her-face-when-she-has-problems-with-skin-on-her-face-in-a-natural-background-problems-with-acne-and-scar-on-the-female-skin-problem-skincare-and-health-concept-photo.jpg`;
+  // temp implementation until S3  is wired
+  if (imageId.startsWith('http://') || imageId.startsWith('https://')) return imageId;
+  return `http://localhost:3000/images/${imageId}`;
 }
 
 function buildPrompt(): string {
@@ -47,13 +49,13 @@ export async function analyzeSkin(answerId: string) {
     throw new Error('Landmarks record not found');
   }
 
-  const value = record.answer?.value as unknown as { image_id?: string } | undefined;
-  const imageId = value?.image_id;
-  if (!imageId) {
-    throw new Error('Image ID not found on answer value');
+  const value = record.answer?.value as unknown as { image_id?: string; image_url?: string } | undefined;
+  const imageUrl = typeof value?.image_url === 'string'
+    ? value!.image_url
+    : (value?.image_id ? getImageUrl(value.image_id) : undefined);
+  if (!imageUrl) {
+    throw new Error('Image URL/ID not found on answer value');
   }
-
-  const imageUrl = getImageUrl(imageId);
   const landmarks = record.landmarks as unknown as object;
 
   const prompt = buildPrompt();
