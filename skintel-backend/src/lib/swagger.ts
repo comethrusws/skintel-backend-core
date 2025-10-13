@@ -9,6 +9,13 @@ const options = {
       version: '1.0.0',
       description: 'API for Skintel onboarding and user authentication',
     },
+    tags: [
+      { name: 'Authentication', description: 'User signup/login and tokens' },
+      { name: 'Sessions', description: 'Anonymous session management' },
+      { name: 'Onboarding', description: 'Onboarding flow and answers' },
+      { name: 'Landmarks', description: 'Facial landmarks retrieval' },
+      { name: 'Analysis', description: 'Skin analysis for face images' },
+    ],
     servers: [
       {
         url: 'http://localhost:3000',
