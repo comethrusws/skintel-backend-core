@@ -96,4 +96,36 @@ export async function analyzeSkin(answerId: string) {
   return parsed;
 }
 
+export async function analyzeWithLandmarks(imageUrl: string, landmarks: object) {
+  if (!process.env.OPENAI_API_KEY) {
+    throw new Error('OPENAI_API_KEY is not set');
+  }
+
+  const prompt = buildPrompt();
+
+  const completion = await openai.chat.completions.create({
+    model: OPENAI_MODEL,
+    messages: [
+      { role: 'system', content: prompt },
+      {
+        role: 'user',
+        content: [
+          { type: 'text', text: 'Here is the face image and the landmarks JSON.' },
+          { type: 'image_url', image_url: { url: imageUrl } },
+          { type: 'text', text: JSON.stringify(landmarks) }
+        ]
+      }
+    ],
+    temperature: 0.2,
+    response_format: { type: 'json_object' }
+  });
+
+  const content = completion.choices?.[0]?.message?.content ?? '';
+
+  try {
+    return JSON.parse(content);
+  } catch {
+    return { raw: content };
+  }
+}
 

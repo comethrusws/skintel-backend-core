@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
-import { analyzeSkin } from '../services/analysis';
+import { analyzeSkin, analyzeWithLandmarks } from '../services/analysis';
+import { processLandmarks } from '../services/landmarks';
 
 export const vanalyseRouter = Router();
 
@@ -20,8 +21,11 @@ export const vanalyseRouter = Router();
  *               answerId:
  *                 type: string
  *                 description: The onboarding `answer_id` for a face image question
+ *               image_url:
+ *                 type: string
+ *                 description: Direct URL to the image to analyze (alternative to answerId)
  *             required:
- *               - answerId
+ *               - image_url
  *     responses:
  *       200:
  *         description: Analysis completed
@@ -41,13 +45,24 @@ export const vanalyseRouter = Router();
  */
 vanalyseRouter.post('/', async (req: Request, res: Response) => {
   try {
-    const { answerId } = req.body as { answerId?: string };
-    if (!answerId) {
-      return res.status(400).json({ error: 'answerId is required' });
+    const { answerId, image_url } = req.body as { answerId?: string; image_url?: string };
+    if (!answerId && !image_url) {
+      return res.status(400).json({ error: 'Provide either answerId or image_url' });
     }
 
-    const analysis = await analyzeSkin(answerId);
-    return res.json({ answerId, analysis });
+    if (answerId) {
+      const analysis = await analyzeSkin(answerId);
+      return res.json({ answerId, analysis });
+    }
+
+    // for direct image URL: call landmark service then analyze with returned landmarks (ment to be removed after we have s3 bucket)
+    const landmarkResult = await processLandmarks(image_url!);
+    if (!landmarkResult.success || !landmarkResult.data) {
+      return res.status(500).json({ error: landmarkResult.error || 'landmark processing failed' });
+    }
+
+    const analysis = await analyzeWithLandmarks(image_url!, landmarkResult.data);
+    return res.json({ image_url, analysis, landmarks: landmarkResult.data });
   } catch (error) {
     console.error('vanalyse error', error);
     return res.status(500).json({ error: error instanceof Error ? error.message : 'analysis failed' });

@@ -112,8 +112,19 @@ export const validateQuestionValue = (questionId: string, value: any): boolean =
       return Number.isInteger(value) && value >= 0;
     }
     case 'image': {
-      return typeof value === 'object' && value !== null && 
-             typeof value.image_id === 'string' && value.image_id.startsWith('img_');
+      if (typeof value !== 'object' || value === null) return false;
+      if (typeof (value as any).image_id === 'string') {
+        return (value as any).image_id.startsWith('img_');
+      }
+      if (typeof (value as any).image_url === 'string') {
+        try {
+          const u = new URL((value as any).image_url);
+          return u.protocol === 'http:' || u.protocol === 'https:';
+        } catch {
+          return false;
+        }
+      }
+      return false;
     }
     case 'boolean': {
       return typeof value === 'boolean';
