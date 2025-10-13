@@ -109,7 +109,6 @@ async function testSaveOnboardingAnswers() {
   const answerId2 = `ans_${uuidv4()}`;
   const faceAnswerId = `ans_${uuidv4()}`;
   
-  // Test with multiple question types
   const response = await makeRequest('PUT', '/v1/onboarding', {
     session_id: sessionId,
     answers: [
@@ -149,7 +148,6 @@ async function testSaveOnboardingAnswers() {
 
   assertEquals(response.status, 200, 'Should save answers with 200');
   assertEquals(response.data.saved, true, 'Should indicate answers were saved');
-  // wait for async landmarking + analysis to complete server-side
   await new Promise(r => setTimeout(r, 9000));
 }
 
@@ -190,8 +188,8 @@ async function testGetOnboardingState() {
 async function testUserSignup() {
   const response = await makeRequest('POST', '/v1/auth/signup', {
     session_id: sessionId,
-    email: `test.${Date.now()}@example.com`,
-    password: 'password123'
+    email: `basab@mail.com`,
+    password: 'basabhaha123'
   });
 
   assertEquals(response.status, 201, 'Should create user with 201');
@@ -310,9 +308,9 @@ async function runAllTests() {
 async function checkServer() {
   try {
     await makeRequest('GET', '/health');
-    log('✅ Server is running', 'green');
+    log('Server is running', 'green');
   } catch (error) {
-    log('❌ Server is not running. Please start the server with: npm run dev', 'red');
+    log('Server is not running. Please start the server with: npm run dev', 'red');
     process.exit(1);
   }
 }
