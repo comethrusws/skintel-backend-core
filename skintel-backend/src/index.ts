@@ -29,7 +29,19 @@ app.use('/v1/products', productsRouter);
 app.use('/v1/vanalyse', vanalyseRouter);
 
 // Swagger documentation
-app.use('/docs', swaggerUi.serve, swaggerUi.setup(specs));
+app.use('/docs', swaggerUi.serve, swaggerUi.setup(specs, {
+  swaggerOptions: {
+    persistAuthorization: true,
+    displayRequestDuration: true,
+    docExpansion: 'none',
+    filter: true,
+    showExtensions: true,
+    showCommonExtensions: true,
+    tryItOutEnabled: true,
+    supportedSubmitMethods: ['get', 'post', 'put', 'delete', 'patch'],
+    validatorUrl: null,
+  },
+}));
 
 app.get('/', (req: Request, res: Response) => {
   res.json({ message: 'Skintel Backend API', version: '1.0.0' });

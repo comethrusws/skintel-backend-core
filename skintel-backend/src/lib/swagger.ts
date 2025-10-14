@@ -35,6 +35,11 @@ const options = {
           scheme: 'bearer',
           bearerFormat: 'JWT',
         },
+        BasicAuth: {
+          type: 'http',
+          scheme: 'basic',
+          description: 'Username and password authentication',
+        },
       },
       schemas: {
         DeviceInfo: {
