@@ -3,15 +3,15 @@ import crypto from 'crypto';
 
 const AWS_REGION = process.env.AWS_REGION;
 const S3_BUCKET_NAME = process.env.S3_BUCKET_NAME || '';
-const S3_PUBLIC_BASE_URL = process.env.S3_PUBLIC_BASE_URL; // Optional: override object URL base
+const S3_PUBLIC_BASE_URL = process.env.S3_PUBLIC_BASE_URL; 
 
 export const s3 = new S3Client({
   region: AWS_REGION,
 });
 
 export type UploadImageInput = {
-  imageBase64: string; // can be raw base64 or data URL (e.g., data:image/png;base64,....)
-  prefix?: string; // optional key prefix, e.g., "uploads/"
+  imageBase64: string; //either raw base64 or data url here
+  prefix?: string; // optional prefix
 };
 
 export type UploadImageResult = {
@@ -22,7 +22,6 @@ export type UploadImageResult = {
 };
 
 function parseBase64(input: string): { buffer: Buffer; contentType: string; extension: string } {
-  // Support both raw base64 and data URLs
   let base64 = input;
   let contentType = 'application/octet-stream';
   if (input.startsWith('data:')) {
@@ -33,7 +32,6 @@ function parseBase64(input: string): { buffer: Buffer; contentType: string; exte
   }
   const buffer = Buffer.from(base64, 'base64');
 
-  // Infer extension from content type for common image types
   let extension = 'bin';
   if (contentType === 'image/jpeg' || contentType === 'image/jpg') extension = 'jpg';
   else if (contentType === 'image/png') extension = 'png';
