@@ -54,6 +54,52 @@ function makeRequest(method, path, data = null, headers = {}) {
   });
 }
 
+function makeBinaryRequest(method, path, buffer = null, headers = {}) {
+  return new Promise((resolve, reject) => {
+    const url = new URL(BASE_URL + path);
+    const options = {
+      hostname: url.hostname,
+      port: url.port,
+      path: url.pathname + url.search,
+      method,
+      headers: {
+        ...headers
+      }
+    };
+
+    const req = http.request(options, (res) => {
+      let body = '';
+      res.on('data', (chunk) => body += chunk);
+      res.on('end', () => {
+        try {
+          const parsed = body ? JSON.parse(body) : {};
+          resolve({ status: res.statusCode, data: parsed, headers: res.headers });
+        } catch (e) {
+          resolve({ status: res.statusCode, data: body, headers: res.headers });
+        }
+      });
+    });
+
+    req.on('error', reject);
+    if (buffer) req.write(buffer);
+    req.end();
+  });
+}
+
+function downloadToBuffer(url) {
+  return new Promise((resolve, reject) => {
+    https.get(url, (res) => {
+      if (res.statusCode && res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
+        // handle simple redirects
+        return resolve(downloadToBuffer(res.headers.location));
+      }
+      const chunks = [];
+      res.on('data', (c) => chunks.push(c));
+      res.on('end', () => resolve(Buffer.concat(chunks)));
+    }).on('error', reject);
+  });
+}
+
 function log(message, color = 'reset') {
   console.log(`${colors[color]}${message}${colors.reset}`);
 }
@@ -105,6 +151,16 @@ async function testCreateAnonymousSession() {
 }
 
 async function testSaveOnboardingAnswers() {
+  // Upload test image via our upload API first, then use returned S3 URL in onboarding
+  const imgBuffer = await downloadToBuffer(TEST_IMAGE_URL);
+  const uploadResp = await makeBinaryRequest('POST', '/v1/upload/file?prefix=tests', imgBuffer, {
+    'Content-Type': 'image/jpeg'
+  });
+  if (uploadResp.status !== 201 || !uploadResp.data || !uploadResp.data.url) {
+    throw new Error(`Image upload failed. Status: ${uploadResp.status}, Body: ${JSON.stringify(uploadResp.data)}`);
+  }
+  const uploadedUrl = uploadResp.data.url;
+
   const answerId1 = `ans_${uuidv4()}`;
   const answerId2 = `ans_${uuidv4()}`;
   const faceAnswerId = `ans_${uuidv4()}`;
@@ -135,7 +191,7 @@ async function testSaveOnboardingAnswers() {
         screen_id: 'screen_face_photos',
         question_id: 'q_face_photo_front',
         type: 'image',
-        value: { image_url: TEST_IMAGE_URL },
+        value: { image_url: uploadedUrl },
         status: 'answered',
         saved_at: new Date().toISOString()
       }
@@ -188,7 +244,7 @@ async function testGetOnboardingState() {
 async function testUserSignup() {
   const response = await makeRequest('POST', '/v1/auth/signup', {
     session_id: sessionId,
-    email: `basab@mail.com`,
+    email: `${uuidv4()}@mail.com`,
     password: 'basabhaha123'
   });
 

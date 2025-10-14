@@ -1,4 +1,5 @@
 import { LandmarkResponse, LandmarkProcessingResult } from '../types';
+import { maybePresignUrl } from '../lib/s3';
 import type { Prisma } from '../generated/prisma';
 import { analyzeSkin, analyzeWithLandmarks } from './analysis';
 
@@ -24,6 +25,7 @@ function getImageUrl(imageId: string): string {
 export async function processLandmarks(imageId: string): Promise<LandmarkProcessingResult> {
   try {
     const imageUrl = getImageUrl(imageId);
+    const presignedUrl = await maybePresignUrl(imageUrl, 300);
     const url = `${LANDMARK_SERVICE_URL}${LANDMARK_ENDPOINT}`;
     
     console.log(`Processing landmarks for image: ${imageId} at ${url}`);
@@ -37,7 +39,7 @@ export async function processLandmarks(imageId: string): Promise<LandmarkProcess
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        image_url: imageUrl
+        image_url: presignedUrl
       }),
       signal: controller.signal
     });
