@@ -1,4 +1,5 @@
-import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
+import { S3Client, PutObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3';
+import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import crypto from 'crypto';
 
 const AWS_REGION = process.env.AWS_REGION;
@@ -51,12 +52,13 @@ export async function uploadImageToS3(input: UploadImageInput): Promise<UploadIm
   const prefix = input.prefix ? input.prefix.replace(/^\/+|\/+$|\.+/g, '') + '/' : '';
   const key = `${prefix}${randomName}.${extension}`;
 
-  const put = new PutObjectCommand({
+  const putParams: any = {
     Bucket: S3_BUCKET_NAME,
     Key: key,
     Body: buffer,
     ContentType: contentType,
-  });
+  };
+  const put = new PutObjectCommand(putParams);
 
   await s3.send(put);
 
@@ -85,12 +87,13 @@ export async function uploadBufferToS3(params: { buffer: Buffer; contentType?: s
   const prefix = params.prefix ? params.prefix.replace(/^\/+|\/+$|\.+/g, '') + '/' : '';
   const key = `${prefix}${randomName}.${extension}`;
 
-  const put = new PutObjectCommand({
+  const putParams: any = {
     Bucket: S3_BUCKET_NAME,
     Key: key,
     Body: buffer,
     ContentType: contentType,
-  });
+  };
+  const put = new PutObjectCommand(putParams);
 
   await s3.send(put);
 
@@ -101,4 +104,29 @@ export async function uploadBufferToS3(params: { buffer: Buffer; contentType?: s
   return { key, url, contentType, sizeBytes: buffer.length };
 }
 
+
+export function isS3HttpUrl(url: string): boolean {
+  // matches https://<bucket>.s3.<region>.amazonaws.com/<key>
+  // and optional dualstack/accelerate variants if we need it baad mei
+  const pattern = new RegExp(
+    `^https://${S3_BUCKET_NAME.replace(/[-/\\^$*+?.()|[\]{}]/g, '\\$&')}\\.s3\\.${AWS_REGION}\\.amazonaws\\.com/`);
+  return pattern.test(url);
+}
+
+export function extractKeyFromS3Url(url: string): string | undefined {
+  if (!isS3HttpUrl(url)) return undefined;
+  const prefix = `https://${S3_BUCKET_NAME}.s3.${AWS_REGION}.amazonaws.com/`;
+  return decodeURIComponent(url.substring(prefix.length));
+}
+
+export async function getPresignedGetUrl(key: string, expiresInSeconds = 300): Promise<string> {
+  const command = new GetObjectCommand({ Bucket: S3_BUCKET_NAME, Key: key });
+  return await getSignedUrl(s3, command, { expiresIn: expiresInSeconds });
+}
+
+export async function maybePresignUrl(url: string, expiresInSeconds = 300): Promise<string> {
+  const key = extractKeyFromS3Url(url);
+  if (!key) return url;
+  return await getPresignedGetUrl(key, expiresInSeconds);
+}
 
