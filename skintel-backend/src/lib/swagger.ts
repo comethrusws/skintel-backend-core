@@ -7,7 +7,7 @@ const options = {
     info: {
       title: 'Skintel Backend API',
       version: '1.0.0',
-      description: 'API for Skintel onboarding and user authentication',
+      description: 'Backend APIs for Skintel App',
     },
     tags: [
       { name: 'Authentication', description: 'User signup/login and tokens' },
