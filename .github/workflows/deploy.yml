@@ -17,7 +17,10 @@ jobs:
 
       - name: Create deployment archive
         run: |
-          tar --exclude-vcs -czf $ARCHIVE_NAME -C .. skintel-backend-core
+          set -euo pipefail
+          ARCHIVE_PATH="$RUNNER_TEMP/${ARCHIVE_NAME}"
+          tar --exclude-vcs -czf "$ARCHIVE_PATH" .
+          echo "ARCHIVE_PATH=$ARCHIVE_PATH" >> "$GITHUB_ENV"
 
       - name: Upload archive to EC2 via SCP
         uses: appleboy/scp-action@v0.1.7
@@ -26,7 +29,7 @@ jobs:
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_KEY }}
           port: ${{ secrets.SSH_PORT || 22 }}
-          source: ${{ env.ARCHIVE_NAME }}
+          source: ${{ env.ARCHIVE_PATH }}
           target: ${{ secrets.DEPLOY_PATH }}
 
       - name: Run remote deployment
