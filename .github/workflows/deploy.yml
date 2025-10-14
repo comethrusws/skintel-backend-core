@@ -1,0 +1,72 @@
+name: Deploy to AWS (EC2 via SCP + Docker Compose)
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      ARCHIVE_NAME: skintel-backend-core-${{ github.sha }}.tar.gz
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Create deployment archive
+        run: |
+          tar --exclude-vcs -czf $ARCHIVE_NAME -C .. skintel-backend-core
+
+      - name: Upload archive to EC2 via SCP
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_KEY }}
+          port: ${{ secrets.SSH_PORT || 22 }}
+          source: ${{ env.ARCHIVE_NAME }}
+          target: ${{ secrets.DEPLOY_PATH }}
+
+      - name: Run remote deployment
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_KEY }}
+          port: ${{ secrets.SSH_PORT || 22 }}
+          script_stop: true
+          script: |
+            set -euo pipefail
+            DEPLOY_PATH="${{ secrets.DEPLOY_PATH }}"
+            ARCHIVE_NAME="${{ env.ARCHIVE_NAME }}"
+            RELEASE_DIR="$DEPLOY_PATH/releases/$(date +%Y%m%d%H%M%S)"
+            mkdir -p "$DEPLOY_PATH/releases" "$DEPLOY_PATH/shared" "$RELEASE_DIR"
+
+            # Extract archive into release directory
+            tar -xzf "$DEPLOY_PATH/$ARCHIVE_NAME" -C "$RELEASE_DIR" --strip-components=1
+
+            # Optionally write .env file from secret
+            if [ -n "${{ secrets.ENV_FILE || '' }}" ]; then
+              echo "Writing .env from secret"
+              echo "${{ secrets.ENV_FILE }}" > "$RELEASE_DIR/.env"
+            fi
+
+            # Ensure uploads dir persists across releases
+            mkdir -p "$DEPLOY_PATH/shared/uploads"
+            ln -snf "$DEPLOY_PATH/shared/uploads" "$RELEASE_DIR/uploads"
+
+            # Switch current symlink
+            ln -sfn "$RELEASE_DIR" "$DEPLOY_PATH/current"
+            cd "$DEPLOY_PATH/current"
+
+            # Build and start services
+            docker compose pull || true
+            docker compose build --no-cache
+            docker compose up -d
+
+            # Prune old releases (keep last 5)
+            ls -1dt "$DEPLOY_PATH/releases"/* | tail -n +6 | xargs -r rm -rf
+
+
