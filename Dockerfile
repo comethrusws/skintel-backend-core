@@ -13,6 +13,7 @@ RUN npm ci
 
 # Copy backend source and build
 COPY skintel-backend/ ./
+RUN npx prisma generate
 RUN npm run build
 
 
