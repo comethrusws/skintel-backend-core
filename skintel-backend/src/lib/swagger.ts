@@ -62,6 +62,7 @@ const options = {
                 { type: 'boolean' },
                 { type: 'array', items: { type: 'string' } },
                 { type: 'object', properties: { image_id: { type: 'string' } } },
+                { type: 'object', properties: { image_url: { type: 'string', format: 'uri', example: 'https://example.com/face.jpg' } } },
               ],
             },
             status: { type: 'string', enum: ['answered', 'skipped'] },

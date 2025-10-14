@@ -119,6 +119,16 @@ export async function processLandmarksAsync(answerId: string, imageId: string): 
       } catch (analysisError) {
         console.error('Skin analysis failed:', analysisError);
       }
+
+      // reconcile user link in case merge happened after we created the record
+      try {
+        const latest = await prisma.onboardingAnswer.findUnique({ where: { answerId }, select: { userId: true } });
+        if (latest?.userId) {
+          await prisma.facialLandmarks.update({ where: { answerId }, data: { userId: latest.userId } });
+        }
+      } catch (linkErr) {
+        console.warn('Failed to reconcile facialLandmarks.userId post-processing', { answerId });
+      }
     } else {
       await prisma.facialLandmarks.update({
         where: { answerId },
@@ -206,6 +216,16 @@ export async function processLandmarksForAnswerWithUrl(answerId: string, imageUr
         });
       } catch (analysisError) {
         console.error('Skin analysis failed:', analysisError);
+      }
+
+      // reconcile user link in case merge happened after we created the record
+      try {
+        const latest = await prisma.onboardingAnswer.findUnique({ where: { answerId }, select: { userId: true } });
+        if (latest?.userId) {
+          await prisma.facialLandmarks.update({ where: { answerId }, data: { userId: latest.userId } });
+        }
+      } catch (linkErr) {
+        console.warn('Failed to reconcile facialLandmarks.userId post-processing (url)', { answerId });
       }
     } else {
       await prisma.facialLandmarks.update({

@@ -3,7 +3,7 @@ const http = require('http');
 const { v4: uuidv4 } = require('uuid');
 
 const BASE_URL = 'http://localhost:3000';
-const TEST_IMAGE_URL = 'https://static.vecteezy.com/system/resources/previews/012/942/981/large_2x/young-asian-woman-worry-about-her-face-when-she-has-problems-with-skin-on-her-face-in-a-natural-background-problems-with-acne-and-scar-on-the-female-skin-problem-skincare-and-health-concept-photo.jpg';
+const TEST_IMAGE_URL = 'https://i.pinimg.com/1200x/8a/76/0c/8a760c2a013aa5d83e0bee58db0fe6c8.jpg';
 const colors = {
   green: '\x1b[32m',
   red: '\x1b[31m',
@@ -109,7 +109,6 @@ async function testSaveOnboardingAnswers() {
   const answerId2 = `ans_${uuidv4()}`;
   const faceAnswerId = `ans_${uuidv4()}`;
   
-  // Test with multiple question types
   const response = await makeRequest('PUT', '/v1/onboarding', {
     session_id: sessionId,
     answers: [
@@ -130,6 +129,15 @@ async function testSaveOnboardingAnswers() {
         value: ['acne', 'dark_spots'],
         status: 'answered',
         saved_at: new Date().toISOString()
+      },
+      {
+        answer_id: faceAnswerId,
+        screen_id: 'screen_face_photos',
+        question_id: 'q_face_photo_front',
+        type: 'image',
+        value: { image_url: TEST_IMAGE_URL },
+        status: 'answered',
+        saved_at: new Date().toISOString()
       }
     ],
     screen_completed: true
@@ -140,8 +148,7 @@ async function testSaveOnboardingAnswers() {
 
   assertEquals(response.status, 200, 'Should save answers with 200');
   assertEquals(response.data.saved, true, 'Should indicate answers were saved');
-  // wait for async landmarking + analysis to complete server-side
-  await new Promise(r => setTimeout(r, 6000));
+  await new Promise(r => setTimeout(r, 9000));
 }
 
 async function testInvalidQuestionValues() {
@@ -181,8 +188,8 @@ async function testGetOnboardingState() {
 async function testUserSignup() {
   const response = await makeRequest('POST', '/v1/auth/signup', {
     session_id: sessionId,
-    email: `test.${Date.now()}@example.com`,
-    password: 'password123'
+    email: `basab@mail.com`,
+    password: 'basabhaha123'
   });
 
   assertEquals(response.status, 201, 'Should create user with 201');
@@ -195,6 +202,26 @@ async function testUserSignup() {
   refreshToken = response.data.refresh_token;
   
   log(`User created with access token`, 'yellow');
+}
+
+async function testGetUserLandmarksAfterSignup() {
+  const response = await makeRequest('GET', '/v1/landmarks/user', null, {
+    'Authorization': `Bearer ${accessToken}`
+  });
+  assertEquals(response.status, 200, 'Should get user landmarks with 200');
+  if (!Array.isArray(response.data.landmarks)) {
+    throw new Error('Response should contain landmarks array');
+  }
+  if (response.data.landmarks.length === 0) {
+    log('No landmarks found yet (processing may still be running). Waiting 5s and retrying...', 'yellow');
+    await new Promise(r => setTimeout(r, 10000));
+    const retry = await makeRequest('GET', '/v1/landmarks/user', null, {
+      'Authorization': `Bearer ${accessToken}`
+    });
+    if (!Array.isArray(retry.data.landmarks) || retry.data.landmarks.length === 0) {
+      throw new Error('Expected at least one completed landmark record after signup merge');
+    }
+  }
 }
 
 async function testRefreshToken() {
@@ -265,6 +292,7 @@ async function runAllTests() {
     await test('Save Onboarding Answers + Landmark + Analysis', testSaveOnboardingAnswers);
     await test('Get Onboarding State', testGetOnboardingState);
     await test('User Signup', testUserSignup);
+    await test('Get User Landmarks After Signup', testGetUserLandmarksAfterSignup);
     await test('Refresh Token', testRefreshToken);
     await test('User Logout', testLogout);
     await test('Invalid Requests', testInvalidRequests);
@@ -280,9 +308,9 @@ async function runAllTests() {
 async function checkServer() {
   try {
     await makeRequest('GET', '/health');
-    log('✅ Server is running', 'green');
+    log('Server is running', 'green');
   } catch (error) {
-    log('❌ Server is not running. Please start the server with: npm run dev', 'red');
+    log('Server is not running. Please start the server with: npm run dev', 'red');
     process.exit(1);
   }
 }
