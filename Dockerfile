@@ -7,9 +7,9 @@ FROM node:18-slim AS backend-builder
 
 WORKDIR /app/backend
 
-# Install dependencies
+# Install dependencies (including devDependencies for build)
 COPY skintel-backend/package*.json ./
-RUN npm ci --omit=dev
+RUN npm ci
 
 # Copy backend source and build
 COPY skintel-backend/ ./
