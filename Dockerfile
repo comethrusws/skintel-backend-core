@@ -1,17 +1,23 @@
+# ============================
 # Multi-stage build for Express + FastAPI services
+# ============================
 
-# Stage 1: Build Node.js backend
-FROM node:18-slim as backend-builder
+# ---------- Stage 1: Build Node.js backend ----------
+FROM node:18-slim AS backend-builder
 
 WORKDIR /app/backend
-COPY skintel-backend/package*.json ./
-RUN npm ci --only=production
 
+# Install dependencies
+COPY skintel-backend/package*.json ./
+RUN npm ci --omit=dev
+
+# Copy backend source and build
 COPY skintel-backend/ ./
 RUN npm run build
 
-# Stage 2: Build Python environment for FastAPI
-FROM python:3.11-slim as python-base
+
+# ---------- Stage 2: Build Python environment for FastAPI ----------
+FROM python:3.11-slim AS python-base
 
 # Install system dependencies for dlib and OpenCV
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -22,18 +28,23 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     ca-certificates \
     libopenblas-dev \
-    libatlas-base-dev \
     liblapack-dev \
     libx11-dev \
     libgtk-3-dev \
     libboost-all-dev \
     supervisor \
-    && rm -rf /var/lib/apt/lists/*
+ && rm -rf /var/lib/apt/lists/*
 
-# Stage 3: Final runtime image
-FROM python-base as runtime
+
+# ---------- Stage 3: Final runtime image ----------
+FROM python-base AS runtime
 
 WORKDIR /app
+
+# Install Node.js runtime first
+RUN curl -fsSL https://deb.nodesource.com/setup_18.x | bash - && \
+    apt-get install -y nodejs && \
+    rm -rf /var/lib/apt/lists/*
 
 # Copy Python requirements and install
 COPY skintel-facial-landmarks/requirements.txt /app/landmarks/
@@ -52,26 +63,45 @@ COPY --from=backend-builder /app/backend/dist /app/backend/dist
 COPY --from=backend-builder /app/backend/package*.json /app/backend/
 COPY skintel-backend/prisma /app/backend/prisma
 
-# Install Node.js runtime
-RUN curl -fsSL https://deb.nodesource.com/setup_18.x | bash - && \
-    apt-get install -y nodejs
-
 # Create supervisor config
-COPY docker/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
+RUN mkdir -p /etc/supervisor/conf.d
+COPY <<EOF /etc/supervisor/conf.d/supervisord.conf
+[supervisord]
+nodaemon=true
+user=root
+logfile=/var/log/supervisor/supervisord.log
+pidfile=/var/run/supervisord.pid
 
-# Environment variables
+[program:express-backend]
+command=node dist/index.js
+directory=/app/backend
+autostart=true
+autorestart=true
+stderr_logfile=/var/log/supervisor/express.err.log
+stdout_logfile=/var/log/supervisor/express.out.log
+environment=NODE_ENV=production,PORT=3000
+
+[program:fastapi-landmarks]
+command=uvicorn main:app --host 0.0.0.0 --port 8000
+directory=/app/landmarks
+autostart=true
+autorestart=true
+stderr_logfile=/var/log/supervisor/fastapi.err.log
+stdout_logfile=/var/log/supervisor/fastapi.out.log
+EOF
+
+# ---------- Environment variables ----------
 ENV NODE_ENV=production
 ENV PORT=3000
 ENV LANDMARK_URL=http://localhost:8000
-ENV DATABASE_URL="postgresql://postgres:password@host.docker.internal:5432/skintel_db"
-ENV JWT_SECRET=your-super-secret-jwt-key-change-this-in-production
+# DATABASE_URL should be provided at runtime via environment variable
+# ENV DATABASE_URL will be set when running the container
 
-# Expose ports
+# ---------- Ports and health check ----------
 EXPOSE 3000 8000
 
-# Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
   CMD curl -f http://localhost:3000/health && curl -f http://localhost:8000/health || exit 1
 
-# Start both services
+# ---------- Start both services ----------
 CMD ["/usr/bin/supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]
