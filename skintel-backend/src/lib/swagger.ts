@@ -16,6 +16,7 @@ const options = {
       { name: 'Landmarks', description: 'Facial landmarks retrieval' },
       { name: 'Products', description: 'Skincare product identification and management' },
       { name: 'Analysis', description: 'Skin analysis for face images' },
+      { name: 'Upload', description: 'Image upload to s3' },
     ],
     servers: [
       {
