@@ -43,6 +43,7 @@ model User {
   answers           OnboardingAnswer[]
   onboardingSession OnboardingSession?
   facialLandmarks   FacialLandmarks[]
+  products          Product[]
 
   @@unique([ssoProvider, ssoId])
   @@map("users")
@@ -120,6 +121,19 @@ model FacialLandmarks {
   user   User?            @relation(fields: [userId], references: [userId], onDelete: Cascade)
 
   @@map("facial_landmarks")
+}
+
+model Product {
+  id          String   @id @default(cuid())
+  userId      String   @map("user_id")
+  imageUrl    String   @map("image_url")
+  productData Json     @map("product_data") // AI analysis results
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [userId], onDelete: Cascade)
+
+  @@map("products")
 }
 
 enum AnswerType {

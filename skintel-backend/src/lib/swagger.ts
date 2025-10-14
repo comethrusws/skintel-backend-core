@@ -14,6 +14,7 @@ const options = {
       { name: 'Sessions', description: 'Anonymous session management' },
       { name: 'Onboarding', description: 'Onboarding flow and answers' },
       { name: 'Landmarks', description: 'Facial landmarks retrieval' },
+      { name: 'Products', description: 'Skincare product identification and management' },
       { name: 'Analysis', description: 'Skin analysis for face images' },
     ],
     servers: [
