@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
-import { verifySessionToken, verifyAccessToken } from '../utils/auth';
+import { verifySessionToken, verifyAccessToken, verifyPassword } from '../utils/auth';
 import { prisma } from '../lib/prisma';
 
 export interface AuthenticatedRequest extends Request {
@@ -38,22 +38,64 @@ export const authenticateSession = async (req: AuthenticatedRequest, res: Respon
   }
 };
 
-export const authenticateUser = (req: AuthenticatedRequest, res: Response, next: NextFunction): void => {
-  const authHeader = req.headers.authorization;
-  
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    res.status(401).json({ error: 'Access token required' });
-    return;
-  }
+export const authenticateUser = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const authHeader = req.headers.authorization;
+    
+    if (!authHeader) {
+      res.status(401).json({ error: 'Authorization header required' });
+      return;
+    }
 
-  const token = authHeader.slice(7);
-  const decoded = verifyAccessToken(token);
-  
-  if (!decoded) {
-    res.status(401).json({ error: 'Invalid access token' });
-    return;
-  }
+    // Handle Bearer token authentication
+    if (authHeader.startsWith('Bearer ')) {
+      const token = authHeader.slice(7);
+      const decoded = verifyAccessToken(token);
+      
+      if (!decoded) {
+        res.status(401).json({ error: 'Invalid access token' });
+        return;
+      }
 
-  req.userId = decoded.userId;
-  next();
+      req.userId = decoded.userId;
+      next();
+      return;
+    }
+
+    // Handle Basic authentication
+    if (authHeader.startsWith('Basic ')) {
+      const base64Credentials = authHeader.slice(6);
+      const credentials = Buffer.from(base64Credentials, 'base64').toString('ascii');
+      const [email, password] = credentials.split(':');
+
+      if (!email || !password) {
+        res.status(401).json({ error: 'Invalid Basic auth credentials' });
+        return;
+      }
+
+      const user = await prisma.user.findUnique({
+        where: { email },
+      });
+
+      if (!user || !user.passwordHash) {
+        res.status(401).json({ error: 'Invalid credentials' });
+        return;
+      }
+
+      const isValidPassword = await verifyPassword(password, user.passwordHash);
+      if (!isValidPassword) {
+        res.status(401).json({ error: 'Invalid credentials' });
+        return;
+      }
+
+      req.userId = user.userId;
+      next();
+      return;
+    }
+
+    res.status(401).json({ error: 'Unsupported authorization method' });
+  } catch (error) {
+    console.error('Authentication error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
 };

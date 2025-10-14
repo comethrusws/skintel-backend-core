@@ -22,6 +22,7 @@ const productParamsSchema = z.object({
  *     tags: [Products]
  *     security:
  *       - BearerAuth: []
+ *       - BasicAuth: []
  *     requestBody:
  *       required: true
  *       content:
@@ -59,6 +60,7 @@ const productParamsSchema = z.object({
  *     tags: [Products]
  *     security:
  *       - BearerAuth: []
+ *       - BasicAuth: []
  *     responses:
  *       200:
  *         description: Products retrieved successfully
@@ -149,6 +151,7 @@ router.get('/', authenticateUser, async (req: AuthenticatedRequest, res: Respons
  *     tags: [Products]
  *     security:
  *       - BearerAuth: []
+ *       - BasicAuth: []
  *     parameters:
  *       - in: path
  *         name: productId
@@ -169,6 +172,7 @@ router.get('/', authenticateUser, async (req: AuthenticatedRequest, res: Respons
  *     tags: [Products]
  *     security:
  *       - BearerAuth: []
+ *       - BasicAuth: []
  *     parameters:
  *       - in: path
  *         name: productId
