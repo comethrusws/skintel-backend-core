@@ -46,7 +46,7 @@ export async function analyzeProduct(imageUrl: string): Promise<object> {
       {
         role: 'user',
         content: [
-          { type: 'text', text: 'Please analyze this skincare product image and extract all relevant information.' },
+          { type: 'text', text: 'Please analyze this skincare product image and extract all relevant information. Return your response as valid JSON.' },
           { type: 'image_url', image_url: { url: imageUrl } }
         ]
       }
