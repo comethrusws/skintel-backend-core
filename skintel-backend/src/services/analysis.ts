@@ -1,6 +1,7 @@
 import { prisma } from '../lib/prisma';
 import type { Prisma } from '../generated/prisma';
 import OpenAI from 'openai';
+import { maybePresignUrl } from '../lib/s3';
 
 const OPENAI_MODEL = process.env.OPENAI_MODEL || 'gpt-4o-mini';
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
@@ -56,6 +57,7 @@ export async function analyzeSkin(answerId: string) {
   if (!imageUrl) {
     throw new Error('Image URL/ID not found on answer value');
   }
+  const urlForOpenAI = await maybePresignUrl(imageUrl, 300);
   const landmarks = record.landmarks as unknown as object;
 
   const prompt = buildPrompt();
@@ -68,7 +70,7 @@ export async function analyzeSkin(answerId: string) {
         role: 'user',
         content: [
           { type: 'text', text: 'Here is the face image and the landmarks JSON.' },
-          { type: 'image_url', image_url: { url: imageUrl } },
+          { type: 'image_url', image_url: { url: urlForOpenAI } },
           { type: 'text', text: JSON.stringify(landmarks) }
         ]
       }
@@ -104,6 +106,7 @@ export async function analyzeWithLandmarks(imageUrl: string, landmarks: object) 
   }
 
   const prompt = buildPrompt();
+  const urlForOpenAI = await maybePresignUrl(imageUrl, 300);
 
   const completion = await openai.chat.completions.create({
     model: OPENAI_MODEL,
@@ -113,7 +116,7 @@ export async function analyzeWithLandmarks(imageUrl: string, landmarks: object) 
         role: 'user',
         content: [
           { type: 'text', text: 'Here is the face image and the landmarks JSON.' },
-          { type: 'image_url', image_url: { url: imageUrl } },
+          { type: 'image_url', image_url: { url: urlForOpenAI } },
           { type: 'text', text: JSON.stringify(landmarks) }
         ]
       }

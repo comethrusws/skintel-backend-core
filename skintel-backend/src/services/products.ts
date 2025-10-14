@@ -1,6 +1,7 @@
 import { prisma } from '../lib/prisma';
 import type { Prisma } from '../generated/prisma';
 import OpenAI from 'openai';
+import { maybePresignUrl } from '../lib/s3';
 
 const OPENAI_MODEL = process.env.OPENAI_MODEL || 'gpt-4o-mini';
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
@@ -16,6 +17,7 @@ function buildProductAnalysisPrompt(): string {
     '4. Identify the skin concerns this product targets\n' +
     '5. Provide usage instructions if visible\n' +
     '6. Note any warnings or special instructions\n' +
+    '7. If the product image is in another landuage, translate it to English\n' +
     '\n' +
     'Example output:\n' +
     '{\n' +
@@ -38,6 +40,7 @@ export async function analyzeProduct(imageUrl: string): Promise<object> {
   }
 
   const prompt = buildProductAnalysisPrompt();
+  const urlForOpenAI = await maybePresignUrl(imageUrl, 300);
 
   const completion = await openai.chat.completions.create({
     model: OPENAI_MODEL,
@@ -47,7 +50,7 @@ export async function analyzeProduct(imageUrl: string): Promise<object> {
         role: 'user',
         content: [
           { type: 'text', text: 'Please analyze this skincare product image and extract all relevant information. Return your response as valid JSON.' },
-          { type: 'image_url', image_url: { url: imageUrl } }
+          { type: 'image_url', image_url: { url: urlForOpenAI } }
         ]
       }
     ],
