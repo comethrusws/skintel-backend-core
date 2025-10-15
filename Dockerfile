@@ -6,7 +6,7 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-# Install system dependencies
+# Install system dependencies (including OpenGL for OpenCV)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     wget \
@@ -21,6 +21,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libsm6 \
     libxext6 \
     libxrender-dev \
+    libgl1-mesa-glx \
+    libglib2.0-0 \
+    libfontconfig1 \
+    libxcb1 \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Node.js
@@ -46,25 +50,21 @@ WORKDIR /app/backend
 COPY skintel-backend/package*.json ./
 RUN npm ci
 
-# Copy backend source and build
-COPY skintel-backend/ ./
-RUN npx prisma generate && npm run build
+# Copy backend source and build (including prisma schema first)
+COPY skintel-backend/prisma ./prisma/
+RUN npx prisma generate
 
-# Create startup script
-WORKDIR /app
-RUN echo '#!/bin/bash' > /app/start.sh && \
-    echo 'echo "Starting FastAPI landmarks service..."' >> /app/start.sh && \
-    echo 'cd /app/landmarks && python -m uvicorn main:app --host 0.0.0.0 --port 8000 &' >> /app/start.sh && \
-    echo 'FASTAPI_PID=$!' >> /app/start.sh && \
-    echo 'echo "FastAPI started with PID $FASTAPI_PID"' >> /app/start.sh && \
-    echo 'echo "Waiting for FastAPI to be ready..."' >> /app/start.sh && \
-    echo 'sleep 5' >> /app/start.sh && \
-    echo 'echo "Starting Express backend..."' >> /app/start.sh && \
-    echo 'cd /app/backend && node dist/index.js &' >> /app/start.sh && \
-    echo 'EXPRESS_PID=$!' >> /app/start.sh && \
-    echo 'echo "Express started with PID $EXPRESS_PID"' >> /app/start.sh && \
-    echo 'wait $EXPRESS_PID' >> /app/start.sh && \
-    chmod +x /app/start.sh
+# Copy the rest of the backend source
+COPY skintel-backend/ ./
+RUN npm run build
+
+# Ensure generated Prisma files are in the right place
+RUN cp -r node_modules/.prisma dist/ && \
+    cp -r prisma/generated dist/ 2>/dev/null || true
+
+# Copy startup script
+COPY start.sh /app/start.sh
+RUN chmod +x /app/start.sh
 
 # Environment variables
 ENV NODE_ENV=production
