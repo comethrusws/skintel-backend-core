@@ -71,39 +71,28 @@
     # Create supervisor config directory and logs
     RUN mkdir -p /etc/supervisor/conf.d /var/log/supervisor
     
-    # Create startup script with environment variables
-    COPY <<'SCRIPT' /app/start.sh
-    #!/bin/bash
-    set -e
-    
-    # Generate supervisor config with environment variables passed through
-    cat > /etc/supervisor/conf.d/supervisord.conf << 'EOF'
-    [supervisord]
-    nodaemon=true
-    user=root
-    logfile=/var/log/supervisor/supervisord.log
-    pidfile=/var/run/supervisord.pid
-    
-    [program:express-backend]
-    command=bash -c "cd /app/backend && node dist/index.js"
-    autostart=true
-    autorestart=true
-    stderr_logfile=/var/log/supervisor/express.err.log
-    stdout_logfile=/var/log/supervisor/express.out.log
-    
-    [program:fastapi-landmarks]
-    command=bash -c "cd /app/landmarks && uvicorn main:app --host 0.0.0.0 --port 8000"
-    autostart=true
-    autorestart=true
-    stderr_logfile=/var/log/supervisor/fastapi.err.log
-    stdout_logfile=/var/log/supervisor/fastapi.out.log
-    EOF
-    
-    # Start supervisord
-    exec /usr/bin/supervisord -c /etc/supervisor/conf.d/supervisord.conf
-    SCRIPT
-    
-    RUN chmod +x /app/start.sh
+    # Create supervisor config that will use environment variables
+    RUN echo '[supervisord]' > /etc/supervisor/conf.d/supervisord.conf && \
+        echo 'nodaemon=true' >> /etc/supervisor/conf.d/supervisord.conf && \
+        echo 'user=root' >> /etc/supervisor/conf.d/supervisord.conf && \
+        echo 'logfile=/var/log/supervisor/supervisord.log' >> /etc/supervisor/conf.d/supervisord.conf && \
+        echo 'pidfile=/var/run/supervisord.pid' >> /etc/supervisor/conf.d/supervisord.conf && \
+        echo '' >> /etc/supervisor/conf.d/supervisord.conf && \
+        echo '[program:express-backend]' >> /etc/supervisor/conf.d/supervisord.conf && \
+        echo 'command=bash -c "cd /app/backend && node dist/index.js"' >> /etc/supervisor/conf.d/supervisord.conf && \
+        echo 'directory=/app/backend' >> /etc/supervisor/conf.d/supervisord.conf && \
+        echo 'autostart=true' >> /etc/supervisor/conf.d/supervisord.conf && \
+        echo 'autorestart=true' >> /etc/supervisor/conf.d/supervisord.conf && \
+        echo 'stderr_logfile=/var/log/supervisor/express.err.log' >> /etc/supervisor/conf.d/supervisord.conf && \
+        echo 'stdout_logfile=/var/log/supervisor/express.out.log' >> /etc/supervisor/conf.d/supervisord.conf && \
+        echo '' >> /etc/supervisor/conf.d/supervisord.conf && \
+        echo '[program:fastapi-landmarks]' >> /etc/supervisor/conf.d/supervisord.conf && \
+        echo 'command=bash -c "cd /app/landmarks && uvicorn main:app --host 0.0.0.0 --port 8000"' >> /etc/supervisor/conf.d/supervisord.conf && \
+        echo 'directory=/app/landmarks' >> /etc/supervisor/conf.d/supervisord.conf && \
+        echo 'autostart=true' >> /etc/supervisor/conf.d/supervisord.conf && \
+        echo 'autorestart=true' >> /etc/supervisor/conf.d/supervisord.conf && \
+        echo 'stderr_logfile=/var/log/supervisor/fastapi.err.log' >> /etc/supervisor/conf.d/supervisord.conf && \
+        echo 'stdout_logfile=/var/log/supervisor/fastapi.out.log' >> /etc/supervisor/conf.d/supervisord.conf
     
     # ---------- Environment variables ----------
     ENV NODE_ENV=production
@@ -117,4 +106,4 @@
       CMD curl -f http://localhost:3000/health && curl -f http://localhost:8000/health || exit 1
     
     # ---------- Start both services ----------
-    CMD ["/app/start.sh"]
+    CMD ["/usr/bin/supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]
