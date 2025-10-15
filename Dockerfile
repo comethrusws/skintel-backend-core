@@ -20,19 +20,15 @@ RUN npm run build
 # ---------- Stage 2: Build Python environment for FastAPI ----------
 FROM python:3.11-slim AS python-base
 
-# Install system dependencies for dlib and OpenCV
+# Install runtime libs for OpenCV and system tools (no build chain needed for prebuilt wheels)
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential \
-    cmake \
-    pkg-config \
     wget \
     curl \
     ca-certificates \
-    libopenblas-dev \
-    liblapack-dev \
-    libx11-dev \
-    libgtk-3-dev \
-    libboost-all-dev \
+    libopenblas0 \
+    liblapack3 \
+    libx11-6 \
+    libgtk-3-0 \
     supervisor \
  && rm -rf /var/lib/apt/lists/*
 
@@ -49,8 +45,12 @@ RUN curl -fsSL https://deb.nodesource.com/setup_18.x | bash - && \
 
 # Copy Python requirements and install
 COPY skintel-facial-landmarks/requirements.txt /app/landmarks/
+# Install prebuilt dlib wheel first to avoid compiling from source
+COPY skintel-facial-landmarks/dlib-*.whl /tmp/dlib.whl
 RUN pip install --upgrade pip setuptools wheel && \
-    pip install -r /app/landmarks/requirements.txt
+    pip install /tmp/dlib.whl && \
+    pip install -r /app/landmarks/requirements.txt && \
+    rm -f /tmp/dlib.whl
 
 # Copy FastAPI service files
 COPY skintel-facial-landmarks/ /app/landmarks/
