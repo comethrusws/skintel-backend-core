@@ -2,7 +2,7 @@
 # Simplified build for Express + FastAPI services
 # ============================
 
-FROM python:3.11-slim
+FROM python:3.12-slim
 
 WORKDIR /app
 
@@ -21,10 +21,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libsm6 \
     libxext6 \
     libxrender-dev \
-    libgl1-mesa-glx \
+    libgl1-mesa-dri \
     libglib2.0-0 \
     libfontconfig1 \
     libxcb1 \
+    libgomp1 \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Node.js
@@ -34,11 +35,11 @@ RUN curl -fsSL https://deb.nodesource.com/setup_18.x | bash - && \
 
 # Copy and install Python dependencies first (better caching)
 COPY skintel-facial-landmarks/requirements.txt /app/landmarks/requirements.txt
-COPY dlib-20.0.99-cp311-cp311-manylinux2014_x86_64.manylinux_2_17_x86_64.whl /tmp/
+COPY dlib-20.0.99-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.whl /tmp/
 RUN pip install --upgrade pip setuptools wheel && \
-    pip install /tmp/dlib-20.0.99-cp311-cp311-manylinux2014_x86_64.manylinux_2_17_x86_64.whl && \
+    pip install /tmp/dlib-20.0.99-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.whl && \
     pip install -r /app/landmarks/requirements.txt && \
-    rm -f /tmp/dlib-20.0.99-cp311-cp311-manylinux2014_x86_64.manylinux_2_17_x86_64.whl
+    rm -f /tmp/dlib-20.0.99-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.whl
 
 # Copy FastAPI service
 COPY skintel-facial-landmarks/ /app/landmarks/
