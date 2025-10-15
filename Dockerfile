@@ -6,7 +6,7 @@ FROM python:3.12-slim
 
 WORKDIR /app
 
-# Install system dependencies (including OpenGL for OpenCV)
+# Install minimal system dependencies (no OpenGL needed for headless)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     wget \
@@ -16,15 +16,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     pkg-config \
     libopenblas-dev \
     liblapack-dev \
-    libx11-6 \
-    libgtk-3-0 \
-    libsm6 \
-    libxext6 \
-    libxrender-dev \
-    libgl1-mesa-dri \
-    libglib2.0-0 \
-    libfontconfig1 \
-    libxcb1 \
     libgomp1 \
     && rm -rf /var/lib/apt/lists/*
 
@@ -33,8 +24,8 @@ RUN curl -fsSL https://deb.nodesource.com/setup_18.x | bash - && \
     apt-get install -y nodejs && \
     rm -rf /var/lib/apt/lists/*
 
-# Copy and install Python dependencies first (better caching)
-COPY skintel-facial-landmarks/requirements.txt /app/landmarks/requirements.txt
+# Copy Docker-specific requirements and install Python dependencies
+COPY requirements-docker.txt /app/landmarks/requirements.txt
 COPY dlib-20.0.99-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.whl /tmp/
 RUN pip install --upgrade pip setuptools wheel && \
     pip install /tmp/dlib-20.0.99-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.whl && \
@@ -51,7 +42,7 @@ WORKDIR /app/backend
 COPY skintel-backend/package*.json ./
 RUN npm ci
 
-# Copy backend source and build (including prisma schema first)
+# Copy Prisma schema and generate client
 COPY skintel-backend/prisma ./prisma/
 RUN npx prisma generate
 
@@ -59,9 +50,16 @@ RUN npx prisma generate
 COPY skintel-backend/ ./
 RUN npm run build
 
-# Ensure generated Prisma files are in the right place
-RUN cp -r node_modules/.prisma dist/ && \
-    cp -r prisma/generated dist/ 2>/dev/null || true
+# Debug: Check where Prisma generated files are
+RUN echo "=== Prisma file locations ===" && \
+    find /app/backend -name "*prisma*" -type f | head -20 && \
+    find /app/backend -name "generated" -type d | head -10 && \
+    ls -la /app/backend/node_modules/.prisma/client/ || true
+
+# Copy Prisma generated files to the correct location in dist
+RUN mkdir -p /app/backend/dist/generated/prisma && \
+    cp -r /app/backend/node_modules/.prisma/client/* /app/backend/dist/generated/prisma/ 2>/dev/null || \
+    cp -r /app/backend/generated/prisma/* /app/backend/dist/generated/prisma/ 2>/dev/null || true
 
 # Copy startup script
 COPY start.sh /app/start.sh
