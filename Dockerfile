@@ -46,11 +46,11 @@ RUN curl -fsSL https://deb.nodesource.com/setup_18.x | bash - && \
 # Copy Python requirements and install
 COPY skintel-facial-landmarks/requirements.txt /app/landmarks/
 # Install prebuilt dlib wheel first to avoid compiling from source
-COPY skintel-facial-landmarks/dlib-*.whl /tmp/dlib.whl
+COPY dlib-20.0.99-cp311-cp311-manylinux2014_x86_64.manylinux_2_17_x86_64.whl /tmp/
 RUN pip install --upgrade pip setuptools wheel && \
-    pip install /tmp/dlib.whl && \
+    pip install /tmp/dlib-20.0.99-cp311-cp311-manylinux2014_x86_64.manylinux_2_17_x86_64.whl && \
     pip install -r /app/landmarks/requirements.txt && \
-    rm -f /tmp/dlib.whl
+    rm -f /tmp/dlib-20.0.99-cp311-cp311-manylinux2014_x86_64.manylinux_2_17_x86_64.whl
 
 # Copy FastAPI service files
 COPY skintel-facial-landmarks/ /app/landmarks/
