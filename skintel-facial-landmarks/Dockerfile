@@ -6,7 +6,7 @@ COPY requirements.txt .
 
 # Install dlib wheel first, then other requirements
 COPY dlib-20.0.99-cp310-cp310-manylinux2014_x86_64.manylinux_2_17_x86_64.whl .
-RUN pip install dlib-20.0.99-cp310-cp310-manylinux2014_x86_64.manylinux_2_17_x86_64.whl
+RUN pip install dlib-20.0.99-cp312-cp312-manylinux2014_aarch64.manylinux_2_17_aarch64.whl
 
 RUN pip install -r requirements.txt
 
