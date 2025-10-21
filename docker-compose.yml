@@ -1,0 +1,57 @@
+services:
+  skintel-backend:
+    build:
+      context: skintel-backend
+      dockerfile: Dockerfile
+    ports:
+      - 3000:3000
+    environment:
+      - NODE_ENV=development
+      - PORT=3000
+      - JWT_SECRET=your-super-secret-jwt-key-change-this-in-production
+      - DATABASE_URL=postgresql://postgres:password@skintel-database:5432/skintel_db
+      - OPENAI_API_KEY=your-openai-api-key
+      - FACIAL_LANDMARKS_URL=http://skintel-facial-landmarks:8000
+    depends_on:
+      skintel-database:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+
+  migrate:
+    build:
+      context: skintel-backend
+      dockerfile: Dockerfile.migrate
+    environment:
+      - NODE_ENV=development
+      - DATABASE_URL=postgresql://postgres:password@skintel-database:5432/skintel_db
+    depends_on:
+      skintel-database:
+        condition: service_healthy
+
+  skintel-facial-landmarks:
+    build:
+      context: skintel-facial-landmarks
+      dockerfile: Dockerfile
+    ports:
+      - 8000:8000
+    environment:
+      - PYTHONPATH=/app
+    depends_on:
+      skintel-database:
+        condition: service_healthy
+    restart: unless-stopped
+
+  skintel-database:
+    image: postgres:16
+    ports:
+      - 5430:5432
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=password
+      - POSTGRES_DB=skintel_db
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5

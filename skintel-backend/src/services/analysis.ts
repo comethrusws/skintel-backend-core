@@ -1,5 +1,5 @@
 import { prisma } from '../lib/prisma';
-import type { Prisma } from '../generated/prisma';
+import type { Prisma } from '@prisma/client';
 import OpenAI from 'openai';
 import { maybePresignUrl } from '../lib/s3';
 
@@ -133,4 +133,3 @@ export async function analyzeWithLandmarks(imageUrl: string, landmarks: object) 
     return { raw: content };
   }
 }
-

@@ -1,11 +1,11 @@
 import { LandmarkResponse, LandmarkProcessingResult } from '../types';
 import { maybePresignUrl } from '../lib/s3';
-import type { Prisma } from '../generated/prisma';
+import type { Prisma } from '@prisma/client';
 import { analyzeSkin, analyzeWithLandmarks } from './analysis';
 
 const LANDMARK_SERVICE_URL = process.env.LANDMARK_URL || 'http://localhost:8000';
 const LANDMARK_ENDPOINT = '/api/v1/landmarks';
-const REQUEST_TIMEOUT = 30000; 
+const REQUEST_TIMEOUT = 30000;
 
 /**
  * convert image_id to accessible URL (temp)
@@ -27,12 +27,12 @@ export async function processLandmarks(imageId: string): Promise<LandmarkProcess
     const imageUrl = getImageUrl(imageId);
     const presignedUrl = await maybePresignUrl(imageUrl, 300);
     const url = `${LANDMARK_SERVICE_URL}${LANDMARK_ENDPOINT}`;
-    
+
     console.log(`Processing landmarks for image: ${imageId} at ${url}`);
-    
+
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT);
-    
+
     const response = await fetch(url, {
       method: 'POST',
       headers: {
@@ -43,28 +43,28 @@ export async function processLandmarks(imageId: string): Promise<LandmarkProcess
       }),
       signal: controller.signal
     });
-    
+
     clearTimeout(timeoutId);
-    
+
     if (!response.ok) {
       const errorText = await response.text();
       throw new Error(`Landmark service returned ${response.status}: ${errorText}`);
     }
-    
+
     const data: LandmarkResponse = await response.json();
-    
+
     if (data.status !== 'success') {
       throw new Error(`Landmark processing failed: ${data.error || 'Unknown error'}`);
     }
-    
+
     return {
       success: true,
       data
     };
-    
+
   } catch (error) {
     console.error('Landmark processing error:', error);
-    
+
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error occurred'
@@ -77,9 +77,9 @@ export async function processLandmarks(imageId: string): Promise<LandmarkProcess
  */
 export async function processLandmarksAsync(answerId: string, imageId: string): Promise<void> {
   const { prisma } = await import('../lib/prisma');
-  
+
   let answer: { userId: string | null; sessionId: string | null } | null = null;
-  
+
   try {
     answer = await prisma.onboardingAnswer.findUnique({
       where: { answerId },
@@ -100,9 +100,9 @@ export async function processLandmarksAsync(answerId: string, imageId: string): 
         status: 'PROCESSING'
       }
     });
-    
+
     const result = await processLandmarks(imageId);
-    
+
     if (result.success && result.data) {
       await prisma.facialLandmarks.update({
         where: { answerId },
@@ -112,7 +112,7 @@ export async function processLandmarksAsync(answerId: string, imageId: string): 
           processedAt: new Date()
         }
       });
-      
+
       console.log(`Landmarks processed successfully for answer: ${answerId}`);
 
       try {
@@ -140,13 +140,13 @@ export async function processLandmarksAsync(answerId: string, imageId: string): 
           processedAt: new Date()
         }
       });
-      
+
       console.error(`landmark processing failed for answer: ${answerId}, error: ${result.error}`);
     }
-    
+
   } catch (error) {
     console.error('Error in async landmark processing:', error);
-    
+
     try {
       await prisma.facialLandmarks.upsert({
         where: { answerId },
@@ -270,9 +270,9 @@ export async function processLandmarksForAnswerWithUrl(answerId: string, imageUr
  */
 export async function getUserLandmarks(userId: string) {
   const { prisma } = await import('../lib/prisma');
-  
+
   return await prisma.facialLandmarks.findMany({
-    where: { 
+    where: {
       userId,
       status: 'COMPLETED'
     },

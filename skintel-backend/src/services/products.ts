@@ -1,5 +1,5 @@
 import { prisma } from '../lib/prisma';
-import type { Prisma } from '../generated/prisma';
+import type { Prisma } from '@prisma/client';
 import OpenAI from 'openai';
 import { maybePresignUrl } from '../lib/s3';
 
@@ -100,9 +100,9 @@ export async function getUserProducts(userId: string) {
 
 export async function getProductById(productId: string, userId: string) {
   return await prisma.product.findFirst({
-    where: { 
+    where: {
       id: productId,
-      userId 
+      userId
     },
     select: {
       id: true,
@@ -117,9 +117,9 @@ export async function getProductById(productId: string, userId: string) {
 export async function deleteProduct(productId: string, userId: string): Promise<boolean> {
   try {
     await prisma.product.deleteMany({
-      where: { 
+      where: {
         id: productId,
-        userId 
+        userId
       },
     });
     return true;
