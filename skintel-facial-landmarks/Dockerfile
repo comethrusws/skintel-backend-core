@@ -1,14 +1,31 @@
-FROM python:3.12-alpine
+FROM python:3.11-alpine
+
+# Install build dependencies for dlib and other packages
+RUN apk add --no-cache \
+    build-base \
+    cmake \
+    gcc \
+    g++ \
+    make \
+    libffi-dev \
+    openssl-dev \
+    libjpeg-turbo-dev \
+    zlib-dev \
+    freetype-dev \
+    lcms2-dev \
+    openjpeg-dev \
+    tiff-dev \
+    tk-dev \
+    tcl-dev
 
 WORKDIR /app
 
+# Upgrade pip and install setuptools first
+RUN pip install --upgrade pip setuptools wheel
+
 COPY requirements.txt .
 
-# Install dlib wheel first, then other requirements
-COPY dlib-20.0.99-cp310-cp310-manylinux2014_x86_64.manylinux_2_17_x86_64.whl .
-RUN pip install dlib-20.0.99-cp312-cp312-manylinux2014_aarch64.manylinux_2_17_aarch64.whl
-
-RUN pip install -r requirements.txt
+RUN pip install -vr requirements.txt
 
 COPY . .
 
