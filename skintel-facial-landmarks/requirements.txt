@@ -9,5 +9,5 @@ python-multipart==0.0.6
 python-jose[cryptography]==3.3.0
 pydantic==2.5.0
 requests==2.31.0
-# dlib - use standard package with pre-built wheels on Debian
-dlib==20.0.0
+# dlib - use pre-built binary package
+dlib-bin

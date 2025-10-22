@@ -24,7 +24,7 @@ COPY requirements.txt .
 RUN pip install --only-binary=all numpy==1.24.3
 RUN pip install --only-binary=all opencv-python==4.8.1.78
 RUN pip install --only-binary=all Pillow==10.0.1
-RUN pip install --only-binary=all dlib==20.0.0
+RUN pip install --only-binary=all dlib-bin
 RUN pip install -r requirements.txt
 
 COPY . .
