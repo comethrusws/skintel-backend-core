@@ -43,12 +43,17 @@ export const QUESTION_TYPES = {
 // Specific valid values for each question
 export const VALID_VALUES = {
   q_skin_concerns: [
-    'Acne', 'acne', 'Dark Spots', 'dark_spots', 'wrinkles', 'fine_lines', 'dryness', 'oiliness',
+    'acne', 'Acne', 'dark_spots', 'Dark Spots', 'wrinkles', 'fine_lines', 'dryness', 'oiliness',
     'large_pores', 'uneven_texture', 'redness', 'sensitivity', 'dullness',
     'hyperpigmentation', 'blackheads', 'whiteheads', 'scarring'
   ],
-  q_skin_sensitivity: ['Very Sensitive', 'Very sensitive', 'Somewhat Sensitive', 'somewhat sensitive', 'Not Sensitive', 'not sensitive', 'Not Sure', 'not sure'],
-  q_skin_type: ['Oily', 'oily', 'Dry', 'dry', 'Combination', 'combination', 'Normal', 'normal'],
+  q_skin_sensitivity: [
+    'Very sensitive', 'Very Sensitive', 'somewhat sensitive', 'Somewhat Sensitive', 
+    'not sensitive', 'Not Sensitive', 'not sure', 'Not Sure'
+  ],
+  q_skin_type: [
+    'oily', 'Oily', 'dry', 'Dry', 'combination', 'Combination', 'normal', 'Normal'
+  ],
   q_goal: [
     'Healthy Glow', 'clear_skin', 'hydration', 'anti_aging', 'brightening', 'oil_control',
     'pore_minimizing', 'acne_treatment', 'even_skin_tone', 'sun_protection'
@@ -97,13 +102,14 @@ export const validateQuestionValue = (questionId: string, value: any): boolean =
       if (typeof value !== 'string') return false;
       const validValues = getValidValues(questionId);
       if (!validValues) return true;
+      // this is a case insentitive matching so less strict valdiation
       return validValues.some(v => 
         v.toLowerCase().replace(/[_\s]/g, '') === value.toLowerCase().replace(/[_\s]/g, '')
       );
     }
     case 'multi': {
       if (!Array.isArray(value)) return false;
-      if (value.length === 0) return true;
+      if (value.length === 0) return true; // Allow empty arrays
       const validValues = getValidValues(questionId);
       if (!validValues) return value.every(v => typeof v === 'string');
       return value.every(v => 
@@ -122,11 +128,10 @@ export const validateQuestionValue = (questionId: string, value: any): boolean =
     case 'image': {
       if (typeof value !== 'object' || value === null) return false;
       if (typeof (value as any).image_id === 'string') {
-        return true; // no more strict img_ prefix requirement
+        return (value as any).image_id.length > 0; // no more strict img_ requirement
       }
       if (typeof (value as any).image_url === 'string') {
         const url = (value as any).image_url;
-        // allow any valid URL format
         return url.startsWith('http://') || url.startsWith('https://') || url.startsWith('/');
       }
       return false;
@@ -135,7 +140,6 @@ export const validateQuestionValue = (questionId: string, value: any): boolean =
       return typeof value === 'boolean';
     }
     case 'derived': {
-      // Derived values are set by server, so we accept strings
       return typeof value === 'string';
     }
     default:
