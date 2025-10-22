@@ -43,14 +43,14 @@ export const QUESTION_TYPES = {
 // Specific valid values for each question
 export const VALID_VALUES = {
   q_skin_concerns: [
-    'acne', 'dark_spots', 'wrinkles', 'fine_lines', 'dryness', 'oiliness',
+    'Acne', 'acne', 'Dark Spots', 'dark_spots', 'wrinkles', 'fine_lines', 'dryness', 'oiliness',
     'large_pores', 'uneven_texture', 'redness', 'sensitivity', 'dullness',
     'hyperpigmentation', 'blackheads', 'whiteheads', 'scarring'
   ],
-  q_skin_sensitivity: ['Very sensitive', 'somewhat sensitive', 'not sensitive', 'not sure'],
-  q_skin_type: ['oily', 'dry', 'combination', 'normal'],
+  q_skin_sensitivity: ['Very Sensitive', 'Very sensitive', 'Somewhat Sensitive', 'somewhat sensitive', 'Not Sensitive', 'not sensitive', 'Not Sure', 'not sure'],
+  q_skin_type: ['Oily', 'oily', 'Dry', 'dry', 'Combination', 'combination', 'Normal', 'normal'],
   q_goal: [
-    'clear_skin', 'hydration', 'anti_aging', 'brightening', 'oil_control',
+    'Healthy Glow', 'clear_skin', 'hydration', 'anti_aging', 'brightening', 'oil_control',
     'pore_minimizing', 'acne_treatment', 'even_skin_tone', 'sun_protection'
   ],
   q_profile_gender: ['female', 'male', 'nonbinary', 'prefer_not_to_say'],
@@ -96,13 +96,21 @@ export const validateQuestionValue = (questionId: string, value: any): boolean =
     case 'single': {
       if (typeof value !== 'string') return false;
       const validValues = getValidValues(questionId);
-      return validValues ? validValues.includes(value) : true;
+      if (!validValues) return true;
+      return validValues.some(v => 
+        v.toLowerCase().replace(/[_\s]/g, '') === value.toLowerCase().replace(/[_\s]/g, '')
+      );
     }
     case 'multi': {
       if (!Array.isArray(value)) return false;
+      if (value.length === 0) return true;
       const validValues = getValidValues(questionId);
       if (!validValues) return value.every(v => typeof v === 'string');
-      return value.every(v => typeof v === 'string' && validValues.includes(v));
+      return value.every(v => 
+        typeof v === 'string' && validValues.some(vv => 
+          vv.toLowerCase().replace(/[_\s]/g, '') === v.toLowerCase().replace(/[_\s]/g, '')
+        )
+      );
     }
     case 'slider': {
       if (typeof value !== 'number') return false;
@@ -114,15 +122,12 @@ export const validateQuestionValue = (questionId: string, value: any): boolean =
     case 'image': {
       if (typeof value !== 'object' || value === null) return false;
       if (typeof (value as any).image_id === 'string') {
-        return (value as any).image_id.startsWith('img_');
+        return true; // no more strict img_ prefix requirement
       }
       if (typeof (value as any).image_url === 'string') {
-        try {
-          const u = new URL((value as any).image_url);
-          return u.protocol === 'http:' || u.protocol === 'https:';
-        } catch {
-          return false;
-        }
+        const url = (value as any).image_url;
+        // allow any valid URL format
+        return url.startsWith('http://') || url.startsWith('https://') || url.startsWith('/');
       }
       return false;
     }
