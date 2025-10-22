@@ -1,22 +1,17 @@
-FROM python:3.11-alpine
+FROM python:3.11-slim
 
-# Install build dependencies for dlib and other packages
-RUN apk add --no-cache \
-    build-base \
+# Install minimal system dependencies
+RUN apt-get update && apt-get install -y \
+    build-essential \
     cmake \
-    gcc \
-    g++ \
-    make \
-    libffi-dev \
-    openssl-dev \
-    libjpeg-turbo-dev \
-    zlib-dev \
-    freetype-dev \
-    lcms2-dev \
-    openjpeg-dev \
-    tiff-dev \
-    tk-dev \
-    tcl-dev
+    libjpeg-dev \
+    libpng-dev \
+    libtiff-dev \
+    libavcodec-dev \
+    libavformat-dev \
+    libswscale-dev \
+    pkg-config \
+    && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
@@ -25,7 +20,12 @@ RUN pip install --upgrade pip setuptools wheel
 
 COPY requirements.txt .
 
-RUN pip install -vr requirements.txt
+# Install packages in stages to use pre-built wheels where possible
+RUN pip install --only-binary=all numpy==1.24.3
+RUN pip install --only-binary=all opencv-python==4.8.1.78
+RUN pip install --only-binary=all Pillow==10.0.1
+RUN pip install --only-binary=all dlib==20.0.0
+RUN pip install -r requirements.txt
 
 COPY . .
 
