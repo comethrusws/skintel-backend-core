@@ -3,7 +3,8 @@ import { OnboardingAnswerValue } from '../types';
 import { 
   VALID_QUESTION_IDS, 
   validateQuestionValue, 
-  getExpectedType 
+  getExpectedType,
+  getValidValues
 } from '../utils/validation';
 
 export const deviceInfoSchema = z.object({
@@ -49,13 +50,27 @@ export const onboardingAnswerSchema = z.object({
     const expectedType = getExpectedType(data.question_id);
     return expectedType === data.type;
   },
-  { message: "Answer type doesn't match expected type for question_id" }
+  { 
+    message: "Answer type doesn't match expected type for question_id",
+    path: ["type"]
+  }
 ).refine(
   (data) => {
-    if (data.status === 'skipped') return true; // skipc validation for skipped questions
-    return validateQuestionValue(data.question_id, data.value);
+    if (data.status === 'skipped') return true;
+    const isValid = validateQuestionValue(data.question_id, data.value);
+    if (!isValid) {
+      console.log(`Validation failed for ${data.question_id}:`, {
+        value: data.value,
+        expectedType: getExpectedType(data.question_id),
+        validValues: getValidValues(data.question_id)
+      });
+    }
+    return isValid;
   },
-  { message: "Invalid value for question_id" }
+  { 
+    message: "Invalid value for question_id",
+    path: ["value"]
+  }
 );
 
 export const onboardingRequestSchema = z.object({
