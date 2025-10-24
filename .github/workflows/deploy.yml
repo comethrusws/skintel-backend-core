@@ -15,8 +15,9 @@ jobs:
 
       - name: Create and deploy archive
         run: |
-          # Create archive
-          tar --exclude-vcs --exclude='*.tar.gz' -czf skintel-backend-core.tar.gz .
+          # Create archive in /tmp, then move it
+          tar --exclude-vcs --exclude='*.tar.gz' -czf /tmp/skintel-backend-core.tar.gz .
+          mv /tmp/skintel-backend-core.tar.gz .
           
           # Upload to server
           scp -i <(echo "${{ secrets.SSH_KEY }}") -o StrictHostKeyChecking=no \
