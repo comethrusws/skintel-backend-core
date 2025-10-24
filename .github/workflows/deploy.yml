@@ -9,77 +9,28 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    env:
-      ARCHIVE_NAME: skintel-backend-core-${{ github.sha }}.tar.gz
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Create deployment archive
+      - name: Create and deploy archive
         run: |
-          set -euo pipefail
-          # Create archive excluding itself and other artifacts
-          tar --exclude-vcs \
-              --exclude="${ARCHIVE_NAME}" \
-              --exclude="*.tar.gz" \
-              --exclude="node_modules" \
-              --exclude=".git" \
-              -czf "${ARCHIVE_NAME}" .
-          echo "ARCHIVE_PATH=${ARCHIVE_NAME}" >> "$GITHUB_ENV"
-
-      - name: Upload archive to EC2 via SCP
-        uses: appleboy/scp-action@v0.1.7
-        with:
-          host: ${{ secrets.SSH_HOST }}
-          username: ${{ secrets.SSH_USER }}
-          key: ${{ secrets.SSH_KEY }}
-          port: ${{ secrets.SSH_PORT || 22 }}
-          source: ${{ env.ARCHIVE_PATH }}
-          target: ${{ secrets.DEPLOY_PATH }}
-
-      - name: Run remote deployment
-        uses: appleboy/ssh-action@v1.2.0
-        with:
-          host: ${{ secrets.SSH_HOST }}
-          username: ${{ secrets.SSH_USER }}
-          key: ${{ secrets.SSH_KEY }}
-          port: ${{ secrets.SSH_PORT || 22 }}
-          script_stop: true
-          script: |
-            set -euo pipefail
-            DEPLOY_PATH="${{ secrets.DEPLOY_PATH }}"
-            ARCHIVE_NAME="${{ env.ARCHIVE_NAME }}"
-            RELEASE_DIR="$DEPLOY_PATH/releases/$(date +%Y%m%d%H%M%S)"
-            mkdir -p "$DEPLOY_PATH/releases" "$DEPLOY_PATH/shared" "$RELEASE_DIR"
-
-            # Extract archive into release directory
-            tar -xzf "$DEPLOY_PATH/$ARCHIVE_NAME" -C "$RELEASE_DIR"
-
-            # Optionally write .env file from secret
-            if [ -n "${{ secrets.ENV_FILE || '' }}" ]; then
-              echo "Writing .env from secret"
-              echo "${{ secrets.ENV_FILE }}" > "$RELEASE_DIR/.env"
-            fi
-
-            # Ensure uploads dir persists across releases
-            mkdir -p "$DEPLOY_PATH/shared/uploads"
-            ln -snf "$DEPLOY_PATH/shared/uploads" "$RELEASE_DIR/uploads"
-
-            # Switch current symlink
-            ln -sfn "$RELEASE_DIR" "$DEPLOY_PATH/current"
-            cd "$DEPLOY_PATH/current"
-
-            # Stop existing services gracefully
-            docker compose down || true
-
-            # Build and start services
-            docker compose up -d --build
-
-            # Check service status
-            docker compose ps
-
-            # Prune old releases (keep last 5)
-            ls -1dt "$DEPLOY_PATH/releases"/* | tail -n +6 | xargs -r rm -rf
-
-            # Clean up uploaded archive
-            rm -f "$DEPLOY_PATH/$ARCHIVE_NAME"
+          # Create archive
+          tar --exclude-vcs --exclude='*.tar.gz' -czf skintel-backend-core.tar.gz .
+          
+          # Upload to server
+          scp -i <(echo "${{ secrets.SSH_KEY }}") -o StrictHostKeyChecking=no \
+            skintel-backend-core.tar.gz ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:/home/admin/
+          
+          # Deploy on server
+          ssh -i <(echo "${{ secrets.SSH_KEY }}") -o StrictHostKeyChecking=no \
+            ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} << 'EOF'
+            cd /home/admin
+            rm -rf skintel-backend-core
+            mkdir -p skintel-backend-core
+            tar -xzf skintel-backend-core.tar.gz -C skintel-backend-core
+            rm skintel-backend-core.tar.gz
+            cd skintel-backend-core
+            sudo docker compose down || true
+            sudo docker compose up -d --build
+          EOF
