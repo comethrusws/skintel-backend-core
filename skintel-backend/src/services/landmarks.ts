@@ -96,7 +96,7 @@ export async function processLandmarksAsync(answerId: string, imageId: string): 
       data: {
         answerId,
         userId: answer.userId, // set userId if the answer belongs to a user
-        landmarks: {} as Prisma.InputJsonValue,
+        landmarks: {} as any,
         status: 'PROCESSING'
       }
     });
@@ -107,7 +107,7 @@ export async function processLandmarksAsync(answerId: string, imageId: string): 
       await prisma.facialLandmarks.update({
         where: { answerId },
         data: {
-          landmarks: result.data as unknown as Prisma.InputJsonValue,
+          landmarks: result.data as unknown as any,
           status: 'COMPLETED',
           processedAt: new Date()
         }
@@ -153,7 +153,7 @@ export async function processLandmarksAsync(answerId: string, imageId: string): 
         create: {
           answerId,
           userId: answer?.userId || null,
-          landmarks: {} as Prisma.InputJsonValue,
+          landmarks: {} as any,
           status: 'FAILED',
           error: error instanceof Error ? error.message : 'db error',
           processedAt: new Date()
@@ -193,7 +193,7 @@ export async function processLandmarksForAnswerWithUrl(answerId: string, imageUr
       data: {
         answerId,
         userId: answer.userId,
-        landmarks: {} as Prisma.InputJsonValue,
+        landmarks: {} as any,
         status: 'PROCESSING'
       }
     });
@@ -204,7 +204,7 @@ export async function processLandmarksForAnswerWithUrl(answerId: string, imageUr
       await prisma.facialLandmarks.update({
         where: { answerId },
         data: {
-          landmarks: result.data as unknown as Prisma.InputJsonValue,
+          landmarks: result.data as unknown as any,
           status: 'COMPLETED',
           processedAt: new Date()
         }
@@ -214,7 +214,7 @@ export async function processLandmarksForAnswerWithUrl(answerId: string, imageUr
         const analysis = await analyzeWithLandmarks(imageUrl, result.data);
         await prisma.facialLandmarks.update({
           where: { answerId },
-          data: ({ analysis: analysis as Prisma.InputJsonValue } as unknown) as any
+          data: { analysis: analysis as any }
         });
       } catch (analysisError) {
         console.error('Skin analysis failed:', analysisError);
@@ -248,7 +248,7 @@ export async function processLandmarksForAnswerWithUrl(answerId: string, imageUr
         create: {
           answerId,
           userId: answer?.userId || null,
-          landmarks: {} as Prisma.InputJsonValue,
+          landmarks: {} as any,
           status: 'FAILED',
           error: error instanceof Error ? error.message : 'db error',
           processedAt: new Date()

@@ -217,7 +217,7 @@ router.get('/', authenticateSession, async (req: AuthenticatedRequest, res: Resp
 
     const response: OnboardingStateResponse = {
       session_id: sessionId,
-      answers: session.answers.map(answer => ({
+      answers: session.answers.map((answer: any) => ({
         question_id: answer.questionId,
         value: answer.value as any,
       })),
@@ -247,7 +247,7 @@ async function updateOnboardingSession(
     });
 
     // transfrom answers into a combined json struct
-    const combinedAnswers = allAnswers.reduce((acc, answer) => {
+    const combinedAnswers = allAnswers.reduce((acc: Record<string, any>, answer: any) => {
       acc[answer.questionId] = {
         answer_id: answer.answerId,
         screen_id: answer.screenId,

@@ -26,7 +26,7 @@ router.get('/user', authenticateUser, async (req: AuthenticatedRequest, res: Res
     
     res.json({
       user_id: userId,
-      landmarks: landmarks.map(landmark => ({
+      landmarks: landmarks.map((landmark: any) => ({
         answer_id: landmark.answerId,
         question_id: landmark.answer.questionId,
         screen_id: landmark.answer.screenId,

@@ -411,7 +411,7 @@ async function mergeSessionToUser(sessionId: string, userId: string): Promise<bo
       where: { sessionId },
       select: { answerId: true },
     });
-    const answerIds = answers.map(a => a.answerId);
+    const answerIds = answers.map((a: { answerId: string }) => a.answerId);
 
     await prisma.$transaction([
       // this will make surefacial landmarks for these answers are linked to the user

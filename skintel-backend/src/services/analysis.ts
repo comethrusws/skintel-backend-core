@@ -90,7 +90,7 @@ export async function analyzeSkin(answerId: string) {
   try {
     await prisma.facialLandmarks.update({
       where: { answerId },
-      data: { analysis: parsed }
+      data: { analysis: parsed as any }
     });
   } catch (e) {
     console.error('Failed to persist analysis JSON:', e);

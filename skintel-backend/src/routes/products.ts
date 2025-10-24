@@ -128,12 +128,19 @@ router.get('/', authenticateUser, async (req: AuthenticatedRequest, res: Respons
     
     res.json({
       user_id: userId,
-      products: products.map(product => ({
-        id: product.id,
+      products: products.map((product: any) => ({
+        product_id: product.productId,
+        brand: product.brand,
+        name: product.name,
+        category: product.category,
         image_url: product.imageUrl,
-        product_data: product.productData,
+        description: product.description,
+        ingredients: product.ingredients,
+        benefits: product.benefits,
+        skin_types: product.skinTypes,
+        skin_concerns: product.skinConcerns,
         created_at: product.createdAt.toISOString(),
-        updated_at: product.updatedAt.toISOString(),
+        updated_at: product.updatedAt.toISOString()
       }))
     });
   } catch (error) {
