@@ -161,41 +161,148 @@ async function testSaveOnboardingAnswers() {
   }
   const uploadedUrl = uploadResp.data.url;
 
-  const answerId1 = `ans_${uuidv4()}`;
-  const answerId2 = `ans_${uuidv4()}`;
-  const faceAnswerId = `ans_${uuidv4()}`;
+  // Generate comprehensive onboarding answers for all valid questions
+  const answers = [
+    {
+      answer_id: `ans_${uuidv4()}`,
+      screen_id: 'screen_skin_concerns',
+      question_id: 'q_skin_concerns',
+      type: 'multi',
+      value: ['acne', 'dark_spots', 'dryness'],
+      status: 'answered',
+      saved_at: new Date().toISOString()
+    },
+    {
+      answer_id: `ans_${uuidv4()}`,
+      screen_id: 'screen_skin_sensitivity',
+      question_id: 'q_skin_sensitivity',
+      type: 'single',
+      value: 'mildly_sensitive',
+      status: 'answered',
+      saved_at: new Date().toISOString()
+    },
+    {
+      answer_id: `ans_${uuidv4()}`,
+      screen_id: 'screen_skin_type',
+      question_id: 'q_skin_type',
+      type: 'single',
+      value: 'combination',
+      status: 'answered',
+      saved_at: new Date().toISOString()
+    },
+    {
+      answer_id: `ans_${uuidv4()}`,
+      screen_id: 'screen_goals',
+      question_id: 'q_goal',
+      type: 'multi',
+      value: ['clear_skin', 'hydration', 'anti_aging'],
+      status: 'answered',
+      saved_at: new Date().toISOString()
+    },
+    {
+      answer_id: `ans_${uuidv4()}`,
+      screen_id: 'screen_profile_gender',
+      question_id: 'q_profile_gender',
+      type: 'single',
+      value: 'female',
+      status: 'answered',
+      saved_at: new Date().toISOString()
+    },
+    {
+      answer_id: `ans_${uuidv4()}`,
+      screen_id: 'screen_age',
+      question_id: 'q_age',
+      type: 'slider',
+      value: 28,
+      status: 'answered',
+      saved_at: new Date().toISOString()
+    },
+    {
+      answer_id: `ans_${uuidv4()}`,
+      screen_id: 'screen_profile_ethnicity',
+      question_id: 'q_profile_ethnicity',
+      type: 'single',
+      value: 'south_asian',
+      status: 'answered',
+      saved_at: new Date().toISOString()
+    },
+    {
+      answer_id: `ans_${uuidv4()}`,
+      screen_id: 'screen_time_outdoors',
+      question_id: 'q_time_spent_outdoors',
+      type: 'single',
+      value: '1_to_3_hours',
+      status: 'answered',
+      saved_at: new Date().toISOString()
+    },
+    {
+      answer_id: `ans_${uuidv4()}`,
+      screen_id: 'screen_weather_conditions',
+      question_id: 'q_profile_weather_conditions',
+      type: 'single',
+      value: 'temperate',
+      status: 'answered',
+      saved_at: new Date().toISOString()
+    },
+    {
+      answer_id: `ans_${uuidv4()}`,
+      screen_id: 'screen_regime_products',
+      question_id: 'q_regime_product',
+      type: 'multi',
+      value: ['cleanser', 'serum', 'moisturizer', 'face_mask'],
+      status: 'answered',
+      saved_at: new Date().toISOString()
+    },
+    {
+      answer_id: `ans_${uuidv4()}`,
+      screen_id: 'screen_medical_conditions',
+      question_id: 'q_medical_conditions',
+      type: 'multi',
+      value: ['none'],
+      status: 'answered',
+      saved_at: new Date().toISOString()
+    },
+    {
+      answer_id: `ans_${uuidv4()}`,
+      screen_id: 'screen_hormone_factors',
+      question_id: 'q_hormone_factors',
+      type: 'multi',
+      value: ['none'],
+      status: 'answered',
+      saved_at: new Date().toISOString()
+    },
+    {
+      answer_id: `ans_${uuidv4()}`,
+      screen_id: 'screen_face_photos',
+      question_id: 'q_face_photo_front',
+      type: 'image',
+      value: { image_url: uploadedUrl },
+      status: 'answered',
+      saved_at: new Date().toISOString()
+    },
+    {
+      answer_id: `ans_${uuidv4()}`,
+      screen_id: 'screen_onboarding_complete',
+      question_id: 'q_onboarding_complete',
+      type: 'boolean',
+      value: true,
+      status: 'answered',
+      saved_at: new Date().toISOString()
+    },
+    {
+      answer_id: `ans_${uuidv4()}`,
+      screen_id: 'screen_onboarding_status',
+      question_id: 'q_onboarding_status',
+      type: 'derived',
+      value: 'completed',
+      status: 'answered',
+      saved_at: new Date().toISOString()
+    }
+  ];
   
   const response = await makeRequest('PUT', '/v1/onboarding', {
     session_id: sessionId,
-    answers: [
-      {
-        answer_id: answerId1,
-        screen_id: 'screen_skin_type',
-        question_id: 'q_skin_type',
-        type: 'single',
-        value: 'combination',
-        status: 'answered',
-        saved_at: new Date().toISOString()
-      },
-      {
-        answer_id: answerId2,
-        screen_id: 'screen_concerns',
-        question_id: 'q_skin_concerns',
-        type: 'multi',
-        value: ['acne', 'dark_spots'],
-        status: 'answered',
-        saved_at: new Date().toISOString()
-      },
-      {
-        answer_id: faceAnswerId,
-        screen_id: 'screen_face_photos',
-        question_id: 'q_face_photo_front',
-        type: 'image',
-        value: { image_url: uploadedUrl },
-        status: 'answered',
-        saved_at: new Date().toISOString()
-      }
-    ],
+    answers,
     screen_completed: true
   }, {
     'X-Session-Token': sessionToken,
@@ -204,6 +311,10 @@ async function testSaveOnboardingAnswers() {
 
   assertEquals(response.status, 200, 'Should save answers with 200');
   assertEquals(response.data.saved, true, 'Should indicate answers were saved');
+  
+  log(`Saved ${answers.length} onboarding answers including comprehensive questionnaire`, 'yellow');
+  
+  // Wait for landmark processing to complete
   await new Promise(r => setTimeout(r, 9000));
 }
 
