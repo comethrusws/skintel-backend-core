@@ -1,5 +1,4 @@
 import { prisma } from '../lib/prisma';
-import type { Prisma } from '@prisma/client';
 import OpenAI from 'openai';
 import { maybePresignUrl } from '../lib/s3';
 
@@ -74,7 +73,7 @@ export async function createProduct(userId: string, imageUrl: string): Promise<{
     data: {
       userId,
       imageUrl,
-      productData: productData as Prisma.InputJsonValue,
+      productData,
     },
   });
 

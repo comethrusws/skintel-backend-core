@@ -1,5 +1,4 @@
 import { prisma } from '../lib/prisma';
-import type { Prisma } from '@prisma/client';
 import OpenAI from 'openai';
 import { maybePresignUrl } from '../lib/s3';
 
@@ -91,7 +90,7 @@ export async function analyzeSkin(answerId: string) {
   try {
     await prisma.facialLandmarks.update({
       where: { answerId },
-      data: ({ analysis: parsed as Prisma.InputJsonValue } as unknown) as any
+      data: { analysis: parsed }
     });
   } catch (e) {
     console.error('Failed to persist analysis JSON:', e);
