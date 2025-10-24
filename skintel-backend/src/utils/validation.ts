@@ -6,6 +6,7 @@ export const VALID_QUESTION_IDS = [
   'q_profile_gender',
   'q_age',
   'q_profile_ethnicity',
+  'q_time_spent_outdoors',
   'q_profile_sun_exposure',
   'q_profile_weather_conditions',
   'q_regime_product',
