@@ -68,13 +68,7 @@ jobs:
             docker compose down || true
 
             # Build and start services
-            docker compose pull || true
-            docker compose build --no-cache
-            docker compose up -d
-
-            # Wait for services to be healthy
-            echo "Waiting for services to start..."
-            sleep 10
+            docker compose up -d --build
 
             # Check service status
             docker compose ps

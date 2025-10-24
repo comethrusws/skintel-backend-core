@@ -105,3 +105,15 @@ npm test
 curl http://localhost:3000/health
 curl http://localhost:8000/health
 ```
+
+## Deployment steps:
+
+tar --exclude-vcs --exclude='*.tar.gz' -czf skintel-backend-core-$(date +%Y%m%d%H%M%S).tar.gz .
+scp -i ~/Downloads/skintel-mumbai.pem skintel-backend-core-20251022204205.tar.gz admin@13.233.238.57:/home/admin
+ssh admin@13.233.238.57 -i ~/Downloads/skintel-mumbai.pem
+mv skintel-backend-core-*.tar.gz skintel
+tar -xvf skintel-backend-core-*tar.gz
+rm skintel-backend-core-*tar.gz
+sudo docker compose down
+sudo docker compose up -d --build
+
