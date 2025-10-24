@@ -2,7 +2,7 @@ import { prisma } from '../lib/prisma';
 import OpenAI from 'openai';
 import { maybePresignUrl } from '../lib/s3';
 
-const OPENAI_MODEL = process.env.OPENAI_MODEL || 'gpt-4o-mini';
+const OPENAI_MODEL = process.env.OPENAI_MODEL || 'gpt-5';
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 function getImageUrl(imageId: string): string {
@@ -20,12 +20,19 @@ function buildPrompt(): string {
     '1. Do skin analysis\n' +
     '2. Clearly mention the affected regions (e.g., "mild acne on the right cheek").\n' +
     '3. Give severity-based explanations (mild = easy care, severe = consider dermatologist).\n' +
+    '4. Return the facial issues in 68 face landmark data format in JSON \n' +
     '\n' +
-    'Example output:\n' +
+    'Example output (clearly highlight the issues in image and not just same two example issues):\n' +
     '{\n' +
     '  "issues": [\n' +
-    '    {"type": "dark_circles", "region": "under_eye_left", "severity": "moderate"},\n' +
-    '    {"type": "acne", "region": "cheek_right", "severity": "mild"}\n' +
+    '    {"type": "dark_circles", "region": "under_eye_left", "severity": "moderate", "dlib 68 facial_landmarks": [\n' +
+    '      {"x": 30, "y": 40},\n' +
+    '      {"x": 32, "y": 42}\n' +
+    '    ]},\n' +
+    '    {"type": "acne", "region": "cheek_right", "severity": "mild", "dlib 68 facial_landmarks": [\n' +
+    '      {"x": 50, "y": 60},\n' +
+    '      {"x": 52, "y": 62}\n' +
+    '    ]}\n' +
     '  ]\n' +
     '}'
   );
