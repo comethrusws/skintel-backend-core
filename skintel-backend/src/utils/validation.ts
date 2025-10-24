@@ -63,9 +63,6 @@ export const VALID_VALUES = {
   ],
   q_time_spent_outdoors: [ '0_to_1_hr', '1_to_3_hours', 'more_than_3_hours' ],
   q_profile_weather_conditions: ['hot', 'temperate', 'cold'],
-  q_regime_product: [
-        'cleanser', 'face_oil', 'toner', 'serum', 'moisturizer', 'sunscreen', 'exfoliant', 'scrub'
-  ],
   q_medical_conditions: [
     'eczema', 'psoriasis', 'rosacea', 'contact_dermatitis', 'allergies', 'medications',
     'pcos', 'seborrheic_dermatitis', 'none', 'other'
