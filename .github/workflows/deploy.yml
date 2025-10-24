@@ -18,9 +18,9 @@ jobs:
       - name: Create deployment archive
         run: |
           set -euo pipefail
-          ARCHIVE_PATH="$RUNNER_TEMP/${ARCHIVE_NAME}"
-          tar --exclude-vcs -czf "$ARCHIVE_PATH" .
-          echo "ARCHIVE_PATH=$ARCHIVE_PATH" >> "$GITHUB_ENV"
+          # Create archive in workspace directory instead of RUNNER_TEMP
+          tar --exclude-vcs -czf "${ARCHIVE_NAME}" .
+          echo "ARCHIVE_PATH=${ARCHIVE_NAME}" >> "$GITHUB_ENV"
 
       - name: Upload archive to EC2 via SCP
         uses: appleboy/scp-action@v0.1.7
@@ -75,3 +75,6 @@ jobs:
 
             # Prune old releases (keep last 5)
             ls -1dt "$DEPLOY_PATH/releases"/* | tail -n +6 | xargs -r rm -rf
+
+            # Clean up uploaded archive
+            rm -f "$DEPLOY_PATH/$ARCHIVE_NAME"
