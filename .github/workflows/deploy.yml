@@ -19,12 +19,16 @@ jobs:
           tar --exclude-vcs --exclude='*.tar.gz' -czf /tmp/skintel-backend-core.tar.gz .
           mv /tmp/skintel-backend-core.tar.gz .
           
+          # Create SSH key file
+          echo "${{ secrets.SSH_KEY }}" > /tmp/ssh_key
+          chmod 600 /tmp/ssh_key
+          
           # Upload to server
-          scp -i <(echo "${{ secrets.SSH_KEY }}") -o StrictHostKeyChecking=no \
+          scp -i /tmp/ssh_key -o StrictHostKeyChecking=no \
             skintel-backend-core.tar.gz ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:/home/admin/
           
           # Deploy on server
-          ssh -i <(echo "${{ secrets.SSH_KEY }}") -o StrictHostKeyChecking=no \
+          ssh -i /tmp/ssh_key -o StrictHostKeyChecking=no \
             ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} << 'EOF'
             cd /home/admin
             rm -rf skintel-backend-core
@@ -35,3 +39,6 @@ jobs:
             sudo docker compose down || true
             sudo docker compose up -d --build
           EOF
+          
+          # Clean up SSH key
+          rm -f /tmp/ssh_key
