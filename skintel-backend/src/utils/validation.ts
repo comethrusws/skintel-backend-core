@@ -23,11 +23,11 @@ export const QUESTION_TYPES = {
   q_skin_concerns: 'multi',
   q_skin_sensitivity: 'single',
   q_skin_type: 'single',
-  q_goal: 'single',
+  q_goal: 'multi',
   q_profile_gender: 'single',
   q_age: 'slider',
   q_profile_ethnicity: 'single',
-  q_profile_sun_exposure: 'single',
+  q_time_spent_outdoors: 'single',
   q_profile_weather_conditions: 'single',
   q_regime_product: 'multi',
   q_medical_conditions: 'multi',
@@ -43,35 +43,32 @@ export const QUESTION_TYPES = {
 // Specific valid values for each question
 export const VALID_VALUES = {
   q_skin_concerns: [
-    'acne', 'Acne', 'dark_spots', 'Dark Spots', 'wrinkles', 'fine_lines', 'dryness', 'oiliness',
-    'large_pores', 'uneven_texture', 'redness', 'sensitivity', 'dullness',
-    'hyperpigmentation', 'blackheads', 'whiteheads', 'scarring'
+    'acne', 'dark_spots', 'wrinkles', 'fine_lines', 'dryness', 'oiliness',
+    'redness', 'sensitivity', 'dullness', 'aging',
+    'hyperpigmentation', 'blackheads', 'whiteheads', 'scarring','pores_and_texture'
   ],
   q_skin_sensitivity: [
-    'Very sensitive', 'Very Sensitive', 'somewhat sensitive', 'Somewhat Sensitive', 
-    'not sensitive', 'Not Sensitive', 'not sure', 'Not Sure'
-  ],
+    'not_sensitive', 'mildly_sensitive', 'very_sensitive'],
   q_skin_type: [
-    'oily', 'Oily', 'dry', 'Dry', 'combination', 'Combination', 'normal', 'Normal'
+    'oily', 'dry', 'combination', 'normal', 'dehydrated'
   ],
   q_goal: [
-    'Healthy Glow', 'clear_skin', 'hydration', 'anti_aging', 'brightening', 'oil_control',
-    'pore_minimizing', 'acne_treatment', 'even_skin_tone', 'sun_protection'
+    'healthy_glow', 'clear_skin', 'hydration', 'anti_aging', 'brightening', 'oil_control',
+    'pore_minimizing', 'acne_treatment', 'even_skin_tone', 'sun_protection', 'clear_and_blemish_free', 'even_tone','smooth_texture','hydrated_and_plump'
   ],
-  q_profile_gender: ['female', 'male', 'nonbinary', 'prefer_not_to_say'],
+  q_profile_gender: ['female', 'male', 'nonbinary', 'prefer_not_to_say','female_pregnant'],
   q_profile_ethnicity: [
-    'asian', 'black', 'hispanic', 'white', 'middle_eastern', 'native_american',
-    'pacific_islander', 'mixed', 'prefer_not_to_say'
+    'east_asian', 'black', 'hispanic', 'white', 'middle_eastern', 'native_american', 'south_asian', 'african_descent',
+    'pacific_islander', 'mixed', 'south_east_asian','indigenious_australian' ,'prefer_not_to_say'
   ],
-  q_profile_sun_exposure: ['high', 'medium', 'low', 'minimal'],
+  q_time_spent_outdoors: [ '0_to_1_hr', '1_to_3_hours', 'more_than_3_hours' ],
   q_profile_weather_conditions: ['hot', 'temperate', 'cold'],
   q_regime_product: [
-    'cleanser', 'toner', 'serum', 'moisturizer', 'sunscreen', 'exfoliant',
-    'face_mask', 'eye_cream', 'spot_treatment', 'oil', 'mist', 'retinoid'
+        'cleanser', 'face_oil', 'toner', 'serum', 'moisturizer', 'sunscreen', 'exfoliant', 'scrub'
   ],
   q_medical_conditions: [
-    'eczema', 'psoriasis', 'rosacea', 'dermatitis', 'melasma', 'vitiligo',
-    'keratosis_pilaris', 'seborrheic_dermatitis', 'none', 'other'
+    'eczema', 'psoriasis', 'rosacea', 'contact_dermatitis', 'allergies', 'medications',
+    'pcos', 'seborrheic_dermatitis', 'none', 'other'
   ],
   q_hormone_factors: [
     'pregnancy', 'menopause', 'pms', 'puberty', 'hormonal_acne',
