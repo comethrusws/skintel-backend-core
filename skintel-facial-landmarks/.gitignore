@@ -3,4 +3,6 @@ venv/
 shape_predictor_68_face_landmarks.dat
 shape_predictor_68_face_landmarks.dat.bz2
 
-__pycache__
+__pycache__/
+*.pyc
+.DS_Store
