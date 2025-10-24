@@ -18,8 +18,13 @@ jobs:
       - name: Create deployment archive
         run: |
           set -euo pipefail
-          # Create archive in workspace directory instead of RUNNER_TEMP
-          tar --exclude-vcs -czf "${ARCHIVE_NAME}" .
+          # Create archive excluding itself and other artifacts
+          tar --exclude-vcs \
+              --exclude="${ARCHIVE_NAME}" \
+              --exclude="*.tar.gz" \
+              --exclude="node_modules" \
+              --exclude=".git" \
+              -czf "${ARCHIVE_NAME}" .
           echo "ARCHIVE_PATH=${ARCHIVE_NAME}" >> "$GITHUB_ENV"
 
       - name: Upload archive to EC2 via SCP
@@ -48,7 +53,7 @@ jobs:
             mkdir -p "$DEPLOY_PATH/releases" "$DEPLOY_PATH/shared" "$RELEASE_DIR"
 
             # Extract archive into release directory
-            tar -xzf "$DEPLOY_PATH/$ARCHIVE_NAME" -C "$RELEASE_DIR" --strip-components=1
+            tar -xzf "$DEPLOY_PATH/$ARCHIVE_NAME" -C "$RELEASE_DIR"
 
             # Optionally write .env file from secret
             if [ -n "${{ secrets.ENV_FILE || '' }}" ]; then
