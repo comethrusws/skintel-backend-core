@@ -2,7 +2,7 @@ import { prisma } from '../lib/prisma';
 import OpenAI from 'openai';
 import { maybePresignUrl } from '../lib/s3';
 
-const OPENAI_MODEL = process.env.OPENAI_MODEL || 'gpt-4o-mini';
+const OPENAI_MODEL = process.env.OPENAI_MODEL || 'gpt-5';
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 function getImageUrl(imageId: string): string {
