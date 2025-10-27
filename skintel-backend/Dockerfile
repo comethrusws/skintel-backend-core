@@ -23,6 +23,8 @@ ARG JWT_SECRET=${JWT_SECRET:-your-super-secret-jwt-key-change-this-in-production
 
 ARG DATABASE_URL=${DATABASE_URL:-postgresql://username:password@localhost:5432/skintel_db}
 
+ARG LANDMARK_URL=${LANDMARK_URL:-http://localhost:8000}
+
 ARG OPENAI_API_KEY=${OPENAI_API_KEY:-your-openai-api-key}
 
 ENV OPENAI_API_KEY=${OPENAI_API_KEY}
