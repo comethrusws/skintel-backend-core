@@ -282,6 +282,24 @@ async function testSaveOnboardingAnswers() {
     },
     {
       answer_id: `ans_${uuidv4()}`,
+      screen_id: 'screen_face_photos',
+      question_id: 'q_face_photo_left',
+      type: 'image',
+      value: { image_url: uploadedUrl },
+      status: 'answered',
+      saved_at: new Date().toISOString()
+    },
+    {
+      answer_id: `ans_${uuidv4()}`,
+      screen_id: 'screen_face_photos',
+      question_id: 'q_face_photo_right',
+      type: 'image',
+      value: { image_url: uploadedUrl },
+      status: 'answered',
+      saved_at: new Date().toISOString()
+    },
+    {
+      answer_id: `ans_${uuidv4()}`,
       screen_id: 'screen_onboarding_complete',
       question_id: 'q_onboarding_complete',
       type: 'boolean',
