@@ -53,8 +53,7 @@ jobs:
             
             # Stop existing services and start new ones
             sudo docker compose down || true
-            sudo docker compose build --no-cache
-            sudo docker compose up -d
+            sudo docker compose up -d --build
           EOF
           
           # Clean up SSH key
