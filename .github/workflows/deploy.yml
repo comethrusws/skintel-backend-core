@@ -27,18 +27,27 @@ jobs:
           scp -i /tmp/ssh_key -o StrictHostKeyChecking=no \
             skintel-backend-core.tar.gz ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:/home/admin/
           
-          # Deploy on server
+          # Deploy on server with environment variables from secrets
           ssh -i /tmp/ssh_key -o StrictHostKeyChecking=no \
-            ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} << 'EOF'
-            cd /home/admin
-            rm -rf skintel-backend-core
-            mkdir -p skintel-backend-core
-            tar -xzf skintel-backend-core.tar.gz -C skintel-backend-core
-            rm skintel-backend-core.tar.gz
-            cd skintel-backend-core
-            sudo docker compose down || true
-            sudo docker compose up -d --build
-          EOF
+            ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} \
+            'export NODE_ENV="${{ secrets.NODE_ENV }}" && \
+             export PORT="${{ secrets.PORT }}" && \
+             export JWT_SECRET="${{ secrets.JWT_SECRET }}" && \
+             export OPENAI_API_KEY="${{ secrets.OPENAI_API_KEY }}" && \
+             export AWS_ACCESS_KEY_ID="${{ secrets.AWS_ACCESS_KEY_ID }}" && \
+             export AWS_SECRET_ACCESS_KEY="${{ secrets.AWS_SECRET_ACCESS_KEY }}" && \
+             export AWS_REGION="${{ secrets.AWS_REGION }}" && \
+             export S3_BUCKET_NAME="${{ secrets.S3_BUCKET_NAME }}" && \
+             export S3_PUBLIC_BASE_URL="${{ secrets.S3_PUBLIC_BASE_URL }}" && \
+             export S3_OBJECT_ACL="${{ secrets.S3_OBJECT_ACL }}" && \
+             cd /home/admin && \
+             rm -rf skintel-backend-core && \
+             mkdir -p skintel-backend-core && \
+             tar -xzf skintel-backend-core.tar.gz -C skintel-backend-core && \
+             rm skintel-backend-core.tar.gz && \
+             cd skintel-backend-core && \
+             sudo docker compose down || true && \
+             sudo docker compose up -d --build'
           
           # Clean up SSH key
           rm -f /tmp/ssh_key

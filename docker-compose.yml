@@ -6,12 +6,18 @@ services:
     ports:
       - 3000:3000
     environment:
-      - NODE_ENV=development
-      - PORT=3000
-      - JWT_SECRET=your-super-secret-jwt-key-change-this-in-production
+      - NODE_ENV=${NODE_ENV:-production}
+      - PORT=${PORT:-3000}
+      - JWT_SECRET=${JWT_SECRET}
       - DATABASE_URL=postgresql://postgres:password@skintel-database:5432/skintel_db
-      - OPENAI_API_KEY=your-openai-api-key
-      - FACIAL_LANDMARKS_URL=http://skintel-facial-landmarks:8000
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - LANDMARK_URL=http://skintel-facial-landmarks:8000
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+      - AWS_REGION=${AWS_REGION}
+      - S3_BUCKET_NAME=${S3_BUCKET_NAME}
+      - S3_PUBLIC_BASE_URL=${S3_PUBLIC_BASE_URL}
+      - S3_OBJECT_ACL=${S3_OBJECT_ACL}
     depends_on:
       skintel-database:
         condition: service_healthy
@@ -23,7 +29,7 @@ services:
       context: skintel-backend
       dockerfile: Dockerfile.migrate
     environment:
-      - NODE_ENV=development
+      - NODE_ENV=${NODE_ENV:-production}
       - DATABASE_URL=postgresql://postgres:password@skintel-database:5432/skintel_db
     depends_on:
       skintel-database:
