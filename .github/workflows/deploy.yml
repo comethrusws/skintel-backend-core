@@ -37,18 +37,18 @@ jobs:
             rm skintel-backend-core.tar.gz
             cd skintel-backend-core
             
-            # Create .env file with secrets
+            # Create .env file with properly quoted secrets
             cat > .env << 'ENVEOF'
-          NODE_ENV=${{ secrets.NODE_ENV }}
-          PORT=${{ secrets.PORT }}
-          JWT_SECRET=${{ secrets.JWT_SECRET }}
-          OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}
-          AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          AWS_REGION=${{ secrets.AWS_REGION }}
-          S3_BUCKET_NAME=${{ secrets.S3_BUCKET_NAME }}
-          S3_PUBLIC_BASE_URL=${{ secrets.S3_PUBLIC_BASE_URL }}
-          S3_OBJECT_ACL=${{ secrets.S3_OBJECT_ACL }}
+          NODE_ENV="${{ secrets.NODE_ENV }}"
+          PORT="${{ secrets.PORT }}"
+          JWT_SECRET="${{ secrets.JWT_SECRET }}"
+          OPENAI_API_KEY="${{ secrets.OPENAI_API_KEY }}"
+          AWS_ACCESS_KEY_ID="${{ secrets.AWS_ACCESS_KEY_ID }}"
+          AWS_SECRET_ACCESS_KEY="${{ secrets.AWS_SECRET_ACCESS_KEY }}"
+          AWS_REGION="${{ secrets.AWS_REGION }}"
+          S3_BUCKET_NAME="${{ secrets.S3_BUCKET_NAME }}"
+          S3_PUBLIC_BASE_URL="${{ secrets.S3_PUBLIC_BASE_URL }}"
+          S3_OBJECT_ACL="${{ secrets.S3_OBJECT_ACL }}"
           ENVEOF
             
             # Stop existing services and start new ones
