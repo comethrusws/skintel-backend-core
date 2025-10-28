@@ -2,7 +2,7 @@ import { prisma } from '../lib/prisma';
 import OpenAI from 'openai';
 import { maybePresignUrl } from '../lib/s3';
 
-const OPENAI_MODEL = process.env.OPENAI_MODEL || 'gpt-4o-mini';
+const OPENAI_MODEL = process.env.OPENAI_MODEL || 'gpt-5';
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 function buildProductAnalysisPrompt(): string {
@@ -22,6 +22,7 @@ function buildProductAnalysisPrompt(): string {
     '{\n' +
     '  "product_name": "CeraVe Foaming Facial Cleanser",\n' +
     '  "brand": "CeraVe",\n' +
+    '  "expiry date": "2027/04/12",\n' +
     '  "category": "cleanser",\n' +
     '  "ingredients": ["ceramides", "hyaluronic acid", "niacinamide"],\n' +
     '  "target_concerns": ["dryness", "sensitivity", "barrier repair"],\n' +
