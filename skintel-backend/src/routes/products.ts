@@ -1,12 +1,16 @@
 import { Router, Response } from 'express';
 import { authenticateUser, AuthenticatedRequest } from '../middleware/auth';
-import { createProduct, getUserProducts, getProductById, deleteProduct } from '../services/products';
+import { createProduct, getUserProducts, getProductById, deleteProduct, updateProductName } from '../services/products';
 import { z } from 'zod';
 
 const router = Router();
 
 const createProductSchema = z.object({
-  image_url: z.string().url('Must be a valid URL'),
+  image_urls: z.array(z.string().url('Must be a valid URL')).min(1, 'At least one image URL is required'),
+});
+
+const updateProductSchema = z.object({
+  product_name: z.string().min(1, 'Product name is required').max(200, 'Product name too long'),
 });
 
 const productParamsSchema = z.object({
@@ -18,7 +22,7 @@ const productParamsSchema = z.object({
  * /v1/products:
  *   post:
  *     summary: Analyze and store a skincare product
- *     description: Upload a product image URL for AI analysis and storage
+ *     description: Upload product image URLs for AI analysis and storage. Supports multiple images per product (front, back, ingredients, etc.).
  *     tags: [Products]
  *     security:
  *       - BearerAuth: []
@@ -30,12 +34,15 @@ const productParamsSchema = z.object({
  *           schema:
  *             type: object
  *             properties:
- *               image_url:
- *                 type: string
- *                 format: uri
- *                 example: "https://example.com/product.jpg"
+ *               image_urls:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *                   format: uri
+ *                 example: ["https://example.com/product-front.jpg", "https://example.com/product-back.jpg"]
+ *                 description: Array of image URLs for the product (minimum 1 required)
  *             required:
- *               - image_url
+ *               - image_urls
  *     responses:
  *       201:
  *         description: Product analyzed and stored successfully
@@ -104,10 +111,10 @@ router.post('/', authenticateUser, async (req: AuthenticatedRequest, res: Respon
       return;
     }
 
-    const { image_url } = validationResult.data;
+    const { image_urls } = validationResult.data;
     const userId = req.userId!;
 
-    const result = await createProduct(userId, image_url);
+    const result = await createProduct(userId, image_urls);
     
     res.status(201).json({
       id: result.id,
@@ -129,16 +136,9 @@ router.get('/', authenticateUser, async (req: AuthenticatedRequest, res: Respons
     res.json({
       user_id: userId,
       products: products.map((product: any) => ({
-        product_id: product.productId,
-        brand: product.brand,
-        name: product.name,
-        category: product.category,
+        id: product.id,
         image_url: product.imageUrl,
-        description: product.description,
-        ingredients: product.ingredients,
-        benefits: product.benefits,
-        skin_types: product.skinTypes,
-        skin_concerns: product.skinConcerns,
+        product_data: product.productData,
         created_at: product.createdAt.toISOString(),
         updated_at: product.updatedAt.toISOString()
       }))
@@ -169,6 +169,52 @@ router.get('/', authenticateUser, async (req: AuthenticatedRequest, res: Respons
  *     responses:
  *       200:
  *         description: Product details retrieved successfully
+ *       404:
+ *         description: Product not found
+ *       401:
+ *         description: Authentication required
+ *   put:
+ *     summary: Update product name
+ *     description: Update the name of a specific product
+ *     tags: [Products]
+ *     security:
+ *       - BearerAuth: []
+ *       - BasicAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: productId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Product ID
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               product_name:
+ *                 type: string
+ *                 example: "Updated Product Name"
+ *                 minLength: 1
+ *                 maxLength: 200
+ *             required:
+ *               - product_name
+ *     responses:
+ *       200:
+ *         description: Product name updated successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 id:
+ *                   type: string
+ *                 product_data:
+ *                   type: object
+ *       400:
+ *         description: Invalid request data
  *       404:
  *         description: Product not found
  *       401:
@@ -227,6 +273,48 @@ router.get('/:productId', authenticateUser, async (req: AuthenticatedRequest, re
     });
   } catch (error) {
     console.error('Get product error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+router.put('/:productId', authenticateUser, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const paramsValidation = productParamsSchema.safeParse(req.params);
+    const bodyValidation = updateProductSchema.safeParse(req.body);
+    
+    if (!paramsValidation.success) {
+      res.status(400).json({ 
+        error: 'Invalid product ID',
+        details: paramsValidation.error.errors 
+      });
+      return;
+    }
+
+    if (!bodyValidation.success) {
+      res.status(400).json({ 
+        error: 'Invalid request data',
+        details: bodyValidation.error.errors 
+      });
+      return;
+    }
+
+    const { productId } = paramsValidation.data;
+    const { product_name } = bodyValidation.data;
+    const userId = req.userId!;
+
+    const result = await updateProductName(productId, userId, product_name);
+    
+    if (!result) {
+      res.status(404).json({ error: 'Product not found' });
+      return;
+    }
+
+    res.json({
+      id: result.id,
+      product_data: result.productData,
+    });
+  } catch (error) {
+    console.error('Update product error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });

@@ -67,21 +67,62 @@ export async function analyzeProduct(imageUrl: string): Promise<object> {
   }
 }
 
-export async function createProduct(userId: string, imageUrl: string): Promise<{ id: string; productData: object }> {
-  const productData = await analyzeProduct(imageUrl);
+export async function createProduct(userId: string, imageUrls: string[]): Promise<{ id: string; productData: object }> {
+  // Analyze the first image for product data
+  const primaryImageUrl = imageUrls[0];
+  const productData = await analyzeProduct(primaryImageUrl);
 
   const product = await prisma.product.create({
     data: {
       userId,
-      imageUrl,
-      productData,
+      imageUrl: primaryImageUrl, // Keep primary image in imageUrl field for backward compatibility
+      productData: {
+        ...productData,
+        images: imageUrls, // Store all images in productData
+      },
     },
   });
 
   return {
     id: product.id,
-    productData: productData,
+    productData: (product.productData as object) || {},
   };
+}
+
+export async function updateProductName(productId: string, userId: string, name: string): Promise<{ id: string; productData: object } | null> {
+  try {
+    const existingProduct = await prisma.product.findFirst({
+      where: {
+        id: productId,
+        userId
+      }
+    });
+
+    if (!existingProduct) {
+      return null;
+    }
+
+    const currentProductData = existingProduct.productData as Record<string, any>;
+    const updatedProductData = {
+      ...currentProductData,
+      product_name: name
+    };
+
+    const product = await prisma.product.update({
+      where: { id: productId },
+      data: {
+        productData: updatedProductData,
+      },
+    });
+
+    return {
+      id: product.id,
+      productData: (product.productData as object) || {},
+    };
+  } catch (error) {
+    console.error('Failed to update product name:', error);
+    return null;
+  }
 }
 
 export async function getUserProducts(userId: string) {
