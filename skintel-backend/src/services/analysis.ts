@@ -210,7 +210,6 @@ export async function analyzeWithLandmarks(frontImageUrl: string, landmarks: obj
         ]
       }
     ],
-    temperature: 0.2,
     response_format: { type: 'json_object' }
   });
 

@@ -1,9 +1,10 @@
 const https = require('https');
 const http = require('http');
 const { v4: uuidv4 } = require('uuid');
+const fs = require('fs');
+const path = require('path');
 
 const BASE_URL = 'http://localhost:3000';
-const TEST_IMAGE_URL = 'https://i.pinimg.com/1200x/8a/76/0c/8a760c2a013aa5d83e0bee58db0fe6c8.jpg';
 const colors = {
   green: '\x1b[32m',
   red: '\x1b[31m',
@@ -16,6 +17,12 @@ let sessionToken = '';
 let sessionId = '';
 let accessToken = '';
 let refreshToken = '';
+
+// Use local images from public directory
+const PUBLIC_DIR = path.join(__dirname, '../../public');
+const TEST_IMAGE_FRONT = path.join(PUBLIC_DIR, 'front.jpeg');
+const TEST_IMAGE_LEFT = path.join(PUBLIC_DIR, 'left.jpeg');
+const TEST_IMAGE_RIGHT = path.join(PUBLIC_DIR, 'right.jpeg');
 
 function makeRequest(method, path, data = null, headers = {}) {
   return new Promise((resolve, reject) => {
@@ -151,15 +158,34 @@ async function testCreateAnonymousSession() {
 }
 
 async function testSaveOnboardingAnswers() {
-  // Upload test image via our upload API first, then use returned S3 URL in onboarding
-  const imgBuffer = await downloadToBuffer(TEST_IMAGE_URL);
-  const uploadResp = await makeBinaryRequest('POST', '/v1/upload/file?prefix=tests', imgBuffer, {
+  // Upload test images via our upload API first, then use returned S3 URLs in onboarding
+  const imgBufferFront = fs.readFileSync(TEST_IMAGE_FRONT);
+  const imgBufferLeft = fs.readFileSync(TEST_IMAGE_LEFT);
+  const imgBufferRight = fs.readFileSync(TEST_IMAGE_RIGHT);
+
+  const uploadFront = await makeBinaryRequest('POST', '/v1/upload/file?prefix=tests', imgBufferFront, {
     'Content-Type': 'image/jpeg'
   });
-  if (uploadResp.status !== 201 || !uploadResp.data || !uploadResp.data.url) {
-    throw new Error(`Image upload failed. Status: ${uploadResp.status}, Body: ${JSON.stringify(uploadResp.data)}`);
+  const uploadLeft = await makeBinaryRequest('POST', '/v1/upload/file?prefix=tests', imgBufferLeft, {
+    'Content-Type': 'image/jpeg'
+  });
+  const uploadRight = await makeBinaryRequest('POST', '/v1/upload/file?prefix=tests', imgBufferRight, {
+    'Content-Type': 'image/jpeg'
+  });
+
+  if (uploadFront.status !== 201 || !uploadFront.data.url) {
+    throw new Error(`Front image upload failed. Status: ${uploadFront.status}, Body: ${JSON.stringify(uploadFront.data)}`);
   }
-  const uploadedUrl = uploadResp.data.url;
+  if (uploadLeft.status !== 201 || !uploadLeft.data.url) {
+    throw new Error(`Left image upload failed. Status: ${uploadLeft.status}, Body: ${JSON.stringify(uploadLeft.data)}`);
+  }
+  if (uploadRight.status !== 201 || !uploadRight.data.url) {
+    throw new Error(`Right image upload failed. Status: ${uploadRight.status}, Body: ${JSON.stringify(uploadRight.data)}`);
+  }
+
+  const uploadedFrontUrl = uploadFront.data.url;
+  const uploadedLeftUrl = uploadLeft.data.url;
+  const uploadedRightUrl = uploadRight.data.url;
 
   // Generate comprehensive onboarding answers for all valid questions
   const answers = [
@@ -276,7 +302,7 @@ async function testSaveOnboardingAnswers() {
       screen_id: 'screen_face_photos',
       question_id: 'q_face_photo_front',
       type: 'image',
-      value: { image_url: uploadedUrl },
+      value: { image_url: uploadedFrontUrl },
       status: 'answered',
       saved_at: new Date().toISOString()
     },
@@ -285,7 +311,7 @@ async function testSaveOnboardingAnswers() {
       screen_id: 'screen_face_photos',
       question_id: 'q_face_photo_left',
       type: 'image',
-      value: { image_url: uploadedUrl },
+      value: { image_url: uploadedLeftUrl },
       status: 'answered',
       saved_at: new Date().toISOString()
     },
@@ -294,7 +320,7 @@ async function testSaveOnboardingAnswers() {
       screen_id: 'screen_face_photos',
       question_id: 'q_face_photo_right',
       type: 'image',
-      value: { image_url: uploadedUrl },
+      value: { image_url: uploadedRightUrl },
       status: 'answered',
       saved_at: new Date().toISOString()
     },
