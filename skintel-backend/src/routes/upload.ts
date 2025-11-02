@@ -79,7 +79,7 @@ uploadRouter.post('/', async (req: Request, res: Response) => {
  * /v1/upload/file:
  *   post:
  *     summary: Upload an image file to S3
- *     description: Accepts raw image bytes (binary body) and returns the public URL and key.
+ *     description: Accepts raw image bytes (binary body) and returns the public URL and key. MEANT FOR TESTING> DO NOT USE IN PRODUCTION!
  *     tags: [Upload]
  *     requestBody:
  *       required: true
