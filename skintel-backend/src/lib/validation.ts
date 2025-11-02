@@ -105,3 +105,16 @@ export const logoutRequestSchema = z.object({
   refresh_token: z.string().min(1),
 });
 
+export const profileUpdateRequestSchema = z.object({
+  email: z.string().email().optional(),
+  password: z.string().min(8).max(100).optional(),
+}).refine(
+  (data) => data.email || data.password,
+  { message: "At least one field (email or password) must be provided" }
+);
+
+export const versionCheckRequestSchema = z.object({
+  current_version: z.string().regex(/^\d+\.\d+\.\d+$/, "Version must be in format x.y.z"),
+  platform: z.enum(['ios']),
+});
+

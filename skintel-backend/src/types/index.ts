@@ -167,3 +167,73 @@ export interface UserLandmarksResponse {
     created_at: string;
   }>;
 }
+
+export interface ProfileUpdateRequest {
+  email?: string;
+  password?: string;
+}
+
+export interface UserProfileResponse {
+  user_id: string;
+  email?: string;
+  sso_provider?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface UserAnalysisResponse {
+  user_id: string;
+  analysis: Array<{
+    answer_id: string;
+    question_id: string;
+    screen_id: string;
+    analysis?: any;
+    status: 'PROCESSING' | 'COMPLETED' | 'FAILED';
+    processed_at?: string;
+    created_at: string;
+    error?: string;
+  }>;
+}
+
+export interface UserLandmarksDataResponse {
+  user_id: string;
+  landmarks: Array<{
+    answer_id: string;
+    question_id: string;
+    screen_id: string;
+    landmarks: any;
+    status: 'PROCESSING' | 'COMPLETED' | 'FAILED';
+    processed_at?: string;
+    created_at: string;
+    error?: string;
+  }>;
+}
+
+export interface ProfileUpdateResponse {
+  user_id: string;
+  email?: string;
+  sso_provider?: string;
+  created_at: string;
+  updated_at: string;
+  updated: boolean;
+}
+
+export interface ProfileDeleteResponse {
+  user_id: string;
+  deleted: boolean;
+  deleted_at: string;
+}
+
+export interface VersionCheckRequest {
+  current_version: string;
+  platform: 'ios';
+}
+
+export interface VersionCheckResponse {
+  current_version: string;
+  latest_version: string;
+  update_available: boolean;
+  update_required: boolean;
+  download_url: string;
+  platform: 'ios';
+}
