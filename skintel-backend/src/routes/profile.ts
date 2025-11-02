@@ -11,10 +11,11 @@ const router = Router();
  * /v1/profile:
  *   get:
  *     summary: Get user profile
- *     description: Retrieve user profile with facial landmarks, analysis, and basic info
+ *     description: Retrieve basic user profile information
  *     tags: [Profile]
  *     security:
  *       - BasicAuth: []
+ *       - BearerAuth: []
  *     responses:
  *       200:
  *         description: Profile retrieved successfully
@@ -29,6 +30,7 @@ const router = Router();
  *     tags: [Profile]
  *     security:
  *       - BearerAuth: []
+ *       - BasicAuth: []
  *     requestBody:
  *       required: true
  *       content:
@@ -60,6 +62,7 @@ const router = Router();
  *     tags: [Profile]
  *     security:
  *       - BearerAuth: []
+ *       - BasicAuth: []
  *     responses:
  *       200:
  *         description: Profile deleted successfully
@@ -67,6 +70,34 @@ const router = Router();
  *         description: Authentication required
  *       404:
  *         description: User not found
+
+ * 
+ * /v1/profile/analysis:
+ *   get:
+ *     summary: Get user facial analysis
+ *     description: Retrieve user's facial analysis data
+ *     tags: [Profile]
+ *     security:
+ *       - BearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Analysis retrieved successfully
+ *       401:
+ *         description: Authentication required
+ * 
+ * /v1/profile/landmarks:
+ *   get:
+ *     summary: Get user facial landmarks
+ *     description: Retrieve user's facial landmarks data
+ *     tags: [Profile]
+ *     security:
+ *       - BearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Landmarks retrieved successfully
+ *       401:
+ *         description: Authentication required
+ * 
  */
 
 router.get('/', authenticateUser, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
@@ -75,44 +106,12 @@ router.get('/', authenticateUser, async (req: AuthenticatedRequest, res: Respons
 
     const user = await prisma.user.findUnique({
       where: { userId },
-      include: {
-        facialLandmarks: {
-          include: {
-            answer: {
-              select: {
-                questionId: true,
-                screenId: true,
-                type: true,
-                value: true,
-                status: true,
-                savedAt: true
-              }
-            }
-          },
-          orderBy: { createdAt: 'desc' }
-        },
-        answers: {
-          select: {
-            answerId: true,
-            questionId: true,
-            screenId: true,
-            type: true,
-            value: true,
-            status: true,
-            savedAt: true
-          },
-          orderBy: { savedAt: 'desc' }
-        },
-        products: {
-          select: {
-            id: true,
-            imageUrl: true,
-            productData: true,
-            createdAt: true,
-            updatedAt: true
-          },
-          orderBy: { createdAt: 'desc' }
-        }
+      select: {
+        userId: true,
+        email: true,
+        ssoProvider: true,
+        createdAt: true,
+        updatedAt: true
       }
     });
 
@@ -126,39 +125,88 @@ router.get('/', authenticateUser, async (req: AuthenticatedRequest, res: Respons
       email: user.email,
       sso_provider: user.ssoProvider,
       created_at: user.createdAt.toISOString(),
-      updated_at: user.updatedAt.toISOString(),
-      facial_landmarks: user.facialLandmarks.map(landmark => ({
-        answer_id: landmark.answerId,
-        question_id: landmark.answer.questionId,
-        screen_id: landmark.answer.screenId,
-        landmarks: landmark.landmarks,
-        analysis: landmark.analysis,
-        status: landmark.status,
-        processed_at: landmark.processedAt?.toISOString(),
-        created_at: landmark.createdAt.toISOString(),
-        error: landmark.error
-      })),
-      onboarding_answers: user.answers.map(answer => ({
-        answer_id: answer.answerId,
-        question_id: answer.questionId,
-        screen_id: answer.screenId,
-        type: answer.type,
-        value: answer.value,
-        status: answer.status,
-        saved_at: answer.savedAt.toISOString()
-      })),
-      products: user.products.map(product => ({
-        id: product.id,
-        image_url: product.imageUrl,
-        product_data: product.productData,
-        created_at: product.createdAt.toISOString(),
-        updated_at: product.updatedAt.toISOString()
-      }))
+      updated_at: user.updatedAt.toISOString()
     };
 
     res.json(response);
   } catch (error) {
     console.error('Get profile error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+router.get('/analysis', authenticateUser, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const userId = req.userId!;
+
+    const facialLandmarks = await prisma.facialLandmarks.findMany({
+      where: { userId },
+      include: {
+        answer: {
+          select: {
+            questionId: true,
+            screenId: true
+          }
+        }
+      },
+      orderBy: { createdAt: 'desc' }
+    });
+
+    const response = {
+      user_id: userId,
+      analysis: facialLandmarks.map(landmark => ({
+        answer_id: landmark.answerId,
+        question_id: landmark.answer.questionId,
+        screen_id: landmark.answer.screenId,
+        analysis: landmark.analysis,
+        status: landmark.status,
+        processed_at: landmark.processedAt?.toISOString(),
+        created_at: landmark.createdAt.toISOString(),
+        error: landmark.error
+      }))
+    };
+
+    res.json(response);
+  } catch (error) {
+    console.error('Get profile analysis error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+router.get('/landmarks', authenticateUser, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const userId = req.userId!;
+
+    const facialLandmarks = await prisma.facialLandmarks.findMany({
+      where: { userId },
+      include: {
+        answer: {
+          select: {
+            questionId: true,
+            screenId: true
+          }
+        }
+      },
+      orderBy: { createdAt: 'desc' }
+    });
+
+    const response = {
+      user_id: userId,
+      landmarks: facialLandmarks.map(landmark => ({
+        answer_id: landmark.answerId,
+        question_id: landmark.answer.questionId,
+        screen_id: landmark.answer.screenId,
+        landmarks: landmark.landmarks,
+        status: landmark.status,
+        processed_at: landmark.processedAt?.toISOString(),
+        created_at: landmark.createdAt.toISOString(),
+        error: landmark.error
+      }))
+    };
+
+    res.json(response);
+  } catch (error) {
+    console.error('Get profile landmarks error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });

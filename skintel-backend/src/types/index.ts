@@ -179,32 +179,33 @@ export interface UserProfileResponse {
   sso_provider?: string;
   created_at: string;
   updated_at: string;
-  facial_landmarks: Array<{
+}
+
+export interface UserAnalysisResponse {
+  user_id: string;
+  analysis: Array<{
     answer_id: string;
     question_id: string;
     screen_id: string;
-    landmarks: any;
     analysis?: any;
     status: 'PROCESSING' | 'COMPLETED' | 'FAILED';
     processed_at?: string;
     created_at: string;
     error?: string;
   }>;
-  onboarding_answers: Array<{
+}
+
+export interface UserLandmarksDataResponse {
+  user_id: string;
+  landmarks: Array<{
     answer_id: string;
     question_id: string;
     screen_id: string;
-    type: 'single' | 'multi' | 'slider' | 'image' | 'boolean' | 'derived';
-    value: any;
-    status: 'answered' | 'skipped';
-    saved_at: string;
-  }>;
-  products: Array<{
-    id: string;
-    image_url: string;
-    product_data: any;
+    landmarks: any;
+    status: 'PROCESSING' | 'COMPLETED' | 'FAILED';
+    processed_at?: string;
     created_at: string;
-    updated_at: string;
+    error?: string;
   }>;
 }
 

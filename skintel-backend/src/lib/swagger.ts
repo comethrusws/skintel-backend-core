@@ -17,11 +17,16 @@ const options = {
       { name: 'Products', description: 'Skincare product identification and management' },
       { name: 'Analysis', description: 'Skin analysis for face images' },
       { name: 'Upload', description: 'Image upload to s3' },
+      { name: 'Profile', description: 'User profile management' },
     ],
     servers: [
       {
         url: 'http://localhost:3000',
         description: 'Development server',
+      },
+      {
+        url: 'https://skintel.srecraft.io',
+        description: 'Production server',
       },
     ],
     components: {
