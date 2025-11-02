@@ -9,6 +9,7 @@ import { landmarksRouter } from './routes/landmarks';
 import { productsRouter } from './routes/products';
 import { uploadRouter } from './routes/upload';
 import { profileRouter } from './routes/profile';
+import { versionRouter } from './routes/version';
 import { prisma } from './lib/prisma';
 import { vanalyseRouter } from './routes/vanalyse';
 import { specs, swaggerUi } from './lib/swagger';
@@ -30,6 +31,7 @@ app.use('/v1/landmarks', landmarksRouter);
 app.use('/v1/products', productsRouter);
 app.use('/v1/upload', uploadRouter);
 app.use('/v1/profile', profileRouter);
+app.use('/v1/version', versionRouter);
 app.use('/v1/vanalyse', vanalyseRouter);
 
 // Swagger documentation

@@ -223,3 +223,17 @@ export interface ProfileDeleteResponse {
   deleted: boolean;
   deleted_at: string;
 }
+
+export interface VersionCheckRequest {
+  current_version: string;
+  platform: 'ios';
+}
+
+export interface VersionCheckResponse {
+  current_version: string;
+  latest_version: string;
+  update_available: boolean;
+  update_required: boolean;
+  download_url: string;
+  platform: 'ios';
+}

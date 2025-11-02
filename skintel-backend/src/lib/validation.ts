@@ -113,3 +113,8 @@ export const profileUpdateRequestSchema = z.object({
   { message: "At least one field (email or password) must be provided" }
 );
 
+export const versionCheckRequestSchema = z.object({
+  current_version: z.string().regex(/^\d+\.\d+\.\d+$/, "Version must be in format x.y.z"),
+  platform: z.enum(['ios']),
+});
+
