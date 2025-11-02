@@ -167,3 +167,58 @@ export interface UserLandmarksResponse {
     created_at: string;
   }>;
 }
+
+export interface ProfileUpdateRequest {
+  email?: string;
+  password?: string;
+}
+
+export interface UserProfileResponse {
+  user_id: string;
+  email?: string;
+  sso_provider?: string;
+  created_at: string;
+  updated_at: string;
+  facial_landmarks: Array<{
+    answer_id: string;
+    question_id: string;
+    screen_id: string;
+    landmarks: any;
+    analysis?: any;
+    status: 'PROCESSING' | 'COMPLETED' | 'FAILED';
+    processed_at?: string;
+    created_at: string;
+    error?: string;
+  }>;
+  onboarding_answers: Array<{
+    answer_id: string;
+    question_id: string;
+    screen_id: string;
+    type: 'single' | 'multi' | 'slider' | 'image' | 'boolean' | 'derived';
+    value: any;
+    status: 'answered' | 'skipped';
+    saved_at: string;
+  }>;
+  products: Array<{
+    id: string;
+    image_url: string;
+    product_data: any;
+    created_at: string;
+    updated_at: string;
+  }>;
+}
+
+export interface ProfileUpdateResponse {
+  user_id: string;
+  email?: string;
+  sso_provider?: string;
+  created_at: string;
+  updated_at: string;
+  updated: boolean;
+}
+
+export interface ProfileDeleteResponse {
+  user_id: string;
+  deleted: boolean;
+  deleted_at: string;
+}

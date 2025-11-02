@@ -105,3 +105,11 @@ export const logoutRequestSchema = z.object({
   refresh_token: z.string().min(1),
 });
 
+export const profileUpdateRequestSchema = z.object({
+  email: z.string().email().optional(),
+  password: z.string().min(8).max(100).optional(),
+}).refine(
+  (data) => data.email || data.password,
+  { message: "At least one field (email or password) must be provided" }
+);
+
