@@ -9,7 +9,7 @@ services:
       - NODE_ENV=${NODE_ENV:-production}
       - PORT=${PORT:-3000}
       - JWT_SECRET=${JWT_SECRET}
-      - PRODUCTION_BASE_URL=${PRODUCTION_BASE_URL}
+      - API_BASE_URL=${API_BASE_URL}
       - MAX_REQUEST_SIZE=${MAX_REQUEST_SIZE}
       - DATABASE_URL=postgresql://postgres:password@skintel-database:5432/skintel_db
       - OPENAI_API_KEY=${OPENAI_API_KEY}
