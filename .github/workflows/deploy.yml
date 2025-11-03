@@ -55,7 +55,7 @@ jobs:
             sudo docker compose down || true
             # added as temp fix
             sudo docker system prune -f  # Clean up unused images/containers
-            sudo docker compose build --no-cache  # Force rebuild without cache
+            sudo docker compose build  # Force rebuild without cache
             sudo docker compose up -d --force-recreate
           EOF
           
