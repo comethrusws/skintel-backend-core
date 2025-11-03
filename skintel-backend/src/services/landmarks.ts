@@ -201,47 +201,66 @@ export async function processLandmarksForAnswerWithUrl(answerId: string, imageUr
       }
     });
 
-    const result = await processLandmarks(imageUrl);
+    // presifgned landmark image url
+    const presignedUrl = await maybePresignUrl(imageUrl, 300);
+    const url = `${LANDMARK_SERVICE_URL}${LANDMARK_ENDPOINT}`;
 
-    if (result.success && result.data) {
+    console.log(`Processing landmarks for image URL: ${imageUrl} (presigned) at ${url}`);
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT);
+
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        image_url: presignedUrl
+      }),
+      signal: controller.signal
+    });
+
+    clearTimeout(timeoutId);
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Landmark service returned ${response.status}: ${errorText}`);
+    }
+
+    const result: LandmarkResponse = await response.json();
+
+    if (result.status !== 'success') {
+      throw new Error(`Landmark processing failed: ${result.error || 'Unknown error'}`);
+    }
+
+    await prisma.facialLandmarks.update({
+      where: { answerId },
+      data: {
+        landmarks: result as unknown as any,
+        status: 'COMPLETED',
+        processedAt: new Date()
+      }
+    });
+
+    try {
+      const analysis = await analyzeWithLandmarks(imageUrl, result);
       await prisma.facialLandmarks.update({
         where: { answerId },
-        data: {
-          landmarks: result.data as unknown as any,
-          status: 'COMPLETED',
-          processedAt: new Date()
-        }
+        data: { analysis: analysis as any }
       });
+    } catch (analysisError) {
+      console.error('Skin analysis failed:', analysisError);
+    }
 
-      try {
-        const analysis = await analyzeWithLandmarks(imageUrl, result.data);
-        await prisma.facialLandmarks.update({
-          where: { answerId },
-          data: { analysis: analysis as any }
-        });
-      } catch (analysisError) {
-        console.error('Skin analysis failed:', analysisError);
+    // reconcile user link in case merge happened after we created the record
+    try {
+      const latest = await prisma.onboardingAnswer.findUnique({ where: { answerId }, select: { userId: true } });
+      if (latest?.userId) {
+        await prisma.facialLandmarks.update({ where: { answerId }, data: { userId: latest.userId } });
       }
-
-      // reconcile user link in case merge happened after we created the record
-      try {
-        const latest = await prisma.onboardingAnswer.findUnique({ where: { answerId }, select: { userId: true } });
-        if (latest?.userId) {
-          await prisma.facialLandmarks.update({ where: { answerId }, data: { userId: latest.userId } });
-        }
-      } catch (linkErr) {
-        console.warn('Failed to reconcile facialLandmarks.userId post-processing (url)', { answerId });
-      }
-    } else {
-      await prisma.facialLandmarks.update({
-        where: { answerId },
-        data: {
-          status: 'FAILED',
-          error: result.error,
-          processedAt: new Date()
-        }
-      });
-      console.error(`landmark processing failed for answer: ${answerId}, error: ${result.error}`);
+    } catch (linkErr) {
+      console.warn('Failed to reconcile facialLandmarks.userId post-processing (url)', { answerId });
     }
   } catch (error) {
     console.error('Error in url-based landmark processing:', error);
