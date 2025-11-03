@@ -40,6 +40,8 @@ jobs:
             # Create .env file with properly quoted secrets
             cat > .env << 'ENVEOF'
           NODE_ENV="${{ secrets.NODE_ENV }}"
+          PRODUCTION_BASE_URL="${{ secrets.PRODUCTION_BASE_URL }}"
+          MAX_REQUEST_SIZE="${{ secrets.MAX_REQUEST_SIZE }}"
           PORT="${{ secrets.PORT }}"
           JWT_SECRET="${{ secrets.JWT_SECRET }}"
           OPENAI_API_KEY="${{ secrets.OPENAI_API_KEY }}"
