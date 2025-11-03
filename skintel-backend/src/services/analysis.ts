@@ -22,7 +22,7 @@ function buildPrompt(): string {
     '4. Use information from all angles to provide comprehensive analysis\n' +
     '5. Return the facial issues in 68 face landmark data format in JSON\n' +
     '\n' +
-    'Example output (clearly highlight the issues visible in the images):\n' +
+    'Example output (clearly highlight the issues visible in the images), not just these 2 kind of issues. highlight as many issues you see in the images and respond in the following format:\n' +
     '{\n' +
     '  "issues": [\n' +
     '    {"type": "dark_circles", "region": "under_eye_left", "severity": "moderate", "visible_in": ["front"], "dlib_68_facial_landmarks": [\n' +
@@ -85,9 +85,10 @@ export async function analyzeSkin(answerId: string) {
 
   const record = await prisma.facialLandmarks.findUnique({
     where: { answerId },
-    include: {
+    select: {
+      landmarks: true,
       answer: {
-        select: { value: true, userId: true, sessionId: true }
+        select: { userId: true, sessionId: true }
       }
     }
   });
@@ -96,7 +97,6 @@ export async function analyzeSkin(answerId: string) {
     throw new Error('Landmarks record not found');
   }
 
-  // Get all 3 face images for this user/session
   const faceImages = await getUserFaceImages(record.answer?.userId, record.answer?.sessionId);
   
   if (!faceImages.front && !faceImages.left && !faceImages.right) {
@@ -106,7 +106,6 @@ export async function analyzeSkin(answerId: string) {
   const landmarks = record.landmarks as unknown as object;
   const prompt = buildPrompt();
 
-  // Prepare image content for OpenAI
   const imageContent: any[] = [];
   const availableImages: string[] = [];
 
