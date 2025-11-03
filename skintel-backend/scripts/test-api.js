@@ -399,7 +399,7 @@ async function testGetOnboardingState() {
 async function testUserSignup() {
   const response = await makeRequest('POST', '/v1/auth/signup', {
     session_id: sessionId,
-    email: `basabjha@mail.com`,
+    email: `basabjha112@mail.com`,
     password: 'basabhaha123'
   });
 

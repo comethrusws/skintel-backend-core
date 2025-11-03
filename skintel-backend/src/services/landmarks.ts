@@ -21,6 +21,8 @@ function getImageUrl(imageId: string): string {
 
 /**
  * facial landmarks for an img
+ * Note: Landmarks should only be processed for front-facing images
+ * as this is the standard pose for accurate facial landmark detection
  */
 export async function processLandmarks(imageId: string): Promise<LandmarkProcessingResult> {
   try {
@@ -73,7 +75,7 @@ export async function processLandmarks(imageId: string): Promise<LandmarkProcess
 }
 
 /**
- * this is to porcess landmarks asynchronously w/out blocking our main flow
+ * process landmarks asynchronously for front face images only, skip other profile
  */
 export async function processLandmarksAsync(answerId: string, imageId: string): Promise<void> {
   const { prisma } = await import('../lib/prisma');
@@ -171,7 +173,8 @@ export async function processLandmarksAsync(answerId: string, imageId: string): 
 }
 
 /**
- * process landmarks for a direct image URL and persist analysis for an answer
+ * process landmarks for a direct image URL (front face only)
+ * and persist analysis for an answer
  */
 export async function processLandmarksForAnswerWithUrl(answerId: string, imageUrl: string): Promise<void> {
   const { prisma } = await import('../lib/prisma');

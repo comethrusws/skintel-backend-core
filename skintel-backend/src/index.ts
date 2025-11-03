@@ -19,10 +19,35 @@ dotenv.config();
 const app: Express = express();
 const port = process.env.PORT || 3000;
 
+const maxRequestSize = process.env.MAX_REQUEST_SIZE || '50mb';
+console.log(`Server starting with MAX_REQUEST_SIZE: ${maxRequestSize}`);
+
 app.use(helmet());
 app.use(cors());
-app.use(express.json({ limit: process.env.MAX_REQUEST_SIZE }));
-app.use(express.urlencoded({ extended: true, limit: process.env.MAX_REQUEST_SIZE }));
+
+app.use(express.json({ 
+  limit: maxRequestSize,
+  verify: (req: any, res: any, buf: Buffer) => {
+    req.rawBody = buf;
+  }
+}));
+
+app.use(express.urlencoded({ 
+  extended: true, 
+  limit: maxRequestSize 
+}));
+
+// Add middleware to catch payload too large errors
+app.use((error: any, req: Request, res: Response, next: Function) => {
+  if (error.type === 'entity.too.large') {
+    return res.status(413).json({
+      error: 'Payload too large',
+      message: `Request size exceeds limit of ${maxRequestSize}`,
+      limit: maxRequestSize
+    });
+  }
+  next(error);
+});
 
 app.use('/v1/sessions', sessionsRouter);
 app.use('/v1/onboarding', onboardingRouter);
