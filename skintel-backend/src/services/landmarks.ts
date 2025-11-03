@@ -120,6 +120,11 @@ export async function processLandmarksAsync(answerId: string, imageId: string): 
       try {
         const analysis = await analyzeSkin(answerId);
         console.log('Skin analysis completed:', analysis);
+
+        await prisma.facialLandmarks.update({
+          where: { answerId },
+          data: { analysis: analysis as any }
+        });
       } catch (analysisError) {
         console.error('Skin analysis failed:', analysisError);
       }
