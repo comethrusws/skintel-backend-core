@@ -161,6 +161,13 @@ router.get('/analysis', authenticateUser, async (req: AuthenticatedRequest, res:
         analysis: landmark.analysis ? 
           (typeof landmark.analysis === 'string' ? JSON.parse(landmark.analysis) : landmark.analysis) 
           : null,
+        score: landmark.score,
+        weekly_plan: landmark.weeklyPlan ? 
+          (typeof landmark.weeklyPlan === 'string' ? JSON.parse(landmark.weeklyPlan) : landmark.weeklyPlan) 
+          : null,
+        analysis_type: landmark.analysisType,
+        plan_start_date: landmark.planStartDate?.toISOString(),
+        plan_end_date: landmark.planEndDate?.toISOString(),
         status: landmark.status,
         processed_at: landmark.processedAt?.toISOString(),
         created_at: landmark.createdAt.toISOString(),

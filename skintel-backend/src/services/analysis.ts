@@ -1,6 +1,7 @@
 import { prisma } from '../lib/prisma';
 import OpenAI from 'openai';
 import { maybePresignUrl } from '../lib/s3';
+import { EnhancedAnalysisResult } from '../types';
 
 const OPENAI_MODEL = process.env.OPENAI_MODEL || 'gpt-5';
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
@@ -20,9 +21,11 @@ function buildPrompt(): string {
     '2. Clearly mention the affected regions (e.g., "mild acne on the right cheek", "dark spots on left temple")\n' +
     '3. Give severity-based explanations (mild = easy care, severe = consider dermatologist)\n' +
     '4. Use information from all angles to provide comprehensive analysis\n' +
-    '5. Return the facial issues in 68 face landmark data format in JSON\n' +
+    '5. Provide an overall skin health score out of 100\n' +
+    '6. Create a 4-week improvement plan with weekly previews and expected improvement percentages\n' +
+    '7. Return the facial issues in 68 face landmark data format in JSON\n' +
     '\n' +
-    'Example output (clearly highlight the issues visible in the images), not just these 2 kind of issues. highlight as many issues you see in the images and respond in the following format:\n' +
+    'Example output (clearly highlight the issues visible in the images):\n' +
     '{\n' +
     '  "issues": [\n' +
     '    {"type": "dark_circles", "region": "under_eye_left", "severity": "moderate", "visible_in": ["front"], "dlib_68_facial_landmarks": [\n' +
@@ -35,6 +38,13 @@ function buildPrompt(): string {
     '    ]}\n' +
     '  ],\n' +
     '  "overall_assessment": "Combination skin with mild acne and moderate dark circles",\n' +
+    '  "score": 72,\n' +
+    '  "weekly_plan": [\n' +
+    '    {"week": 1, "preview": "Start gentle cleansing routine with salicylic acid", "improvement_expected": "15%"},\n' +
+    '    {"week": 2, "preview": "Add eye cream for dark circles and maintain cleansing", "improvement_expected": "30%"},\n' +
+    '    {"week": 3, "preview": "Introduce retinol treatment and sun protection", "improvement_expected": "50%"},\n' +
+    '    {"week": 4, "preview": "Maintain routine and assess overall progress", "improvement_expected": "70%"}\n' +
+    '  ],\n' +
     '  "images_analyzed": ["front", "left", "right"]\n' +
     '}'
   );
@@ -78,6 +88,54 @@ async function getUserFaceImages(userId: string | null, sessionId: string | null
   return images;
 }
 
+async function determineAnalysisType(userId: string | null, sessionId: string | null): Promise<{
+  type: 'INITIAL' | 'PROGRESS',
+  planStartDate?: Date,
+  planEndDate?: Date
+}> {
+  const recentAnalysis = await prisma.facialLandmarks.findFirst({
+    where: {
+      OR: [
+        { userId: userId },
+        { answer: { sessionId: sessionId } }
+      ],
+      planStartDate: { not: null }
+    },
+    orderBy: { createdAt: 'desc' }
+  });
+
+  if (!recentAnalysis || !recentAnalysis.planEndDate) {
+    const startDate = new Date();
+    const endDate = new Date(startDate);
+    endDate.setDate(endDate.getDate() + 28);
+    
+    return {
+      type: 'INITIAL',
+      planStartDate: startDate,
+      planEndDate: endDate
+    };
+  }
+
+  const now = new Date();
+  if (now <= recentAnalysis.planEndDate) {
+    return {
+      type: 'PROGRESS',
+      planStartDate: recentAnalysis.planStartDate!,
+      planEndDate: recentAnalysis.planEndDate
+    };
+  } else {
+    const startDate = new Date();
+    const endDate = new Date(startDate);
+    endDate.setDate(endDate.getDate() + 28);
+    
+    return {
+      type: 'INITIAL',
+      planStartDate: startDate,
+      planEndDate: endDate
+    };
+  }
+}
+
 export async function analyzeSkin(answerId: string) {
   if (!process.env.OPENAI_API_KEY) {
     throw new Error('OPENAI_API_KEY is not set');
@@ -103,6 +161,7 @@ export async function analyzeSkin(answerId: string) {
     throw new Error('No face images found for analysis');
   }
 
+  const analysisTypeInfo = await determineAnalysisType(record.answer?.userId, record.answer?.sessionId);
   const landmarks = record.landmarks as unknown as object;
   const prompt = buildPrompt();
 
@@ -134,7 +193,7 @@ export async function analyzeSkin(answerId: string) {
         content: [
           { 
             type: 'text', 
-            text: `Here are the face images (${availableImages.join(', ')}) and the facial landmarks JSON from the front image. Please analyze all visible skin issues across all provided images.` 
+            text: `Here are the face images (${availableImages.join(', ')}) and the facial landmarks JSON from the front image. Please analyze all visible skin issues across all provided images and provide a comprehensive analysis with score and 4-week plan.` 
           },
           ...imageContent,
           { type: 'text', text: `Facial landmarks from front image: ${JSON.stringify(landmarks)}` }
@@ -147,17 +206,24 @@ export async function analyzeSkin(answerId: string) {
 
   const content = completion.choices?.[0]?.message?.content ?? '';
 
-  let parsed: unknown;
+  let parsed: EnhancedAnalysisResult;
   try {
-    parsed = JSON.parse(content);
+    parsed = JSON.parse(content) as EnhancedAnalysisResult;
   } catch {
-    parsed = { raw: content };
+    parsed = { raw: content } as any;
   }
 
   try {
     await prisma.facialLandmarks.update({
       where: { answerId },
-      data: { analysis: parsed as any }
+      data: { 
+        analysis: parsed as any,
+        score: parsed.score || null,
+        weeklyPlan: parsed.weekly_plan || null,
+        analysisType: analysisTypeInfo.type,
+        planStartDate: analysisTypeInfo.planStartDate,
+        planEndDate: analysisTypeInfo.planEndDate
+      }
     });
   } catch (e) {
     console.error('Failed to persist analysis JSON:', e);
@@ -173,7 +239,6 @@ export async function analyzeWithLandmarks(frontImageUrl: string, landmarks: obj
 
   const prompt = buildPrompt();
   
-  // Prepare image content for OpenAI
   const imageContent: any[] = [];
   const availableImages: string[] = [];
 
@@ -202,7 +267,7 @@ export async function analyzeWithLandmarks(frontImageUrl: string, landmarks: obj
         content: [
           { 
             type: 'text', 
-            text: `Here are the face images (${availableImages.join(', ')}) and the facial landmarks JSON from the front image.` 
+            text: `Here are the face images (${availableImages.join(', ')}) and the facial landmarks JSON from the front image. Please analyze all visible skin issues and provide a comprehensive analysis with score and 4-week plan.` 
           },
           ...imageContent,
           { type: 'text', text: `Facial landmarks: ${JSON.stringify(landmarks)}` }
@@ -215,8 +280,8 @@ export async function analyzeWithLandmarks(frontImageUrl: string, landmarks: obj
   const content = completion.choices?.[0]?.message?.content ?? '';
 
   try {
-    return JSON.parse(content);
+    return JSON.parse(content) as EnhancedAnalysisResult;
   } catch {
-    return { raw: content };
+    return { raw: content } as any;
   }
 }
