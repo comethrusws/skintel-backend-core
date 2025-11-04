@@ -219,7 +219,7 @@ export async function analyzeSkin(answerId: string) {
       data: { 
         analysis: parsed as any,
         score: parsed.score || null,
-        weeklyPlan: parsed.weekly_plan || null,
+        weeklyPlan: parsed.weekly_plan as any,
         analysisType: analysisTypeInfo.type,
         planStartDate: analysisTypeInfo.planStartDate,
         planEndDate: analysisTypeInfo.planEndDate
