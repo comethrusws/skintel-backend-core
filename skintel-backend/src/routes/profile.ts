@@ -158,7 +158,9 @@ router.get('/analysis', authenticateUser, async (req: AuthenticatedRequest, res:
         answer_id: landmark.answerId,
         question_id: landmark.answer.questionId,
         screen_id: landmark.answer.screenId,
-        analysis: landmark.analysis,
+        analysis: landmark.analysis ? 
+          (typeof landmark.analysis === 'string' ? JSON.parse(landmark.analysis) : landmark.analysis) 
+          : null,
         status: landmark.status,
         processed_at: landmark.processedAt?.toISOString(),
         created_at: landmark.createdAt.toISOString(),
