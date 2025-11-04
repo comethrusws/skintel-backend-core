@@ -3,6 +3,7 @@ import { authenticateUser, AuthenticatedRequest } from '../middleware/auth';
 import { profileUpdateRequestSchema } from '../lib/validation';
 import { prisma } from '../lib/prisma';
 import { hashPassword } from '../utils/auth';
+import { ProgressAnalysisItem } from '../types';
 
 const router = Router();
 
@@ -98,6 +99,20 @@ const router = Router();
  *       401:
  *         description: Authentication required
  * 
+ * /v1/profile/progress:
+ *   get:
+ *     summary: Get current 4-week plan progress
+ *     description: Retrieve progress tracking data for the user's current active 4-week skin improvement plan
+ *     tags: [Profile]
+ *     security:
+ *       - BearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Progress data retrieved successfully
+ *       401:
+ *         description: Authentication required
+ *       404:
+ *         description: No active plan found
  */
 
 router.get('/', authenticateUser, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
@@ -337,6 +352,116 @@ router.delete('/', authenticateUser, async (req: AuthenticatedRequest, res: Resp
     res.json(response);
   } catch (error) {
     console.error('Delete profile error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+router.get('/progress', authenticateUser, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const userId = req.userId!;
+
+    const currentPlan = await prisma.facialLandmarks.findFirst({
+      where: { 
+        userId,
+        planStartDate: { not: null },
+        planEndDate: { not: null }
+      },
+      orderBy: { planStartDate: 'desc' }
+    });
+
+    if (!currentPlan || !currentPlan.planStartDate || !currentPlan.planEndDate) {
+      res.json({
+        user_id: userId,
+        has_active_plan: false,
+        progress_analyses: [],
+        total_analyses_in_period: 0
+      });
+      return;
+    }
+
+    const now = new Date();
+    const isActivePlan = now <= currentPlan.planEndDate;
+    
+    const planStartDate = currentPlan.planStartDate;
+    const planEndDate = currentPlan.planEndDate;
+
+    const planAnalyses = await prisma.facialLandmarks.findMany({
+      where: {
+        userId,
+        planStartDate: planStartDate,
+        planEndDate: planEndDate,
+        status: 'COMPLETED'
+      },
+      include: {
+        answer: {
+          select: {
+            questionId: true,
+            screenId: true
+          }
+        }
+      },
+      orderBy: { createdAt: 'asc' }
+    });
+
+    const initialAnalysis = planAnalyses.find(a => a.analysisType === 'INITIAL');
+    const progressAnalyses = planAnalyses.filter(a => a.analysisType === 'PROGRESS');
+
+    const daysSincePlanStart = Math.floor(
+      (now.getTime() - planStartDate.getTime()) / (1000 * 60 * 60 * 24)
+    );
+    const daysRemaining = Math.max(0, Math.floor(
+      (planEndDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)
+    ));
+
+    const daysSinceLastAnalysis = planAnalyses.length > 0 
+      ? Math.floor((now.getTime() - planAnalyses[planAnalyses.length - 1].createdAt.getTime()) / (1000 * 60 * 60 * 24))
+      : 0;
+    
+    const nextRecommendedDays = 7 - (daysSinceLastAnalysis % 7);
+    const nextRecommendedDate = new Date();
+    nextRecommendedDate.setDate(nextRecommendedDate.getDate() + (daysSinceLastAnalysis >= 7 ? 0 : nextRecommendedDays));
+
+    const latestAnalysis = planAnalyses[planAnalyses.length - 1];
+    const scoreImprovement = (initialAnalysis?.score && latestAnalysis?.score) 
+      ? latestAnalysis.score - initialAnalysis.score 
+      : undefined;
+
+    const formatAnalysisItem = (analysis: any, planStartDate: Date): ProgressAnalysisItem => ({
+      answer_id: analysis.answerId,
+      question_id: analysis.answer.questionId,
+      screen_id: analysis.answer.screenId,
+      analysis: analysis.analysis ? 
+        (typeof analysis.analysis === 'string' ? JSON.parse(analysis.analysis) : analysis.analysis) 
+        : null,
+      score: analysis.score,
+      weekly_plan: analysis.weeklyPlan ? 
+        (typeof analysis.weeklyPlan === 'string' ? JSON.parse(analysis.weeklyPlan) : analysis.weeklyPlan) 
+        : null,
+      analysis_type: analysis.analysisType,
+      created_at: analysis.createdAt.toISOString(),
+      days_since_initial: Math.floor(
+        (analysis.createdAt.getTime() - planStartDate.getTime()) / (1000 * 60 * 60 * 24)
+      )
+    });
+
+    const response = {
+      user_id: userId,
+      has_active_plan: isActivePlan,
+      plan_start_date: planStartDate.toISOString(),
+      plan_end_date: planEndDate.toISOString(),
+      days_remaining: isActivePlan ? daysRemaining : 0,
+      days_elapsed: daysSincePlanStart,
+      initial_analysis: initialAnalysis ? formatAnalysisItem(initialAnalysis, planStartDate) : undefined,
+      progress_analyses: progressAnalyses.map(a => formatAnalysisItem(a, planStartDate)),
+      latest_score: latestAnalysis?.score,
+      score_improvement: scoreImprovement,
+      total_analyses_in_period: planAnalyses.length,
+      next_recommended_analysis: isActivePlan ? nextRecommendedDate.toISOString() : undefined
+    };
+
+    res.json(response);
+  } catch (error) {
+    console.error('Get progress error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });

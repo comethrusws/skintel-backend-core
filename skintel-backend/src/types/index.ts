@@ -262,3 +262,30 @@ export interface VersionCheckResponse {
   download_url: string;
   platform: 'ios';
 }
+
+export interface ProgressAnalysisItem {
+  answer_id: string;
+  question_id: string;
+  screen_id: string;
+  analysis?: any;
+  score?: number;
+  weekly_plan?: WeeklyPlanItem[];
+  analysis_type: 'INITIAL' | 'PROGRESS';
+  created_at: string;
+  days_since_initial: number;
+}
+
+export interface UserProgressResponse {
+  user_id: string;
+  has_active_plan: boolean;
+  plan_start_date?: string;
+  plan_end_date?: string;
+  days_remaining?: number;
+  days_elapsed?: number;
+  initial_analysis?: ProgressAnalysisItem;
+  progress_analyses: ProgressAnalysisItem[];
+  latest_score?: number;
+  score_improvement?: number;
+  total_analyses_in_period: number;
+  next_recommended_analysis?: string;
+}
