@@ -181,6 +181,26 @@ export interface UserProfileResponse {
   updated_at: string;
 }
 
+export interface WeeklyPlanItem {
+  week: number;
+  preview: string;
+  improvement_expected: string;
+}
+
+export interface EnhancedAnalysisResult {
+  issues: Array<{
+    type: string;
+    region: string;
+    severity: string;
+    visible_in: string[];
+    dlib_68_facial_landmarks: Array<{ x: number; y: number }>;
+  }>;
+  overall_assessment: string;
+  images_analyzed: string[];
+  score: number;
+  weekly_plan: WeeklyPlanItem[];
+}
+
 export interface UserAnalysisResponse {
   user_id: string;
   analysis: Array<{
@@ -188,6 +208,11 @@ export interface UserAnalysisResponse {
     question_id: string;
     screen_id: string;
     analysis?: any;
+    score?: number;
+    weekly_plan?: WeeklyPlanItem[];
+    analysis_type?: 'INITIAL' | 'PROGRESS';
+    plan_start_date?: string;
+    plan_end_date?: string;
     status: 'PROCESSING' | 'COMPLETED' | 'FAILED';
     processed_at?: string;
     created_at: string;
@@ -236,4 +261,31 @@ export interface VersionCheckResponse {
   update_required: boolean;
   download_url: string;
   platform: 'ios';
+}
+
+export interface ProgressAnalysisItem {
+  answer_id: string;
+  question_id: string;
+  screen_id: string;
+  analysis?: any;
+  score?: number;
+  weekly_plan?: WeeklyPlanItem[];
+  analysis_type: 'INITIAL' | 'PROGRESS';
+  created_at: string;
+  days_since_initial: number;
+}
+
+export interface UserProgressResponse {
+  user_id: string;
+  has_active_plan: boolean;
+  plan_start_date?: string;
+  plan_end_date?: string;
+  days_remaining?: number;
+  days_elapsed?: number;
+  initial_analysis?: ProgressAnalysisItem;
+  progress_analyses: ProgressAnalysisItem[];
+  latest_score?: number;
+  score_improvement?: number;
+  total_analyses_in_period: number;
+  next_recommended_analysis?: string;
 }

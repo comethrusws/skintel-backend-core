@@ -54,7 +54,6 @@ export async function analyzeProduct(imageUrl: string): Promise<object> {
         ]
       }
     ],
-    temperature: 0.1,
     response_format: { type: 'json_object' }
   });
 
@@ -75,10 +74,10 @@ export async function createProduct(userId: string, imageUrls: string[]): Promis
   const product = await prisma.product.create({
     data: {
       userId,
-      imageUrl: primaryImageUrl, // Keep primary image in imageUrl field for backward compatibility
+      imageUrl: primaryImageUrl, 
       productData: {
         ...productData,
-        images: imageUrls, // Store all images in productData
+        images: imageUrls, 
       },
     },
   });

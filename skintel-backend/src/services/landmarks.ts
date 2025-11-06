@@ -1,6 +1,5 @@
 import { LandmarkResponse, LandmarkProcessingResult } from '../types';
 import { maybePresignUrl } from '../lib/s3';
-import type { Prisma } from '@prisma/client';
 import { analyzeSkin, analyzeWithLandmarks } from './analysis';
 
 const LANDMARK_SERVICE_URL = process.env.LANDMARK_URL || 'http://localhost:8000';
