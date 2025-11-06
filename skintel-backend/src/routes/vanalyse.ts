@@ -1,16 +1,21 @@
 import { Router, Request, Response } from 'express';
 import { analyzeSkin, analyzeWithLandmarks } from '../services/analysis';
 import { processLandmarks } from '../services/landmarks';
+import { authenticateUser, AuthenticatedRequest } from '../middleware/auth';
+import { prisma } from '../lib/prisma';
 
 export const vanalyseRouter = Router();
 
+
 /**
  * @swagger
- * /v1/vanalyse:
+ * /v1/vanalyse/progress:
  *   post:
- *     summary: Run skin analysis for face images
- *     description: Triggers AI skin analysis using facial landmarks and multiple face images (front, left, right profiles).
+ *     summary: Run progress face analysis
+ *     description: Analyzes face images for progress tracking within an active 4-week improvement plan. Requires authentication and existing active plan.
  *     tags: [Analysis]
+ *     security:
+ *       - BearerAuth: []
  *     requestBody:
  *       required: true
  *       content:
@@ -18,84 +23,139 @@ export const vanalyseRouter = Router();
  *           schema:
  *             type: object
  *             properties:
- *               answerId:
- *                 type: string
- *                 description: The onboarding `answer_id` for a face image question
  *               front_image_url:
  *                 type: string
- *                 description: URL to front face image (required for landmarks)
+ *                 format: uri
+ *                 description: URL to front face image (required)
  *               left_image_url:
  *                 type: string
+ *                 format: uri
  *                 description: URL to left profile image (optional)
  *               right_image_url:
  *                 type: string
+ *                 format: uri
  *                 description: URL to right profile image (optional)
+ *             required:
+ *               - front_image_url
  *     responses:
  *       200:
- *         description: Analysis completed
+ *         description: Progress analysis completed
  *         content:
  *           application/json:
  *             schema:
  *               type: object
  *               properties:
- *                 answerId:
+ *                 answer_id:
  *                   type: string
  *                 analysis:
+ *                   type: object
+ *                 landmarks:
  *                   type: object
  *                 images_analyzed:
  *                   type: array
  *                   items:
  *                     type: string
+ *                 analysis_type:
+ *                   type: string
+ *                   enum: [PROGRESS]
  *       400:
- *         description: Missing or invalid request body
+ *         description: Missing required data or no active plan
+ *       401:
+ *         description: Authentication required
  *       500:
- *         description: Analysis failed due to a server error
+ *         description: Analysis processing failed
  */
-vanalyseRouter.post('/', async (req: Request, res: Response) => {
+vanalyseRouter.post('/progress', authenticateUser, async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const { answerId, front_image_url, left_image_url, right_image_url } = req.body as { 
-      answerId?: string; 
-      front_image_url?: string; 
-      left_image_url?: string; 
-      right_image_url?: string; 
+    const userId = req.userId!;
+    const { front_image_url, left_image_url, right_image_url } = req.body as {
+      front_image_url?: string;
+      left_image_url?: string;
+      right_image_url?: string;
     };
 
-    if (!answerId && !front_image_url) {
-      return res.status(400).json({ error: 'Provide either answerId or front_image_url' });
+    if (!front_image_url) {
+      return res.status(400).json({ error: 'front_image_url is required' });
     }
 
-    if (answerId) {
-      // Use stored landmarks and find all face images for this user
-      const analysis = await analyzeSkin(answerId);
-      return res.json({ answerId, analysis });
+    const activePlan = await prisma.facialLandmarks.findFirst({
+      where: { 
+        userId,
+        planStartDate: { not: null },
+        planEndDate: { gt: new Date() }
+      },
+      orderBy: { createdAt: 'desc' }
+    });
+
+    if (!activePlan) {
+      return res.status(400).json({ 
+        error: 'No active improvement plan found. Complete initial analysis first.' 
+      });
     }
 
-    // For direct image URLs: process landmarks from front image then analyze all images
-    const landmarkResult = await processLandmarks(front_image_url!);
+    const landmarkResult = await processLandmarks(front_image_url);
     if (!landmarkResult.success || !landmarkResult.data) {
-      return res.status(500).json({ error: landmarkResult.error || 'landmark processing failed' });
+      return res.status(500).json({ 
+        error: landmarkResult.error || 'Landmark processing failed' 
+      });
     }
 
     const analysis = await analyzeWithLandmarks(
-      front_image_url!, 
-      landmarkResult.data, 
-      left_image_url, 
+      front_image_url,
+      landmarkResult.data,
+      left_image_url,
       right_image_url
     );
+
+    const answerId = `progress_${Date.now()}_${userId.slice(-6)}`;
+    await prisma.onboardingAnswer.create({
+      data: {
+        answerId,
+        userId,
+        sessionId: null,
+        screenId: 'progress_analysis',
+        questionId: 'q_face_photo_front',
+        type: 'image',
+        value: { image_url: front_image_url },
+        status: 'answered'
+      }
+    });
+
+    await prisma.facialLandmarks.create({
+      data: {
+        answerId,
+        userId,
+        landmarks: landmarkResult.data as unknown as any,
+        analysis: analysis,
+        status: 'COMPLETED',
+        processedAt: new Date(),
+        analysisType: 'PROGRESS',
+        planStartDate: activePlan.planStartDate,
+        planEndDate: activePlan.planEndDate,
+        score: analysis.score || null,
+        weeklyPlan: analysis.weekly_plan || null
+      }
+    });
 
     const imagesAnalyzed = ['front'];
     if (left_image_url) imagesAnalyzed.push('left');
     if (right_image_url) imagesAnalyzed.push('right');
 
-    return res.json({ 
-      front_image_url, 
-      analysis, 
+    return res.json({
+      answer_id: answerId,
+      analysis,
       landmarks: landmarkResult.data,
-      images_analyzed: imagesAnalyzed
+      images_analyzed: imagesAnalyzed,
+      analysis_type: 'PROGRESS',
+      plan_start_date: activePlan.planStartDate?.toISOString(),
+      plan_end_date: activePlan.planEndDate?.toISOString()
     });
+
   } catch (error) {
-    console.error('vanalyse error', error);
-    return res.status(500).json({ error: error instanceof Error ? error.message : 'analysis failed' });
+    console.error('Progress analysis error:', error);
+    return res.status(500).json({ 
+      error: error instanceof Error ? error.message : 'Progress analysis failed' 
+    });
   }
 });
 
