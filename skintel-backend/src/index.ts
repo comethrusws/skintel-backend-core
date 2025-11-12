@@ -13,6 +13,7 @@ import { versionRouter } from './routes/version';
 import { prisma } from './lib/prisma';
 import { vanalyseRouter } from './routes/vanalyse';
 import { specs, swaggerUi } from './lib/swagger';
+import { locationRouter } from './routes/location';
 
 dotenv.config();
 
@@ -37,7 +38,6 @@ app.use(express.urlencoded({
   limit: maxRequestSize 
 }));
 
-// Add middleware to catch payload too large errors
 app.use((error: any, req: Request, res: Response, next: Function) => {
   if (error.type === 'entity.too.large') {
     return res.status(413).json({
@@ -58,6 +58,7 @@ app.use('/v1/upload', uploadRouter);
 app.use('/v1/profile', profileRouter);
 app.use('/v1/version', versionRouter);
 app.use('/v1/vanalyse', vanalyseRouter);
+app.use('/v1/location', locationRouter);
 
 // Swagger documentation
 app.use('/docs', swaggerUi.serve, swaggerUi.setup(specs, {

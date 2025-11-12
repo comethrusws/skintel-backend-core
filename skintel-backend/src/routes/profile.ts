@@ -12,7 +12,7 @@ const router = Router();
  * /v1/profile:
  *   get:
  *     summary: Get user profile
- *     description: Retrieve basic user profile information
+ *     description: Retrieve complete user profile information including name, phone, profile image, and date of birth
  *     tags: [Profile]
  *     security:
  *       - BasicAuth: []
@@ -20,6 +20,41 @@ const router = Router();
  *     responses:
  *       200:
  *         description: Profile retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 user_id:
+ *                   type: string
+ *                 name:
+ *                   type: string
+ *                   nullable: true
+ *                 phone_number:
+ *                   type: string
+ *                   nullable: true
+ *                 date_of_birth:
+ *                   type: string
+ *                   format: date-time
+ *                   nullable: true
+ *                 profile_image:
+ *                   type: string
+ *                   format: uri
+ *                   nullable: true
+ *                   description: Front face photo from onboarding
+ *                 email:
+ *                   type: string
+ *                   format: email
+ *                   nullable: true
+ *                 sso_provider:
+ *                   type: string
+ *                   nullable: true
+ *                 created_at:
+ *                   type: string
+ *                   format: date-time
+ *                 updated_at:
+ *                   type: string
+ *                   format: date-time
  *       401:
  *         description: Authentication required
  *       404:
@@ -27,7 +62,7 @@ const router = Router();
  * 
  *   put:
  *     summary: Update user profile
- *     description: Update user profile information
+ *     description: Update user profile information (only name and phone number can be updated)
  *     tags: [Profile]
  *     security:
  *       - BearerAuth: []
@@ -39,23 +74,63 @@ const router = Router();
  *           schema:
  *             type: object
  *             properties:
- *               email:
+ *               name:
  *                 type: string
- *                 format: email
- *               password:
+ *                 minLength: 1
+ *                 maxLength: 100
+ *                 example: "John Doe"
+ *               phone_number:
  *                 type: string
- *                 minLength: 8
+ *                 minLength: 1
+ *                 maxLength: 20
+ *                 example: "+1234567890"
+ *             minProperties: 1
+ *             description: At least one field must be provided
  *     responses:
  *       200:
  *         description: Profile updated successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 user_id:
+ *                   type: string
+ *                 name:
+ *                   type: string
+ *                   nullable: true
+ *                 phone_number:
+ *                   type: string
+ *                   nullable: true
+ *                 date_of_birth:
+ *                   type: string
+ *                   format: date-time
+ *                   nullable: true
+ *                 profile_image:
+ *                   type: string
+ *                   format: uri
+ *                   nullable: true
+ *                 email:
+ *                   type: string
+ *                   format: email
+ *                   nullable: true
+ *                 sso_provider:
+ *                   type: string
+ *                   nullable: true
+ *                 created_at:
+ *                   type: string
+ *                   format: date-time
+ *                 updated_at:
+ *                   type: string
+ *                   format: date-time
+ *                 updated:
+ *                   type: boolean
  *       400:
  *         description: Invalid request data
  *       401:
  *         description: Authentication required
  *       404:
  *         description: User not found
- *       409:
- *         description: Email already exists
  * 
  *   delete:
  *     summary: Delete user profile
@@ -123,6 +198,9 @@ router.get('/', authenticateUser, async (req: AuthenticatedRequest, res: Respons
       where: { userId },
       select: {
         userId: true,
+        name: true,
+        phoneNumber: true,
+        dateOfBirth: true,
         email: true,
         ssoProvider: true,
         createdAt: true,
@@ -135,8 +213,29 @@ router.get('/', authenticateUser, async (req: AuthenticatedRequest, res: Respons
       return;
     }
 
+    let profileImage: string | undefined;
+    const frontFaceAnswer = await prisma.onboardingAnswer.findFirst({
+      where: {
+        userId,
+        questionId: 'q_face_photo_front',
+        status: 'answered'
+      },
+      orderBy: { savedAt: 'desc' }
+    });
+
+    if (frontFaceAnswer && frontFaceAnswer.value) {
+      const value = frontFaceAnswer.value as any;
+      if (value.image_url) {
+        profileImage = value.image_url;
+      }
+    }
+
     const response = {
       user_id: user.userId,
+      name: user.name,
+      phone_number: user.phoneNumber,
+      date_of_birth: user.dateOfBirth?.toISOString(),
+      profile_image: profileImage,
       email: user.email,
       sso_provider: user.ssoProvider,
       created_at: user.createdAt.toISOString(),
@@ -249,7 +348,7 @@ router.put('/', authenticateUser, async (req: AuthenticatedRequest, res: Respons
       return;
     }
 
-    const { email, password } = validationResult.data;
+    const { name, phone_number } = validationResult.data;
 
     const existingUser = await prisma.user.findUnique({
       where: { userId }
@@ -260,25 +359,14 @@ router.put('/', authenticateUser, async (req: AuthenticatedRequest, res: Respons
       return;
     }
 
-    if (email && email !== existingUser.email) {
-      const emailExists = await prisma.user.findUnique({
-        where: { email }
-      });
-
-      if (emailExists) {
-        res.status(409).json({ error: 'Email already exists' });
-        return;
-      }
-    }
-
     const updateData: any = {};
     
-    if (email) {
-      updateData.email = email;
+    if (name !== undefined) {
+      updateData.name = name;
     }
     
-    if (password) {
-      updateData.passwordHash = await hashPassword(password);
+    if (phone_number !== undefined) {
+      updateData.phoneNumber = phone_number;
     }
 
     const updatedUser = await prisma.user.update({
@@ -286,6 +374,9 @@ router.put('/', authenticateUser, async (req: AuthenticatedRequest, res: Respons
       data: updateData,
       select: {
         userId: true,
+        name: true,
+        phoneNumber: true,
+        dateOfBirth: true,
         email: true,
         ssoProvider: true,
         createdAt: true,
@@ -293,8 +384,29 @@ router.put('/', authenticateUser, async (req: AuthenticatedRequest, res: Respons
       }
     });
 
+    let profileImage: string | undefined;
+    const frontFaceAnswer = await prisma.onboardingAnswer.findFirst({
+      where: {
+        userId,
+        questionId: 'q_face_photo_front',
+        status: 'answered'
+      },
+      orderBy: { savedAt: 'desc' }
+    });
+
+    if (frontFaceAnswer && frontFaceAnswer.value) {
+      const value = frontFaceAnswer.value as any;
+      if (value.image_url) {
+        profileImage = value.image_url;
+      }
+    }
+
     const response = {
       user_id: updatedUser.userId,
+      name: updatedUser.name,
+      phone_number: updatedUser.phoneNumber,
+      date_of_birth: updatedUser.dateOfBirth?.toISOString(),
+      profile_image: profileImage,
       email: updatedUser.email,
       sso_provider: updatedUser.ssoProvider,
       created_at: updatedUser.createdAt.toISOString(),

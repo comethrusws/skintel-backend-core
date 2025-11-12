@@ -499,6 +499,37 @@ async function testInvalidRequests() {
   await testInvalidQuestionValues();
 }
 
+async function testLocationWeather() {
+  // Test valid coordinates (New York City)
+  const response = await makeRequest('POST', '/v1/location/weather', {
+    latitude: 40.7128,
+    longitude: -74.0060
+  });
+
+  assertEquals(response.status, 200, 'Should get weather data with 200');
+  
+  if (!response.data.temperature_celsius || !response.data.weather_condition_range) {
+    throw new Error('Response should contain temperature and weather range');
+  }
+  
+  const validRanges = ['minus_10_to_15_celsius', '6_to_29_celsius', '30_celsius_and_above'];
+  if (!validRanges.includes(response.data.weather_condition_range)) {
+    throw new Error(`Invalid weather range: ${response.data.weather_condition_range}`);
+  }
+  
+  log(`Weather: ${response.data.temperature_celsius}°C, Range: ${response.data.weather_condition_range}`, 'yellow');
+}
+
+async function testLocationWeatherInvalidCoords() {
+  // Test invalid coordinates
+  const response = await makeRequest('POST', '/v1/location/weather', {
+    latitude: 91, // Invalid latitude > 90
+    longitude: -74.0060
+  });
+  
+  assertEquals(response.status, 400, 'Should reject invalid coordinates');
+}
+
 async function runAllTests() {
   log('🚀 Starting API Tests', 'blue');
   
@@ -511,6 +542,8 @@ async function runAllTests() {
     await test('Get User Landmarks After Signup', testGetUserLandmarksAfterSignup);
     await test('Refresh Token', testRefreshToken);
     await test('User Logout', testLogout);
+    await test('Location Weather API', testLocationWeather);
+    await test('Location Weather Invalid Coords', testLocationWeatherInvalidCoords);
     await test('Invalid Requests', testInvalidRequests);
     
     log('\n🎉 All tests passed!', 'green');

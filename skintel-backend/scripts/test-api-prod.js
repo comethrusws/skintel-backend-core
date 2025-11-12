@@ -4,7 +4,7 @@ const { v4: uuidv4 } = require('uuid');
 const fs = require('fs');
 const path = require('path');
 
-const BASE_URL = 'http://localhost:3000';
+const BASE_URL = 'https://skintel.srecraft.io';
 const colors = {
   green: '\x1b[32m',
   red: '\x1b[31m',
@@ -29,7 +29,7 @@ function makeRequest(method, path, data = null, headers = {}) {
     const url = new URL(BASE_URL + path);
     const options = {
       hostname: url.hostname,
-      port: url.port,
+      port: url.port || 443,
       path: url.pathname + url.search,
       method,
       headers: {
@@ -38,7 +38,7 @@ function makeRequest(method, path, data = null, headers = {}) {
       }
     };
 
-    const req = http.request(options, (res) => {
+    const req = https.request(options, (res) => {
       let body = '';
       res.on('data', (chunk) => body += chunk);
       res.on('end', () => {
@@ -66,7 +66,7 @@ function makeBinaryRequest(method, path, buffer = null, headers = {}) {
     const url = new URL(BASE_URL + path);
     const options = {
       hostname: url.hostname,
-      port: url.port,
+      port: url.port || 443,
       path: url.pathname + url.search,
       method,
       headers: {
@@ -74,7 +74,7 @@ function makeBinaryRequest(method, path, buffer = null, headers = {}) {
       }
     };
 
-    const req = http.request(options, (res) => {
+    const req = https.request(options, (res) => {
       let body = '';
       res.on('data', (chunk) => body += chunk);
       res.on('end', () => {
@@ -97,7 +97,6 @@ function downloadToBuffer(url) {
   return new Promise((resolve, reject) => {
     https.get(url, (res) => {
       if (res.statusCode && res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
-        // handle simple redirects
         return resolve(downloadToBuffer(res.headers.location));
       }
       const chunks = [];
@@ -163,13 +162,13 @@ async function testSaveOnboardingAnswers() {
   const imgBufferLeft = fs.readFileSync(TEST_IMAGE_LEFT);
   const imgBufferRight = fs.readFileSync(TEST_IMAGE_RIGHT);
 
-  const uploadFront = await makeBinaryRequest('POST', '/v1/upload/file?prefix=tests-bdev', imgBufferFront, {
+  const uploadFront = await makeBinaryRequest('POST', '/v1/upload/file?prefix=prod-tests', imgBufferFront, {
     'Content-Type': 'image/jpeg'
   });
-  const uploadLeft = await makeBinaryRequest('POST', '/v1/upload/file?prefix=tests-bdev', imgBufferLeft, {
+  const uploadLeft = await makeBinaryRequest('POST', '/v1/upload/file?prefix=prod-tests', imgBufferLeft, {
     'Content-Type': 'image/jpeg'
   });
-  const uploadRight = await makeBinaryRequest('POST', '/v1/upload/file?prefix=tests-bdev', imgBufferRight, {
+  const uploadRight = await makeBinaryRequest('POST', '/v1/upload/file?prefix=prod-tests', imgBufferRight, {
     'Content-Type': 'image/jpeg'
   });
 
@@ -358,12 +357,11 @@ async function testSaveOnboardingAnswers() {
   
   log(`Saved ${answers.length} onboarding answers including comprehensive questionnaire`, 'yellow');
   
-  // Wait for landmark processing to complete
-  await new Promise(r => setTimeout(r, 20000));
+  // Wait longer for landmark processing in production
+  await new Promise(r => setTimeout(r, 30000));
 }
 
 async function testInvalidQuestionValues() {
-  // Test invalid skin type value
   const invalidResponse = await makeRequest('PUT', '/v1/onboarding', {
     session_id: sessionId,
     answers: [{
@@ -371,7 +369,7 @@ async function testInvalidQuestionValues() {
       screen_id: 'screen_skin_type',
       question_id: 'q_skin_type',
       type: 'single',
-      value: 'invalid_skin_type', // Invalid value
+      value: 'invalid_skin_type',
       status: 'answered',
       saved_at: new Date().toISOString()
     }]
@@ -397,16 +395,13 @@ async function testGetOnboardingState() {
 }
 
 async function testUserSignup() {
-  const uniqueEmail = `test_${Date.now()}_${Math.random().toString(36).substr(2, 9)}@example.com`;
+  const uniqueEmail = `prod_test_${Date.now()}_${Math.random().toString(36).substr(2, 9)}@example.com`;
   
   const response = await makeRequest('POST', '/v1/auth/signup', {
     session_id: sessionId,
     email: uniqueEmail,
-    password: 'iambasab1'
+    password: 'prodtest123'
   });
-
-  console.log('Signup response status:', response.status);
-  console.log('Signup response data:', JSON.stringify(response.data, null, 2));
 
   assertEquals(response.status, 201, 'Should create user with 201');
   
@@ -429,8 +424,8 @@ async function testGetUserLandmarksAfterSignup() {
     throw new Error('Response should contain landmarks array');
   }
   if (response.data.landmarks.length === 0) {
-    log('No landmarks found yet (processing may still be running). Waiting 5s and retrying...', 'yellow');
-    await new Promise(r => setTimeout(r, 10000));
+    log('No landmarks found yet (processing may still be running). Waiting 15s and retrying...', 'yellow');
+    await new Promise(r => setTimeout(r, 15000));
     const retry = await makeRequest('GET', '/v1/landmarks/user', null, {
       'Authorization': `Bearer ${accessToken}`
     });
@@ -476,18 +471,15 @@ async function testLogout() {
 }
 
 async function testInvalidRequests() {
-  // Test invalid session creation
   const invalidSessionResponse = await makeRequest('POST', '/v1/sessions/anonymous', {
     device_id: 'invalid',
     device_info: {
       os: 'ios'
-      // missing required fields
     }
   });
   
   assertEquals(invalidSessionResponse.status, 400, 'Should reject invalid session data');
 
-  // Test unauthorized onboarding access
   const unauthorizedResponse = await makeRequest('PUT', '/v1/onboarding', {
     session_id: 'fake_session',
     answers: []
@@ -495,12 +487,12 @@ async function testInvalidRequests() {
   
   assertEquals(unauthorizedResponse.status, 401, 'Should reject unauthorized access');
 
-  // Test invalid question values
   await testInvalidQuestionValues();
 }
 
 async function runAllTests() {
-  log('🚀 Starting API Tests', 'blue');
+  log('🚀 Starting Production API Tests', 'blue');
+  log(`🌐 Testing against: ${BASE_URL}`, 'blue');
   
   try {
     await test('Health Check', testHealthCheck);
@@ -513,25 +505,23 @@ async function runAllTests() {
     await test('User Logout', testLogout);
     await test('Invalid Requests', testInvalidRequests);
     
-    log('\n🎉 All tests passed!', 'green');
+    log('\n🎉 All production tests passed!', 'green');
   } catch (error) {
-    log(`\n💥 Test suite failed: ${error.message}`, 'red');
+    log(`\n💥 Production test suite failed: ${error.message}`, 'red');
     process.exit(1);
   }
 }
 
-// Check if server is running
 async function checkServer() {
   try {
     await makeRequest('GET', '/health');
-    log('Server is running', 'green');
+    log(`Production server is running at ${BASE_URL}`, 'green');
   } catch (error) {
-    log('Server is not running. Please start the server with: npm run dev', 'red');
+    log(`Production server is not accessible at ${BASE_URL}: ${error.message}`, 'red');
     process.exit(1);
   }
 }
 
-// Main execution
 (async () => {
   await checkServer();
   await runAllTests();

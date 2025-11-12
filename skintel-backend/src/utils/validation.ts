@@ -41,7 +41,6 @@ export const QUESTION_TYPES = {
   q_onboarding_status: 'derived'
 } as const;
 
-// Specific valid values for each question
 export const VALID_VALUES = {
   q_skin_concerns: [
     'acne', 'dark_spots', 'wrinkles', 'fine_lines', 'dryness', 'oiliness',
@@ -49,7 +48,7 @@ export const VALID_VALUES = {
     'hyperpigmentation', 'blackheads', 'whiteheads', 'scarring','pores_and_texture'
   ],
   q_skin_sensitivity: [
-    'not_sensitive', 'mildly_sensitive', 'very_sensitive'],
+    'not_sensitive', 'mildly_sensitive', 'very_sensitive', 'not_sure'],
   q_skin_type: [
     'oily', 'dry', 'combination', 'normal', 'dehydrated'
   ],
@@ -63,7 +62,7 @@ export const VALID_VALUES = {
     'pacific_islander', 'mixed', 'south_east_asian','indigenious_australian' ,'prefer_not_to_say'
   ],
   q_time_spent_outdoors: [ '0_to_1_hr', '1_to_3_hours', 'more_than_3_hours' ],
-  q_profile_weather_conditions: ['hot', 'temperate', 'cold'],
+  q_profile_weather_conditions: ['hot', 'temperate', 'cold', 'minus_10_to_15_celsius', '6_to_29_celsius', '30_celsius_and_above'],
   q_medical_conditions: [
     'eczema', 'psoriasis', 'rosacea', 'contact_dermatitis', 'allergies', 'medications',
     'pcos', 'seborrheic_dermatitis', 'none', 'other'
@@ -97,14 +96,13 @@ export const validateQuestionValue = (questionId: string, value: any): boolean =
       if (typeof value !== 'string') return false;
       const validValues = getValidValues(questionId);
       if (!validValues) return true;
-      // this is a case insentitive matching so less strict valdiation
       return validValues.some(v => 
         v.toLowerCase().replace(/[_\s]/g, '') === value.toLowerCase().replace(/[_\s]/g, '')
       );
     }
     case 'multi': {
       if (!Array.isArray(value)) return false;
-      if (value.length === 0) return true; // Allow empty arrays
+      if (value.length === 0) return true;
       const validValues = getValidValues(questionId);
       if (!validValues) return value.every(v => typeof v === 'string');
       return value.every(v => 

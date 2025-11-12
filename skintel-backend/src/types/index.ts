@@ -169,12 +169,16 @@ export interface UserLandmarksResponse {
 }
 
 export interface ProfileUpdateRequest {
-  email?: string;
-  password?: string;
+  name?: string;
+  phone_number?: string;
 }
 
 export interface UserProfileResponse {
   user_id: string;
+  name?: string;
+  phone_number?: string;
+  date_of_birth?: string;
+  profile_image?: string;
   email?: string;
   sso_provider?: string;
   created_at: string;
@@ -236,6 +240,10 @@ export interface UserLandmarksDataResponse {
 
 export interface ProfileUpdateResponse {
   user_id: string;
+  name?: string;
+  phone_number?: string;
+  date_of_birth?: string;
+  profile_image?: string;
   email?: string;
   sso_provider?: string;
   created_at: string;
@@ -288,4 +296,17 @@ export interface UserProgressResponse {
   score_improvement?: number;
   total_analyses_in_period: number;
   next_recommended_analysis?: string;
+}
+
+export interface LocationWeatherRequest {
+  latitude: number;
+  longitude: number;
+}
+
+export interface LocationWeatherResponse {
+  latitude: number;
+  longitude: number;
+  temperature_celsius: number;
+  weather_condition_range: 'minus_10_to_15_celsius' | '6_to_29_celsius' | '30_celsius_and_above';
+  location_name?: string;
 }
