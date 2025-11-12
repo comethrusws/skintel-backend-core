@@ -41,7 +41,6 @@ export const QUESTION_TYPES = {
   q_onboarding_status: 'derived'
 } as const;
 
-// Specific valid values for each question
 export const VALID_VALUES = {
   q_skin_concerns: [
     'acne', 'dark_spots', 'wrinkles', 'fine_lines', 'dryness', 'oiliness',
@@ -97,14 +96,13 @@ export const validateQuestionValue = (questionId: string, value: any): boolean =
       if (typeof value !== 'string') return false;
       const validValues = getValidValues(questionId);
       if (!validValues) return true;
-      // this is a case insentitive matching so less strict valdiation
       return validValues.some(v => 
         v.toLowerCase().replace(/[_\s]/g, '') === value.toLowerCase().replace(/[_\s]/g, '')
       );
     }
     case 'multi': {
       if (!Array.isArray(value)) return false;
-      if (value.length === 0) return true; // Allow empty arrays
+      if (value.length === 0) return true;
       const validValues = getValidValues(questionId);
       if (!validValues) return value.every(v => typeof v === 'string');
       return value.every(v => 
