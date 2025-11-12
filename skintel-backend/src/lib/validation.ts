@@ -118,3 +118,8 @@ export const versionCheckRequestSchema = z.object({
   platform: z.enum(['ios']),
 });
 
+export const locationWeatherRequestSchema = z.object({
+  latitude: z.number().min(-90).max(90),
+  longitude: z.number().min(-180).max(180),
+});
+

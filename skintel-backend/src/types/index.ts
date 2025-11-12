@@ -297,3 +297,16 @@ export interface UserProgressResponse {
   total_analyses_in_period: number;
   next_recommended_analysis?: string;
 }
+
+export interface LocationWeatherRequest {
+  latitude: number;
+  longitude: number;
+}
+
+export interface LocationWeatherResponse {
+  latitude: number;
+  longitude: number;
+  temperature_celsius: number;
+  weather_condition_range: 'minus_10_to_15_celsius' | '6_to_29_celsius' | '30_celsius_and_above';
+  location_name?: string;
+}
