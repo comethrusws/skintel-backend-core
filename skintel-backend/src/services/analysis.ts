@@ -25,7 +25,7 @@ function buildPrompt(): string {
     '6. Create a 4-week improvement plan with weekly previews and expected improvement percentages\n' +
     '7. Return the facial issues in 68 face landmark data format in JSON\n' +
     '\n' +
-    'Example output (clearly highlight the issues visible in the images):\n' +
+    'Example JSON output (clearly highlight the issues visible in the images):\n' +
     '{\n' +
     '  "issues": [\n' +
     '    {"type": "dark_circles", "region": "under_eye_left", "severity": "moderate", "visible_in": ["front"], "dlib_68_facial_landmarks": [\n' +
@@ -178,24 +178,38 @@ export async function analyzeSkin(answerId: string) {
   const imageContent: any[] = [];
   const availableImages: string[] = [];
 
+  // Parallelize image presigning for better performance
+  const imagePromises: Promise<void>[] = [];
+
+  if (faceImages.front) {
+    imagePromises.push(
+      maybePresignUrl(faceImages.front, 300).then(presignedUrl => {
+        imageContent.push({ type: 'image_url', image_url: { url: presignedUrl } });
+        availableImages.push('front');
+      })
+    );
+  }
+  
+  if (faceImages.left) {
+    imagePromises.push(
+      maybePresignUrl(faceImages.left, 300).then(presignedUrl => {
+        imageContent.push({ type: 'image_url', image_url: { url: presignedUrl } });
+        availableImages.push('left');
+      })
+    );
+  }
+  
+  if (faceImages.right) {
+    imagePromises.push(
+      maybePresignUrl(faceImages.right, 300).then(presignedUrl => {
+        imageContent.push({ type: 'image_url', image_url: { url: presignedUrl } });
+        availableImages.push('right');
+      })
+    );
+  }
+
   try {
-    if (faceImages.front) {
-      const presignedUrl = await maybePresignUrl(faceImages.front, 300);
-      imageContent.push({ type: 'image_url', image_url: { url: presignedUrl } });
-      availableImages.push('front');
-    }
-    
-    if (faceImages.left) {
-      const presignedUrl = await maybePresignUrl(faceImages.left, 300);
-      imageContent.push({ type: 'image_url', image_url: { url: presignedUrl } });
-      availableImages.push('left');
-    }
-    
-    if (faceImages.right) {
-      const presignedUrl = await maybePresignUrl(faceImages.right, 300);
-      imageContent.push({ type: 'image_url', image_url: { url: presignedUrl } });
-      availableImages.push('right');
-    }
+    await Promise.all(imagePromises);
   } catch (error) {
     console.error('Error processing images:', error);
     throw error;
@@ -212,14 +226,13 @@ export async function analyzeSkin(answerId: string) {
           content: [
             { 
               type: 'text', 
-              text: `Here are the face images (${availableImages.join(', ')}) and the facial landmarks JSON from the front image. Please analyze all visible skin issues across all provided images and provide a comprehensive analysis with score and 4-week plan.` 
+              text: `Analyze these face images (${availableImages.join(', ')}) with facial landmarks. Provide comprehensive skin analysis with score and 4-week plan.` 
             },
             ...imageContent,
-            { type: 'text', text: `Facial landmarks from front image: ${JSON.stringify(landmarks)}` }
+            { type: 'text', text: `Landmarks: ${JSON.stringify(landmarks)}` }
           ]
         }
       ],
-      temperature: 0.2,
       response_format: { type: 'json_object' }
     });
   } catch (error) {
@@ -267,21 +280,34 @@ export async function analyzeWithLandmarks(frontImageUrl: string, landmarks: obj
   const imageContent: any[] = [];
   const availableImages: string[] = [];
 
-  const frontPresignedUrl = await maybePresignUrl(frontImageUrl, 300);
-  imageContent.push({ type: 'image_url', image_url: { url: frontPresignedUrl } });
-  availableImages.push('front');
+  const imagePromises: Promise<void>[] = [];
+
+  imagePromises.push(
+    maybePresignUrl(frontImageUrl, 300).then(presignedUrl => {
+      imageContent.push({ type: 'image_url', image_url: { url: presignedUrl } });
+      availableImages.push('front');
+    })
+  );
 
   if (leftImageUrl) {
-    const leftPresignedUrl = await maybePresignUrl(leftImageUrl, 300);
-    imageContent.push({ type: 'image_url', image_url: { url: leftPresignedUrl } });
-    availableImages.push('left');
+    imagePromises.push(
+      maybePresignUrl(leftImageUrl, 300).then(presignedUrl => {
+        imageContent.push({ type: 'image_url', image_url: { url: presignedUrl } });
+        availableImages.push('left');
+      })
+    );
   }
 
   if (rightImageUrl) {
-    const rightPresignedUrl = await maybePresignUrl(rightImageUrl, 300);
-    imageContent.push({ type: 'image_url', image_url: { url: rightPresignedUrl } });
-    availableImages.push('right');
+    imagePromises.push(
+      maybePresignUrl(rightImageUrl, 300).then(presignedUrl => {
+        imageContent.push({ type: 'image_url', image_url: { url: presignedUrl } });
+        availableImages.push('right');
+      })
+    );
   }
+
+  await Promise.all(imagePromises);
 
   const completion = await openai.chat.completions.create({
     model: OPENAI_MODEL,
@@ -292,10 +318,10 @@ export async function analyzeWithLandmarks(frontImageUrl: string, landmarks: obj
         content: [
           { 
             type: 'text', 
-            text: `Here are the face images (${availableImages.join(', ')}) and the facial landmarks JSON from the front image. Please analyze all visible skin issues and provide a comprehensive analysis with score and 4-week plan.` 
+            text: `Analyze these face images (${availableImages.join(', ')}) with facial landmarks for comprehensive skin analysis.` 
           },
           ...imageContent,
-          { type: 'text', text: `Facial landmarks: ${JSON.stringify(landmarks)}` }
+          { type: 'text', text: `Landmarks: ${JSON.stringify(landmarks)}` }
         ]
       }
     ],
