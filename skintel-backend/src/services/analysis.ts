@@ -137,14 +137,11 @@ async function determineAnalysisType(userId: string | null, sessionId: string | 
 }
 
 export async function analyzeSkin(answerId: string) {
-  console.log(`[analyzeSkin] Starting analysis for answerId: ${answerId}`);
-  
   if (!process.env.OPENAI_API_KEY) {
-    console.error('[analyzeSkin] OPENAI_API_KEY is not set');
+    console.error('OPENAI_API_KEY is not set');
     throw new Error('OPENAI_API_KEY is not set');
   }
 
-  console.log('[analyzeSkin] Fetching landmarks record from database');
   const record = await prisma.facialLandmarks.findUnique({
     where: { answerId },
     select: {
@@ -156,74 +153,54 @@ export async function analyzeSkin(answerId: string) {
   });
 
   if (!record) {
-    console.error(`[analyzeSkin] No landmarks record found for answerId: ${answerId}`);
+    console.error(`No landmarks record found for answerId: ${answerId}`);
     throw new Error('Landmarks record not found');
   }
 
-  console.log(`[analyzeSkin] Found landmarks record for userId: ${record.answer?.userId}, sessionId: ${record.answer?.sessionId}`);
-
-  console.log('[analyzeSkin] Fetching face images');
   const faceImages = await getUserFaceImages(record.answer?.userId, record.answer?.sessionId);
   
-  console.log(`[analyzeSkin] Face images found: ${JSON.stringify(Object.keys(faceImages))}`);
-  
   if (!faceImages.front && !faceImages.left && !faceImages.right) {
-    console.error('[analyzeSkin] No face images found for analysis');
+    console.error('No face images found for analysis');
     throw new Error('No face images found for analysis');
   }
 
-  console.log('[analyzeSkin] Determining analysis type');
   let analysisTypeInfo;
   try {
     analysisTypeInfo = await determineAnalysisType(record.answer?.userId, record.answer?.sessionId);
-    console.log(`[analyzeSkin] Analysis type determined: ${analysisTypeInfo.type}, planStartDate: ${analysisTypeInfo.planStartDate}, planEndDate: ${analysisTypeInfo.planEndDate}`);
   } catch (error) {
-    console.error('[analyzeSkin] Error determining analysis type:', error);
+    console.error('Error determining analysis type:', error);
     throw error;
   }
 
   const landmarks = record.landmarks as unknown as object;
-  console.log(`[analyzeSkin] Landmarks data size: ${JSON.stringify(landmarks).length} characters`);
-  
   const prompt = buildPrompt();
-  console.log(`[analyzeSkin] Built prompt, length: ${prompt.length} characters`);
 
-  console.log('[analyzeSkin] Preparing image content for OpenAI');
   const imageContent: any[] = [];
   const availableImages: string[] = [];
 
   try {
     if (faceImages.front) {
-      console.log(`[analyzeSkin] Processing front image: ${faceImages.front}`);
       const presignedUrl = await maybePresignUrl(faceImages.front, 300);
       imageContent.push({ type: 'image_url', image_url: { url: presignedUrl } });
       availableImages.push('front');
-      console.log('[analyzeSkin] Front image presigned and added');
     }
     
     if (faceImages.left) {
-      console.log(`[analyzeSkin] Processing left image: ${faceImages.left}`);
       const presignedUrl = await maybePresignUrl(faceImages.left, 300);
       imageContent.push({ type: 'image_url', image_url: { url: presignedUrl } });
       availableImages.push('left');
-      console.log('[analyzeSkin] Left image presigned and added');
     }
     
     if (faceImages.right) {
-      console.log(`[analyzeSkin] Processing right image: ${faceImages.right}`);
       const presignedUrl = await maybePresignUrl(faceImages.right, 300);
       imageContent.push({ type: 'image_url', image_url: { url: presignedUrl } });
       availableImages.push('right');
-      console.log('[analyzeSkin] Right image presigned and added');
     }
   } catch (error) {
-    console.error('[analyzeSkin] Error processing images:', error);
+    console.error('Error processing images:', error);
     throw error;
   }
 
-  console.log(`[analyzeSkin] Prepared ${imageContent.length} images for OpenAI: ${availableImages.join(', ')}`);
-
-  console.log(`[analyzeSkin] Calling OpenAI API with model: ${OPENAI_MODEL}`);
   let completion;
   try {
     completion = await openai.chat.completions.create({
@@ -245,28 +222,21 @@ export async function analyzeSkin(answerId: string) {
       temperature: 0.2,
       response_format: { type: 'json_object' }
     });
-    console.log('[analyzeSkin] OpenAI API call completed successfully');
   } catch (error) {
-    console.error('[analyzeSkin] OpenAI API call failed:', error);
+    console.error('OpenAI API call failed:', error);
     throw error;
   }
 
   const content = completion.choices?.[0]?.message?.content ?? '';
-  console.log(`[analyzeSkin] OpenAI response received, content length: ${content.length} characters`);
-  console.log(`[analyzeSkin] OpenAI response preview: ${content.substring(0, 200)}...`);
 
-  console.log('[analyzeSkin] Parsing OpenAI response');
   let parsed: EnhancedAnalysisResult;
   try {
     parsed = JSON.parse(content) as EnhancedAnalysisResult;
-    console.log(`[analyzeSkin] Successfully parsed OpenAI response. Score: ${parsed.score}, Issues count: ${parsed.issues?.length || 0}, Weekly plan items: ${parsed.weekly_plan?.length || 0}`);
   } catch (parseError) {
-    console.error('[analyzeSkin] Failed to parse OpenAI response as JSON:', parseError);
-    console.error('[analyzeSkin] Raw content that failed to parse:', content);
+    console.error('Failed to parse OpenAI response as JSON:', parseError);
     parsed = { raw: content } as any;
   }
 
-  console.log('[analyzeSkin] Updating database with analysis results');
   try {
     await prisma.facialLandmarks.update({
       where: { answerId },
@@ -279,20 +249,11 @@ export async function analyzeSkin(answerId: string) {
         planEndDate: analysisTypeInfo.planEndDate
       }
     });
-    console.log(`[analyzeSkin] Successfully updated database for answerId: ${answerId}`);
   } catch (dbError) {
-    console.error('[analyzeSkin] Failed to update database:', dbError);
-    console.error('[analyzeSkin] Attempted to save data:', {
-      analysisType: analysisTypeInfo.type,
-      score: parsed.score,
-      hasWeeklyPlan: !!parsed.weekly_plan,
-      planStartDate: analysisTypeInfo.planStartDate,
-      planEndDate: analysisTypeInfo.planEndDate
-    });
+    console.error('Failed to update database:', dbError);
     throw dbError;
   }
 
-  console.log(`[analyzeSkin] Analysis completed successfully for answerId: ${answerId}`);
   return parsed;
 }
 
