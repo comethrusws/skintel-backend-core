@@ -49,7 +49,7 @@ export const VALID_VALUES = {
     'hyperpigmentation', 'blackheads', 'whiteheads', 'scarring','pores_and_texture'
   ],
   q_skin_sensitivity: [
-    'not_sensitive', 'mildly_sensitive', 'very_sensitive'],
+    'not_sensitive', 'mildly_sensitive', 'very_sensitive', 'not_sure'],
   q_skin_type: [
     'oily', 'dry', 'combination', 'normal', 'dehydrated'
   ],
@@ -63,7 +63,7 @@ export const VALID_VALUES = {
     'pacific_islander', 'mixed', 'south_east_asian','indigenious_australian' ,'prefer_not_to_say'
   ],
   q_time_spent_outdoors: [ '0_to_1_hr', '1_to_3_hours', 'more_than_3_hours' ],
-  q_profile_weather_conditions: ['hot', 'temperate', 'cold'],
+  q_profile_weather_conditions: ['hot', 'temperate', 'cold', 'minus_10_to_15_celsius', '6_to_29_celsius', '30_celsius_and_above'],
   q_medical_conditions: [
     'eczema', 'psoriasis', 'rosacea', 'contact_dermatitis', 'allergies', 'medications',
     'pcos', 'seborrheic_dermatitis', 'none', 'other'
