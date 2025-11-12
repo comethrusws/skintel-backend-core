@@ -12,7 +12,7 @@ const router = Router();
  * /v1/profile:
  *   get:
  *     summary: Get user profile
- *     description: Retrieve basic user profile information
+ *     description: Retrieve complete user profile information including name, phone, profile image, and date of birth
  *     tags: [Profile]
  *     security:
  *       - BasicAuth: []
@@ -20,6 +20,41 @@ const router = Router();
  *     responses:
  *       200:
  *         description: Profile retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 user_id:
+ *                   type: string
+ *                 name:
+ *                   type: string
+ *                   nullable: true
+ *                 phone_number:
+ *                   type: string
+ *                   nullable: true
+ *                 date_of_birth:
+ *                   type: string
+ *                   format: date-time
+ *                   nullable: true
+ *                 profile_image:
+ *                   type: string
+ *                   format: uri
+ *                   nullable: true
+ *                   description: Front face photo from onboarding
+ *                 email:
+ *                   type: string
+ *                   format: email
+ *                   nullable: true
+ *                 sso_provider:
+ *                   type: string
+ *                   nullable: true
+ *                 created_at:
+ *                   type: string
+ *                   format: date-time
+ *                 updated_at:
+ *                   type: string
+ *                   format: date-time
  *       401:
  *         description: Authentication required
  *       404:
@@ -27,7 +62,7 @@ const router = Router();
  * 
  *   put:
  *     summary: Update user profile
- *     description: Update user profile information
+ *     description: Update user profile information (only name and phone number can be updated)
  *     tags: [Profile]
  *     security:
  *       - BearerAuth: []
@@ -39,23 +74,63 @@ const router = Router();
  *           schema:
  *             type: object
  *             properties:
- *               email:
+ *               name:
  *                 type: string
- *                 format: email
- *               password:
+ *                 minLength: 1
+ *                 maxLength: 100
+ *                 example: "John Doe"
+ *               phone_number:
  *                 type: string
- *                 minLength: 8
+ *                 minLength: 1
+ *                 maxLength: 20
+ *                 example: "+1234567890"
+ *             minProperties: 1
+ *             description: At least one field must be provided
  *     responses:
  *       200:
  *         description: Profile updated successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 user_id:
+ *                   type: string
+ *                 name:
+ *                   type: string
+ *                   nullable: true
+ *                 phone_number:
+ *                   type: string
+ *                   nullable: true
+ *                 date_of_birth:
+ *                   type: string
+ *                   format: date-time
+ *                   nullable: true
+ *                 profile_image:
+ *                   type: string
+ *                   format: uri
+ *                   nullable: true
+ *                 email:
+ *                   type: string
+ *                   format: email
+ *                   nullable: true
+ *                 sso_provider:
+ *                   type: string
+ *                   nullable: true
+ *                 created_at:
+ *                   type: string
+ *                   format: date-time
+ *                 updated_at:
+ *                   type: string
+ *                   format: date-time
+ *                 updated:
+ *                   type: boolean
  *       400:
  *         description: Invalid request data
  *       401:
  *         description: Authentication required
  *       404:
  *         description: User not found
- *       409:
- *         description: Email already exists
  * 
  *   delete:
  *     summary: Delete user profile
