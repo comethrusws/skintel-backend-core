@@ -5,6 +5,7 @@ import { idempotencyMiddleware } from '../middleware/idempotency';
 import { onboardingRequestSchema } from '../lib/validation';
 import { prisma } from '../lib/prisma';
 import { processLandmarksAsync, processLandmarksForAnswerWithUrl } from '../services/landmarks';
+import { analyzeSkin } from '../services/analysis';
 
 const router = Router();
 
@@ -136,28 +137,18 @@ router.put('/', idempotencyMiddleware, authenticateSession, async (req: Authenti
         });
       }
 
-      // process facial landmarks for image questions
+      // trigger analysis for front face images only (analysis-first approach)
       if (answer.type === 'image' && answer.status === 'answered' && 
           typeof answer.value === 'object' && answer.value !== null && 
           ('image_id' in answer.value || 'image_url' in answer.value)) {
 
-        //  front face image only goes for landmark
         if (answer.question_id === 'q_face_photo_front') {
-          if ('image_id' in (answer.value as any)) {
-            const imageValue = answer.value as { image_id: string };
-            console.log(`Triggering landmark processing for front face: ${imageValue.image_id}`);
-            processLandmarksAsync(answer.answer_id, imageValue.image_id).catch(error => {
-              console.error('Async landmark processing error:', error);
-            });
-          } else if ('image_url' in (answer.value as any)) {
-            const urlValue = answer.value as { image_url: string };
-            console.log(`Triggering URL-based landmark processing for front face: ${urlValue.image_url}`);
-            processLandmarksForAnswerWithUrl(answer.answer_id, urlValue.image_url).catch(error => {
-              console.error('Async url landmark processing error:', error);
-            });
-          }
+          console.log(`Triggering skin analysis for front face: ${answer.answer_id}`);
+          analyzeSkin(answer.answer_id).catch(error => {
+            console.error('Async skin analysis error:', error);
+          });
         } else if (['q_face_photo_left', 'q_face_photo_right'].includes(answer.question_id)) {
-          console.log(`Skipping landmark processing for ${answer.question_id} (only front face is processed for landmarks)`);
+          console.log(`Profile image saved: ${answer.question_id} (will be included in front face analysis)`);
         }
       }
 

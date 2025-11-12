@@ -93,16 +93,9 @@ vanalyseRouter.post('/progress', authenticateUser, async (req: AuthenticatedRequ
       });
     }
 
-    const landmarkResult = await processLandmarks(front_image_url);
-    if (!landmarkResult.success || !landmarkResult.data) {
-      return res.status(500).json({ 
-        error: landmarkResult.error || 'Landmark processing failed' 
-      });
-    }
-
     const analysis = await analyzeWithLandmarks(
       front_image_url,
-      landmarkResult.data,
+      {}, 
       left_image_url,
       right_image_url
     );
@@ -125,7 +118,7 @@ vanalyseRouter.post('/progress', authenticateUser, async (req: AuthenticatedRequ
       data: {
         answerId,
         userId,
-        landmarks: landmarkResult.data as unknown as any,
+        landmarks: {} as any,
         analysis: analysis,
         status: 'COMPLETED',
         processedAt: new Date(),
@@ -144,11 +137,12 @@ vanalyseRouter.post('/progress', authenticateUser, async (req: AuthenticatedRequ
     return res.json({
       answer_id: answerId,
       analysis,
-      landmarks: landmarkResult.data,
+      landmarks: {}, 
       images_analyzed: imagesAnalyzed,
       analysis_type: 'PROGRESS',
       plan_start_date: activePlan.planStartDate?.toISOString(),
-      plan_end_date: activePlan.planEndDate?.toISOString()
+      plan_end_date: activePlan.planEndDate?.toISOString(),
+      annotated_image_url: analysis.annotated_image_url || null
     });
 
   } catch (error) {
