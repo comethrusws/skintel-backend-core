@@ -163,13 +163,13 @@ async function testSaveOnboardingAnswers() {
   const imgBufferLeft = fs.readFileSync(TEST_IMAGE_LEFT);
   const imgBufferRight = fs.readFileSync(TEST_IMAGE_RIGHT);
 
-  const uploadFront = await makeBinaryRequest('POST', '/v1/upload/file?prefix=tests', imgBufferFront, {
+  const uploadFront = await makeBinaryRequest('POST', '/v1/upload/file?prefix=tests-bdev', imgBufferFront, {
     'Content-Type': 'image/jpeg'
   });
-  const uploadLeft = await makeBinaryRequest('POST', '/v1/upload/file?prefix=tests', imgBufferLeft, {
+  const uploadLeft = await makeBinaryRequest('POST', '/v1/upload/file?prefix=tests-bdev', imgBufferLeft, {
     'Content-Type': 'image/jpeg'
   });
-  const uploadRight = await makeBinaryRequest('POST', '/v1/upload/file?prefix=tests', imgBufferRight, {
+  const uploadRight = await makeBinaryRequest('POST', '/v1/upload/file?prefix=tests-bdev', imgBufferRight, {
     'Content-Type': 'image/jpeg'
   });
 
