@@ -397,22 +397,27 @@ async function testGetOnboardingState() {
 }
 
 async function testUserSignup() {
+  const uniqueEmail = `test_${Date.now()}_${Math.random().toString(36).substr(2, 9)}@example.com`;
+  
   const response = await makeRequest('POST', '/v1/auth/signup', {
     session_id: sessionId,
-    email: `basabjha112@mail.com`,
-    password: 'basabhaha123'
+    email: uniqueEmail,
+    password: 'iambasab1'
   });
+
+  console.log('Signup response status:', response.status);
+  console.log('Signup response data:', JSON.stringify(response.data, null, 2));
 
   assertEquals(response.status, 201, 'Should create user with 201');
   
   if (!response.data.access_token || !response.data.refresh_token) {
-    throw new Error('Response should contain tokens');
+    throw new Error(`Response should contain tokens. Got: ${JSON.stringify(response.data)}`);
   }
 
   accessToken = response.data.access_token;
   refreshToken = response.data.refresh_token;
   
-  log(`User created with access token`, 'yellow');
+  log(`User created with email: ${uniqueEmail}`, 'yellow');
 }
 
 async function testGetUserLandmarksAfterSignup() {
