@@ -359,7 +359,7 @@ async function testSaveOnboardingAnswers() {
   log(`Saved ${answers.length} onboarding answers including comprehensive questionnaire`, 'yellow');
   
   // Wait for landmark processing to complete
-  await new Promise(r => setTimeout(r, 9000));
+  await new Promise(r => setTimeout(r, 20000));
 }
 
 async function testInvalidQuestionValues() {
