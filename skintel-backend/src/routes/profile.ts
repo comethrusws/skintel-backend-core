@@ -123,6 +123,9 @@ router.get('/', authenticateUser, async (req: AuthenticatedRequest, res: Respons
       where: { userId },
       select: {
         userId: true,
+        name: true,
+        phoneNumber: true,
+        dateOfBirth: true,
         email: true,
         ssoProvider: true,
         createdAt: true,
@@ -135,8 +138,29 @@ router.get('/', authenticateUser, async (req: AuthenticatedRequest, res: Respons
       return;
     }
 
+    let profileImage: string | undefined;
+    const frontFaceAnswer = await prisma.onboardingAnswer.findFirst({
+      where: {
+        userId,
+        questionId: 'q_face_photo_front',
+        status: 'answered'
+      },
+      orderBy: { savedAt: 'desc' }
+    });
+
+    if (frontFaceAnswer && frontFaceAnswer.value) {
+      const value = frontFaceAnswer.value as any;
+      if (value.image_url) {
+        profileImage = value.image_url;
+      }
+    }
+
     const response = {
       user_id: user.userId,
+      name: user.name,
+      phone_number: user.phoneNumber,
+      date_of_birth: user.dateOfBirth?.toISOString(),
+      profile_image: profileImage,
       email: user.email,
       sso_provider: user.ssoProvider,
       created_at: user.createdAt.toISOString(),
@@ -249,7 +273,7 @@ router.put('/', authenticateUser, async (req: AuthenticatedRequest, res: Respons
       return;
     }
 
-    const { email, password } = validationResult.data;
+    const { name, phone_number } = validationResult.data;
 
     const existingUser = await prisma.user.findUnique({
       where: { userId }
@@ -260,25 +284,14 @@ router.put('/', authenticateUser, async (req: AuthenticatedRequest, res: Respons
       return;
     }
 
-    if (email && email !== existingUser.email) {
-      const emailExists = await prisma.user.findUnique({
-        where: { email }
-      });
-
-      if (emailExists) {
-        res.status(409).json({ error: 'Email already exists' });
-        return;
-      }
-    }
-
     const updateData: any = {};
     
-    if (email) {
-      updateData.email = email;
+    if (name !== undefined) {
+      updateData.name = name;
     }
     
-    if (password) {
-      updateData.passwordHash = await hashPassword(password);
+    if (phone_number !== undefined) {
+      updateData.phoneNumber = phone_number;
     }
 
     const updatedUser = await prisma.user.update({
@@ -286,6 +299,9 @@ router.put('/', authenticateUser, async (req: AuthenticatedRequest, res: Respons
       data: updateData,
       select: {
         userId: true,
+        name: true,
+        phoneNumber: true,
+        dateOfBirth: true,
         email: true,
         ssoProvider: true,
         createdAt: true,
@@ -293,8 +309,29 @@ router.put('/', authenticateUser, async (req: AuthenticatedRequest, res: Respons
       }
     });
 
+    let profileImage: string | undefined;
+    const frontFaceAnswer = await prisma.onboardingAnswer.findFirst({
+      where: {
+        userId,
+        questionId: 'q_face_photo_front',
+        status: 'answered'
+      },
+      orderBy: { savedAt: 'desc' }
+    });
+
+    if (frontFaceAnswer && frontFaceAnswer.value) {
+      const value = frontFaceAnswer.value as any;
+      if (value.image_url) {
+        profileImage = value.image_url;
+      }
+    }
+
     const response = {
       user_id: updatedUser.userId,
+      name: updatedUser.name,
+      phone_number: updatedUser.phoneNumber,
+      date_of_birth: updatedUser.dateOfBirth?.toISOString(),
+      profile_image: profileImage,
       email: updatedUser.email,
       sso_provider: updatedUser.ssoProvider,
       created_at: updatedUser.createdAt.toISOString(),

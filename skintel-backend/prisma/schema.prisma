@@ -32,6 +32,9 @@ model AnonymousSession {
 model User {
   id                String             @id @default(cuid())
   userId            String             @unique @map("user_id")
+  name              String?
+  phoneNumber       String?            @map("phone_number")
+  dateOfBirth       DateTime?          @map("date_of_birth")
   email             String?            @unique
   passwordHash      String?            @map("password_hash")
   ssoProvider       String?            @map("sso_provider")
@@ -131,7 +134,7 @@ model Product {
   id          String   @id @default(cuid())
   userId      String   @map("user_id")
   imageUrl    String   @map("image_url")
-  productData Json     @map("product_data") // AI analysis results
+  productData Json     @map("product_data") 
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
 

@@ -106,11 +106,11 @@ export const logoutRequestSchema = z.object({
 });
 
 export const profileUpdateRequestSchema = z.object({
-  email: z.string().email().optional(),
-  password: z.string().min(8).max(100).optional(),
+  name: z.string().min(1).max(100).optional(),
+  phone_number: z.string().min(1).max(20).optional(),
 }).refine(
-  (data) => data.email || data.password,
-  { message: "At least one field (email or password) must be provided" }
+  (data) => data.name || data.phone_number,
+  { message: "At least one field (name or phone_number) must be provided" }
 );
 
 export const versionCheckRequestSchema = z.object({

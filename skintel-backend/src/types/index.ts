@@ -169,12 +169,16 @@ export interface UserLandmarksResponse {
 }
 
 export interface ProfileUpdateRequest {
-  email?: string;
-  password?: string;
+  name?: string;
+  phone_number?: string;
 }
 
 export interface UserProfileResponse {
   user_id: string;
+  name?: string;
+  phone_number?: string;
+  date_of_birth?: string;
+  profile_image?: string;
   email?: string;
   sso_provider?: string;
   created_at: string;
@@ -236,6 +240,10 @@ export interface UserLandmarksDataResponse {
 
 export interface ProfileUpdateResponse {
   user_id: string;
+  name?: string;
+  phone_number?: string;
+  date_of_birth?: string;
+  profile_image?: string;
   email?: string;
   sso_provider?: string;
   created_at: string;
