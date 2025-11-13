@@ -129,6 +129,13 @@ export async function processLandmarksAsync(answerId: string, imageId: string): 
         });
       } catch (analysisError) {
         console.error('Skin analysis failed:', analysisError);
+        await prisma.facialLandmarks.update({
+          where: { answerId },
+          data: {
+            status: 'FAILED',
+            error: `Analysis failed: ${analysisError instanceof Error ? analysisError.message : 'Unknown error'}`
+          }
+        });
       }
 
       // reconcile user link in case merge happened after we created the record
@@ -245,7 +252,7 @@ export async function processLandmarksForAnswerWithUrl(answerId: string, imageUr
       where: { answerId },
       data: {
         landmarks: result as unknown as any,
-        status: 'COMPLETED',
+        status: 'PROCESSING',
         processedAt: new Date()
       }
     });
@@ -256,6 +263,7 @@ export async function processLandmarksForAnswerWithUrl(answerId: string, imageUr
       await prisma.facialLandmarks.update({
         where: { answerId },
         data: { 
+          status: 'COMPLETED',
           analysis: analysis as any,
           score: analysis.score || null,
           weeklyPlan: analysis.care_plan_4_weeks as any,
@@ -266,6 +274,13 @@ export async function processLandmarksForAnswerWithUrl(answerId: string, imageUr
       });
     } catch (analysisError) {
       console.error('Skin analysis failed:', analysisError);
+      await prisma.facialLandmarks.update({
+        where: { answerId },
+        data: {
+          status: 'FAILED',
+          error: `Analysis failed: ${analysisError instanceof Error ? analysisError.message : 'Unknown error'}`
+        }
+      });
     }
 
     // reconcile user link in case merge happened after we created the record
