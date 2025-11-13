@@ -2,6 +2,7 @@ import { Router, Response } from 'express';
 import { authenticateUser, AuthenticatedRequest } from '../middleware/auth';
 import { profileUpdateRequestSchema } from '../lib/validation';
 import { prisma } from '../lib/prisma';
+import { Prisma } from '@prisma/client';
 import { hashPassword } from '../utils/auth';
 import { ProgressAnalysisItem } from '../types';
 
@@ -188,6 +189,51 @@ const router = Router();
  *         description: Authentication required
  *       404:
  *         description: No active plan found
+ * 
+ * /v1/profile/weekly:
+ *   get:
+ *     summary: Get user's weekly plan
+ *     description: Retrieve the most recent weekly improvement plan for the authenticated user
+ *     tags: [Profile]
+ *     security:
+ *       - BearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Weekly plan retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 user_id:
+ *                   type: string
+ *                 weekly_plan:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       week:
+ *                         type: number
+ *                       preview:
+ *                         type: string
+ *                       improvement_expected:
+ *                         type: string
+ *                 analysis_type:
+ *                   type: string
+ *                   enum: [INITIAL, PROGRESS]
+ *                 plan_start_date:
+ *                   type: string
+ *                   format: date-time
+ *                 plan_end_date:
+ *                   type: string
+ *                   format: date-time
+ *                 created_at:
+ *                   type: string
+ *                   format: date-time
+ *       401:
+ *         description: Authentication required
+ *       404:
+ *         description: No weekly plan found
  */
 
 router.get('/', authenticateUser, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
@@ -574,6 +620,44 @@ router.get('/progress', authenticateUser, async (req: AuthenticatedRequest, res:
     res.json(response);
   } catch (error) {
     console.error('Get progress error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+router.get('/weekly', authenticateUser, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const userId = req.userId!;
+
+    const facialLandmark = await prisma.facialLandmarks.findFirst({
+      where: { 
+        userId,
+        status: 'COMPLETED',
+        weeklyPlan: { not: Prisma.DbNull }
+      },
+      orderBy: { createdAt: 'desc' }
+    });
+
+    if (!facialLandmark) {
+      res.status(404).json({ error: 'No weekly plan found' });
+      return;
+    }
+
+    const weeklyPlan = facialLandmark.weeklyPlan ? 
+      (typeof facialLandmark.weeklyPlan === 'string' ? JSON.parse(facialLandmark.weeklyPlan) : facialLandmark.weeklyPlan) 
+      : null;
+
+    const response = {
+      user_id: userId,
+      weekly_plan: weeklyPlan,
+      analysis_type: facialLandmark.analysisType,
+      plan_start_date: facialLandmark.planStartDate?.toISOString(),
+      plan_end_date: facialLandmark.planEndDate?.toISOString(),
+      created_at: facialLandmark.createdAt.toISOString()
+    };
+
+    res.json(response);
+  } catch (error) {
+    console.error('Get weekly plan error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
