@@ -25,7 +25,7 @@ function buildPrompt(): string {
     '6. Create a 4-week improvement plan with weekly previews and expected improvement percentages\n' +
     '7. Return the facial issues in 68 face landmark data format in JSON\n' +
     '\n' +
-    'Example JSON output (clearly highlight the issues visible in the images):\n' +
+    'Example JSON output (clearly highlight the issues visible in the images) and respond strictly in the following json format! DO NOT ADD ANYTHING ELSE:\n' +
     '{\n' +
     '  "issues": [\n' +
     '    {"type": "dark_circles", "region": "under_eye_left", "severity": "moderate", "visible_in": ["front"], "dlib_68_facial_landmarks": [\n' +
@@ -39,7 +39,7 @@ function buildPrompt(): string {
     '  ],\n' +
     '  "overall_assessment": "Combination skin with mild acne and moderate dark circles",\n' +
     '  "score": 72,\n' +
-    '  "weekly_plan": [\n' +
+    '  "care_plan_4_weeks": [\n' +
     '    {"week": 1, "preview": "Start gentle cleansing routine with salicylic acid", "improvement_expected": "15%"},\n' +
     '    {"week": 2, "preview": "Add eye cream for dark circles and maintain cleansing", "improvement_expected": "30%"},\n' +
     '    {"week": 3, "preview": "Introduce retinol treatment and sun protection", "improvement_expected": "50%"},\n' +
@@ -256,7 +256,7 @@ export async function analyzeSkin(answerId: string) {
       data: { 
         analysis: parsed as any,
         score: parsed.score || null,
-        weeklyPlan: parsed.weekly_plan as any,
+        weeklyPlan: parsed.care_plan_4_weeks as any,
         analysisType: analysisTypeInfo.type,
         planStartDate: analysisTypeInfo.planStartDate,
         planEndDate: analysisTypeInfo.planEndDate
