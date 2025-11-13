@@ -29,8 +29,6 @@ export async function processLandmarks(imageId: string): Promise<LandmarkProcess
     const presignedUrl = await maybePresignUrl(imageUrl, 300);
     const url = `${LANDMARK_SERVICE_URL}${LANDMARK_ENDPOINT}`;
 
-    console.log(`Processing landmarks for image: ${imageId} at ${url}`);
-
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT);
 
@@ -114,13 +112,9 @@ export async function processLandmarksAsync(answerId: string, imageId: string): 
         }
       });
 
-      console.log(`Landmarks processed successfully for answer: ${answerId}`);
-
       try {
         const analysis = await analyzeSkin(answerId);
-        console.log('Skin analysis completed:', analysis);
         
-        // backup for if analyzeSkin() update fails
         await prisma.facialLandmarks.update({
           where: { answerId },
           data: { 
