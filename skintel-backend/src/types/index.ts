@@ -310,3 +310,23 @@ export interface LocationWeatherResponse {
   weather_condition_range: 'minus_10_to_15_celsius' | '6_to_29_celsius' | '30_celsius_and_above';
   location_name?: string;
 }
+
+export interface ProgressUpdateResult {
+  overall_progress_score: number;
+  score_change: number;
+  issues_improved: Array<{
+    issue_type: string;
+    initial_severity: string;
+    current_severity: string;
+    improvement_percentage: number;
+  }>;
+  plan_adherence: {
+    weeks_completed: number;
+    adherence_score: number;
+    missed_recommendations: string[];
+  };
+  visual_improvements: string[];
+  areas_needing_attention: string[];
+  updated_recommendations: string[];
+  next_week_focus: string;
+}
