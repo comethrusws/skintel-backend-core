@@ -55,6 +55,13 @@ npm run dev
 npm test
 ```
 
+**for testing** - focused onboarding flow test:
+
+```bash
+# to test just the onboarding flow with clear examples
+node scripts/test-onboarding-flow.js
+```
+
 the test script validates:
 - health check endpoint
 - anonymous session creation
