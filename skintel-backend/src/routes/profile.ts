@@ -192,7 +192,7 @@ const router = Router();
  * 
  * /v1/profile/weekly:
  *   get:
- *     summary: Get user's weekly plan
+ *     summary: Get user's weekly plan generated at onboarding
  *     description: Retrieve the most recent weekly improvement plan for the authenticated user
  *     tags: [Profile]
  *     security:
