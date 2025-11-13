@@ -109,7 +109,7 @@ export async function processLandmarksAsync(answerId: string, imageId: string): 
         where: { answerId },
         data: {
           landmarks: result.data as unknown as any,
-          status: 'COMPLETED',
+          status: 'PROCESSING',
           processedAt: new Date()
         }
       });
@@ -119,10 +119,19 @@ export async function processLandmarksAsync(answerId: string, imageId: string): 
       try {
         const analysis = await analyzeSkin(answerId);
         console.log('Skin analysis completed:', analysis);
-
+        
+        // backup for if analyzeSkin() update fails
         await prisma.facialLandmarks.update({
           where: { answerId },
-          data: { analysis: analysis as any }
+          data: { 
+            status: 'COMPLETED',
+            analysis: analysis as any,
+            score: analysis.score || null,
+            weeklyPlan: analysis.care_plan_4_weeks as any,
+            analysisType: 'INITIAL', // def value as onboarding analysis is always apne liye initial
+            planStartDate: new Date(),
+            planEndDate: new Date(Date.now() + 28 * 24 * 60 * 60 * 1000) // basically a 4 week end date rom current
+          }
         });
       } catch (analysisError) {
         console.error('Skin analysis failed:', analysisError);
@@ -249,9 +258,17 @@ export async function processLandmarksForAnswerWithUrl(answerId: string, imageUr
 
     try {
       const analysis = await analyzeWithLandmarks(imageUrl, result);
+      
       await prisma.facialLandmarks.update({
         where: { answerId },
-        data: { analysis: analysis as any }
+        data: { 
+          analysis: analysis as any,
+          score: analysis.score || null,
+          weeklyPlan: analysis.care_plan_4_weeks as any,
+          analysisType: 'INITIAL',
+          planStartDate: new Date(),
+          planEndDate: new Date(Date.now() + 28 * 24 * 60 * 60 * 1000)
+        }
       });
     } catch (analysisError) {
       console.error('Skin analysis failed:', analysisError);
