@@ -133,7 +133,7 @@ vanalyseRouter.post('/progress', authenticateUser, async (req: AuthenticatedRequ
         planStartDate: activePlan.planStartDate,
         planEndDate: activePlan.planEndDate,
         score: analysis.score || null,
-        weeklyPlan: analysis.weekly_plan || null
+        weeklyPlan: analysis.care_plan_4_weeks || null
       }
     });
 

@@ -29,8 +29,6 @@ export async function processLandmarks(imageId: string): Promise<LandmarkProcess
     const presignedUrl = await maybePresignUrl(imageUrl, 300);
     const url = `${LANDMARK_SERVICE_URL}${LANDMARK_ENDPOINT}`;
 
-    console.log(`Processing landmarks for image: ${imageId} at ${url}`);
-
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT);
 
@@ -109,23 +107,35 @@ export async function processLandmarksAsync(answerId: string, imageId: string): 
         where: { answerId },
         data: {
           landmarks: result.data as unknown as any,
-          status: 'COMPLETED',
+          status: 'PROCESSING',
           processedAt: new Date()
         }
       });
 
-      console.log(`Landmarks processed successfully for answer: ${answerId}`);
-
       try {
         const analysis = await analyzeSkin(answerId);
-        console.log('Skin analysis completed:', analysis);
-
+        
         await prisma.facialLandmarks.update({
           where: { answerId },
-          data: { analysis: analysis as any }
+          data: { 
+            status: 'COMPLETED',
+            analysis: analysis as any,
+            score: analysis.score || null,
+            weeklyPlan: analysis.care_plan_4_weeks as any,
+            analysisType: 'INITIAL', // def value as onboarding analysis is always apne liye initial
+            planStartDate: new Date(),
+            planEndDate: new Date(Date.now() + 28 * 24 * 60 * 60 * 1000) // basically a 4 week end date rom current
+          }
         });
       } catch (analysisError) {
         console.error('Skin analysis failed:', analysisError);
+        await prisma.facialLandmarks.update({
+          where: { answerId },
+          data: {
+            status: 'FAILED',
+            error: `Analysis failed: ${analysisError instanceof Error ? analysisError.message : 'Unknown error'}`
+          }
+        });
       }
 
       // reconcile user link in case merge happened after we created the record
@@ -242,19 +252,35 @@ export async function processLandmarksForAnswerWithUrl(answerId: string, imageUr
       where: { answerId },
       data: {
         landmarks: result as unknown as any,
-        status: 'COMPLETED',
+        status: 'PROCESSING',
         processedAt: new Date()
       }
     });
 
     try {
       const analysis = await analyzeWithLandmarks(imageUrl, result);
+      
       await prisma.facialLandmarks.update({
         where: { answerId },
-        data: { analysis: analysis as any }
+        data: { 
+          status: 'COMPLETED',
+          analysis: analysis as any,
+          score: analysis.score || null,
+          weeklyPlan: analysis.care_plan_4_weeks as any,
+          analysisType: 'INITIAL',
+          planStartDate: new Date(),
+          planEndDate: new Date(Date.now() + 28 * 24 * 60 * 60 * 1000)
+        }
       });
     } catch (analysisError) {
       console.error('Skin analysis failed:', analysisError);
+      await prisma.facialLandmarks.update({
+        where: { answerId },
+        data: {
+          status: 'FAILED',
+          error: `Analysis failed: ${analysisError instanceof Error ? analysisError.message : 'Unknown error'}`
+        }
+      });
     }
 
     // reconcile user link in case merge happened after we created the record

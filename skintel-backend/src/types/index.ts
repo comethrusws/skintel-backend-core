@@ -202,7 +202,7 @@ export interface EnhancedAnalysisResult {
   overall_assessment: string;
   images_analyzed: string[];
   score: number;
-  weekly_plan: WeeklyPlanItem[];
+  care_plan_4_weeks: WeeklyPlanItem[];
 }
 
 export interface UserAnalysisResponse {
