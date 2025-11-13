@@ -4,6 +4,7 @@ import {
   generateUserId, 
   generateAccessToken, 
   generateRefreshToken,
+  generatePasswordResetToken,
   hashPassword,
   verifyPassword
 } from '../utils/auth';
@@ -13,7 +14,9 @@ import {
   authLoginRequestSchema,
   authSSORequestSchema,
   refreshTokenRequestSchema,
-  logoutRequestSchema
+  logoutRequestSchema,
+  passwordResetRequestSchema,
+  passwordResetConfirmSchema
 } from '../lib/validation';
 import { prisma } from '../lib/prisma';
 
@@ -107,6 +110,69 @@ const router = Router();
  *         description: Token refreshed successfully
  *       401:
  *         description: Invalid refresh token
+ * 
+ * /v1/auth/password-reset/request:
+ *   post:
+ *     summary: Request password reset
+ *     description: Generate password reset token for user email
+ *     tags: [Authentication]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               email:
+ *                 type: string
+ *                 format: email
+ *             required:
+ *               - email
+ *     responses:
+ *       200:
+ *         description: Reset token generated successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 reset_token:
+ *                   type: string
+ *                 expires_at:
+ *                   type: string
+ *                   format: date-time
+ *       404:
+ *         description: User not found
+ *       400:
+ *         description: Invalid request data
+ * 
+ * /v1/auth/password-reset/confirm:
+ *   post:
+ *     summary: Confirm password reset
+ *     description: Reset user password using reset token
+ *     tags: [Authentication]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               reset_token:
+ *                 type: string
+ *               new_password:
+ *                 type: string
+ *                 minLength: 8
+ *             required:
+ *               - reset_token
+ *               - new_password
+ *     responses:
+ *       200:
+ *         description: Password reset successfully
+ *       400:
+ *         description: Invalid request data
+ *       401:
+ *         description: Invalid or expired reset token
  */
 
 router.post('/signup', async (req: Request, res: Response): Promise<void> => {
@@ -404,9 +470,104 @@ router.post('/logout', authenticateUser, async (req: AuthenticatedRequest, res: 
   }
 });
 
+router.post('/password-reset/request', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const validationResult = passwordResetRequestSchema.safeParse(req.body);
+    
+    if (!validationResult.success) {
+      res.status(400).json({ 
+        error: 'Invalid request data',
+        details: validationResult.error.errors 
+      });
+      return;
+    }
+
+    const { email } = validationResult.data;
+
+    const user = await prisma.user.findUnique({
+      where: { email },
+    });
+
+    if (!user) {
+      res.status(404).json({ error: 'User not found' });
+      return;
+    }
+
+    await prisma.passwordResetToken.deleteMany({
+      where: { userId: user.userId },
+    });
+
+    const resetToken = generatePasswordResetToken();
+    const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+
+    await prisma.passwordResetToken.create({
+      data: {
+        token: resetToken,
+        userId: user.userId,
+        expiresAt,
+      },
+    });
+
+    res.json({
+      reset_token: resetToken,
+      expires_at: expiresAt.toISOString(),
+    });
+  } catch (error) {
+    console.error('Password reset request error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+router.post('/password-reset/confirm', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const validationResult = passwordResetConfirmSchema.safeParse(req.body);
+    
+    if (!validationResult.success) {
+      res.status(400).json({ 
+        error: 'Invalid request data',
+        details: validationResult.error.errors 
+      });
+      return;
+    }
+
+    const { reset_token, new_password } = validationResult.data;
+
+    const resetToken = await prisma.passwordResetToken.findUnique({
+      where: { token: reset_token },
+      include: { user: true },
+    });
+
+    if (!resetToken || resetToken.expiresAt < new Date()) {
+      res.status(401).json({ error: 'Invalid or expired reset token' });
+      return;
+    }
+
+    const passwordHash = await hashPassword(new_password);
+
+    await prisma.$transaction([
+      prisma.user.update({
+        where: { userId: resetToken.userId },
+        data: { passwordHash },
+      }),
+      prisma.passwordResetToken.delete({
+        where: { token: reset_token },
+      }),
+      prisma.refreshToken.deleteMany({
+        where: { userId: resetToken.userId },
+      }),
+    ]);
+
+    res.json({
+      message: 'Password reset successfully',
+    });
+  } catch (error) {
+    console.error('Password reset confirm error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 async function mergeSessionToUser(sessionId: string, userId: string): Promise<boolean> {
   try {
-    // capture ansID belonging to this session before we null out apna seshID
     const answers = await prisma.onboardingAnswer.findMany({
       where: { sessionId },
       select: { answerId: true },
@@ -414,7 +575,6 @@ async function mergeSessionToUser(sessionId: string, userId: string): Promise<bo
     const answerIds = answers.map((a: { answerId: string }) => a.answerId);
 
     await prisma.$transaction([
-      // this will make surefacial landmarks for these answers are linked to the user
       prisma.facialLandmarks.updateMany({
         where: { answerId: { in: answerIds } },
         data: { userId }

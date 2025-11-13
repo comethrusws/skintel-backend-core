@@ -46,6 +46,7 @@ model User {
   onboardingSession OnboardingSession?
   facialLandmarks   FacialLandmarks[]
   products          Product[]
+  passwordResetTokens PasswordResetToken[]
 
   @@unique([ssoProvider, ssoId])
   @@map("users")
@@ -142,6 +143,16 @@ model Product {
   user User @relation(fields: [userId], references: [userId], onDelete: Cascade)
 
   @@map("products")
+}
+
+model PasswordResetToken {
+  token     String   @id
+  userId    String
+  user      User     @relation(fields: [userId], references: [userId], onDelete: Cascade)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@map("password_reset_tokens")
 }
 
 enum AnswerType {

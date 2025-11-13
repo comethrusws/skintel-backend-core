@@ -123,3 +123,12 @@ export const locationWeatherRequestSchema = z.object({
   longitude: z.number().min(-180).max(180),
 });
 
+export const passwordResetRequestSchema = z.object({
+  email: z.string().email()
+});
+
+export const passwordResetConfirmSchema = z.object({
+  reset_token: z.string().min(1),
+  new_password: z.string().min(8)
+});
+

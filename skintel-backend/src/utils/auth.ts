@@ -27,6 +27,10 @@ export const generateRefreshToken = (): string => {
   return `rt_${crypto.randomBytes(32).toString('hex')}`;
 };
 
+export const generatePasswordResetToken = (): string => {
+  return `prt_${crypto.randomBytes(32).toString('hex')}`;
+};
+
 export const verifySessionToken = (token: string): { sessionId: string } | null => {
   try {
     if (!token.startsWith('st_')) return null;
