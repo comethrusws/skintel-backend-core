@@ -3,9 +3,15 @@ import { analyzeSkin, analyzeWithLandmarks } from '../services/analysis';
 import { processLandmarks } from '../services/landmarks';
 import { authenticateUser, AuthenticatedRequest } from '../middleware/auth';
 import { prisma } from '../lib/prisma';
+import { z } from 'zod';
 
 export const vanalyseRouter = Router();
 
+const progressAnalysisSchema = z.object({
+  front_image_url: z.string().url('Must be a valid URL'),
+  left_image_url: z.string().url('Must be a valid URL').optional(),
+  right_image_url: z.string().url('Must be a valid URL').optional()
+});
 
 /**
  * @swagger
@@ -67,16 +73,17 @@ export const vanalyseRouter = Router();
  */
 vanalyseRouter.post('/progress', authenticateUser, async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const userId = req.userId!;
-    const { front_image_url, left_image_url, right_image_url } = req.body as {
-      front_image_url?: string;
-      left_image_url?: string;
-      right_image_url?: string;
-    };
-
-    if (!front_image_url) {
-      return res.status(400).json({ error: 'front_image_url is required' });
+    const validationResult = progressAnalysisSchema.safeParse(req.body);
+    
+    if (!validationResult.success) {
+      return res.status(400).json({ 
+        error: 'Invalid request data',
+        details: validationResult.error.errors 
+      });
     }
+
+    const { front_image_url, left_image_url, right_image_url } = validationResult.data;
+    const userId = req.userId!;
 
     const activePlan = await prisma.facialLandmarks.findFirst({
       where: { 
@@ -108,34 +115,25 @@ vanalyseRouter.post('/progress', authenticateUser, async (req: AuthenticatedRequ
     );
 
     const answerId = `progress_${Date.now()}_${userId.slice(-6)}`;
-    await prisma.onboardingAnswer.create({
-      data: {
-        answerId,
-        userId,
-        sessionId: null,
-        screenId: 'progress_analysis',
-        questionId: 'q_face_photo_front',
-        type: 'image',
-        value: { image_url: front_image_url },
-        status: 'answered'
-      }
-    });
-
-    await prisma.facialLandmarks.create({
-      data: {
-        answerId,
-        userId,
-        landmarks: landmarkResult.data as unknown as any,
-        analysis: analysis,
-        status: 'COMPLETED',
-        processedAt: new Date(),
-        analysisType: 'PROGRESS',
-        planStartDate: activePlan.planStartDate,
-        planEndDate: activePlan.planEndDate,
-        score: analysis.score || null,
-        weeklyPlan: analysis.care_plan_4_weeks || null
-      }
-    });
+    
+    // Create records in transaction
+    await prisma.$transaction([
+      prisma.facialLandmarks.create({
+        data: {
+          answerId,
+          userId,
+          landmarks: landmarkResult.data as unknown as any,
+          analysis: analysis,
+          status: 'COMPLETED',
+          processedAt: new Date(),
+          analysisType: 'PROGRESS',
+          planStartDate: activePlan.planStartDate,
+          planEndDate: activePlan.planEndDate,
+          score: analysis.score || null,
+          weeklyPlan: analysis.care_plan_4_weeks as any
+        }
+      })
+    ]);
 
     const imagesAnalyzed = ['front'];
     if (left_image_url) imagesAnalyzed.push('left');
