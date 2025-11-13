@@ -50,6 +50,41 @@ function buildPrompt(): string {
   );
 }
 
+function buildProgressPrompt(): string {
+  return (
+    'You are a dermatologist assistant AI specializing in progress tracking.\n' +
+    'You will receive:\n' +
+    '1. Current face images (front, left profile, right profile) with landmarks\n' +
+    '2. Initial analysis data with weekly plan and baseline score\n' +
+    '3. Time elapsed since initial analysis\n' +
+    '\n' +
+    'Your task:\n' +
+    '1. Compare current skin condition to initial analysis\n' +
+    '2. Evaluate progress on specific issues identified initially\n' +
+    '3. Assess adherence to the 4-week improvement plan\n' +
+    '4. Provide progress score and updated recommendations\n' +
+    '5. Identify visual improvements and areas needing attention\n' +
+    '\n' +
+    'Respond strictly in this JSON format:\n' +
+    '{\n' +
+    '  "overall_progress_score": 85,\n' +
+    '  "score_change": 13,\n' +
+    '  "issues_improved": [\n' +
+    '    {"issue_type": "dark_circles", "initial_severity": "moderate", "current_severity": "mild", "improvement_percentage": 40}\n' +
+    '  ],\n' +
+    '  "plan_adherence": {\n' +
+    '    "weeks_completed": 2,\n' +
+    '    "adherence_score": 75,\n' +
+    '    "missed_recommendations": ["retinol application", "sun protection"]\n' +
+    '  },\n' +
+    '  "visual_improvements": ["reduced under-eye puffiness", "clearer T-zone"],\n' +
+    '  "areas_needing_attention": ["forehead texture", "jawline breakouts"],\n' +
+    '  "updated_recommendations": ["increase retinol frequency", "add exfoliation"],\n' +
+    '  "next_week_focus": "Focus on consistency with evening routine and add gentle exfoliation twice weekly"\n' +
+    '}'
+  );
+}
+
 interface FaceImages {
   front?: string;
   left?: string;
@@ -270,6 +305,90 @@ export async function analyzeSkin(answerId: string) {
   return parsed;
 }
 
+export async function analyzeProgress(
+  currentImages: { front: string; left?: string; right?: string },
+  currentLandmarks: object,
+  initialAnalysis: any,
+  initialScore: number,
+  weeklyPlan: any[],
+  daysElapsed: number
+): Promise<any> {
+  if (!process.env.OPENAI_API_KEY) {
+    throw new Error('OPENAI_API_KEY is not set');
+  }
+
+  const prompt = buildProgressPrompt();
+  const imageContent: any[] = [];
+  const availableImages: string[] = [];
+
+  const imagePromises: Promise<void>[] = [];
+
+  imagePromises.push(
+    maybePresignUrl(currentImages.front, 300).then(presignedUrl => {
+      imageContent.push({ type: 'image_url', image_url: { url: presignedUrl } });
+      availableImages.push('front');
+    })
+  );
+
+  if (currentImages.left) {
+    imagePromises.push(
+      maybePresignUrl(currentImages.left, 300).then(presignedUrl => {
+        imageContent.push({ type: 'image_url', image_url: { url: presignedUrl } });
+        availableImages.push('left');
+      })
+    );
+  }
+
+  if (currentImages.right) {
+    imagePromises.push(
+      maybePresignUrl(currentImages.right, 300).then(presignedUrl => {
+        imageContent.push({ type: 'image_url', image_url: { url: presignedUrl } });
+        availableImages.push('right');
+      })
+    );
+  }
+
+  await Promise.all(imagePromises);
+
+  const weeksElapsed = Math.floor(daysElapsed / 7);
+  const currentWeekPlan = weeklyPlan[Math.min(weeksElapsed, weeklyPlan.length - 1)];
+
+  const completion = await openai.chat.completions.create({
+    model: OPENAI_MODEL,
+    messages: [
+      { role: 'system', content: prompt },
+      {
+        role: 'user',
+        content: [
+          { 
+            type: 'text', 
+            text: `Analyze progress in these current images (${availableImages.join(', ')}) compared to initial analysis and return your response in JSON.` 
+          },
+          ...imageContent,
+          { 
+            type: 'text', 
+            text: `Current landmarks: ${JSON.stringify(currentLandmarks)}\n` +
+                  `Initial analysis: ${JSON.stringify(initialAnalysis)}\n` +
+                  `Initial score: ${initialScore}\n` +
+                  `Weekly plan: ${JSON.stringify(weeklyPlan)}\n` +
+                  `Days elapsed: ${daysElapsed}\n` +
+                  `Current week plan: ${JSON.stringify(currentWeekPlan)}`
+          }
+        ]
+      }
+    ],
+    response_format: { type: 'json_object' },
+  });
+
+  const content = completion.choices?.[0]?.message?.content ?? '';
+
+  try {
+    return JSON.parse(content);
+  } catch {
+    return { raw: content };
+  }
+}
+
 export async function analyzeWithLandmarks(frontImageUrl: string, landmarks: object, leftImageUrl?: string, rightImageUrl?: string) {
   if (!process.env.OPENAI_API_KEY) {
     throw new Error('OPENAI_API_KEY is not set');
@@ -336,3 +455,6 @@ export async function analyzeWithLandmarks(frontImageUrl: string, landmarks: obj
     return { raw: content } as any;
   }
 }
+
+// Export these for the optimized functions
+export { buildPrompt, buildProgressPrompt, openai, OPENAI_MODEL };

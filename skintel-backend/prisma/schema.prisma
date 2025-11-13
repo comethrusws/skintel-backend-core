@@ -114,6 +114,7 @@ model FacialLandmarks {
   userId      String?        @map("user_id")
   landmarks   Json
   analysis    Json?
+  progressUpdate     Json?          @map("progress_update")
   status      LandmarkStatus @default(PROCESSING)
   processedAt DateTime?      @map("processed_at")
   error       String?
