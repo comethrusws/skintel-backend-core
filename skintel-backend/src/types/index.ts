@@ -330,3 +330,110 @@ export interface ProgressUpdateResult {
   updated_recommendations: string[];
   next_week_focus: string;
 }
+
+export interface Task {
+  id: string;
+  userId: string;
+  week: number; // 1-4
+  title: string;
+  description: string;
+  timeOfDay: 'morning' | 'evening' | 'anytime';
+  category: 'cleansing' | 'treatment' | 'moisturizing' | 'protection' | 'lifestyle';
+  priority: 'critical' | 'important' | 'optional';
+  recommendedProducts?: string[]; // product categories
+  userProducts?: string[]; // user's scanned product IDs
+  isActive: boolean;
+  adaptations?: {
+    skipCount: number;
+    lastSkipped?: string;
+    timeAdjusted?: boolean;
+  };
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface TaskCompletion {
+  id: string;
+  taskId: string;
+  userId: string;
+  completedAt: string; // date string (YYYY-MM-DD)
+  timestamp: string; // full datetime when marked complete
+}
+
+export interface DailyTasksResponse {
+  date: string;
+  week: number;
+  dayOfPlan: number; // 1-28
+  tasks: Array<{
+    id: string;
+    title: string;
+    description: string;
+    timeOfDay: 'morning' | 'evening' | 'anytime';
+    category: string;
+    priority: 'critical' | 'important' | 'optional';
+    recommendedProducts?: string[];
+    userProducts?: Array<{
+      id: string;
+      name: string;
+      category: string;
+    }>;
+    isCompleted: boolean;
+    completedAt?: string;
+  }>;
+  completionRate: number; 
+  dailyScore: number; 
+}
+
+export interface TaskProgressResponse {
+  userId: string;
+  currentWeek: number;
+  currentDay: number; // 1-28
+  overallScore: number; 
+  weeklyScores: Array<{
+    week: number;
+    score: number;
+    completedTasks: number;
+    totalTasks: number;
+    criticalTasksCompleted: number;
+    criticalTasksTotal: number;
+  }>;
+  dailyStreak: number;
+  longestStreak: number;
+  totalTasksCompleted: number;
+  totalTasksPossible: number;
+  planStartDate: string;
+  planEndDate: string;
+  recentActivity: Array<{
+    date: string;
+    score: number;
+    tasksCompleted: number;
+    tasksTotal: number;
+  }>;
+}
+
+export interface TaskGenerationRequest {
+  userId: string;
+  weeklyPlan: WeeklyPlanItem[];
+  userProducts?: Array<{
+    id: string;
+    category: string;
+    name: string;
+    ingredients?: string[];
+  }>;
+}
+
+export interface TaskCompletionRequest {
+  taskId: string;
+  completedAt?: string; // optional, defaults to today. as it shudl
+}
+
+export interface TaskAdaptationResult {
+  taskId: string;
+  adaptationType: 'time_adjusted' | 'made_optional' | 'alternative_suggested';
+  reason: string;
+  newTimeOfDay?: 'morning' | 'evening' | 'anytime';
+  alternativeTask?: {
+    title: string;
+    description: string;
+  };
+}
