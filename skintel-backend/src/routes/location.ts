@@ -168,4 +168,143 @@ router.post('/weather', async (req: Request, res: Response): Promise<void> => {
   }
 });
 
+interface UVIndexAPIResponse {
+  ok: boolean;
+  latitude?: number;
+  longitude?: number;
+  now?: {
+    time: string;
+    uvi: number;
+  };
+  forecast?: Array<{
+    time: string;
+    uvi: number;
+  }>;
+  history?: Array<{
+    time: string;
+    uvi: number;
+  }>;
+  message?: string;
+}
+
+async function fetchUVIndex(lat: number, lon: number): Promise<UVIndexAPIResponse> {
+  const url = `https://currentuvindex.com/api/v1/uvi?latitude=${lat}&longitude=${lon}`;
+  
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 10000);
+  
+  try {
+    const response = await fetch(url, { 
+      signal: controller.signal,
+      headers: {
+        'User-Agent': 'Skintel-Backend/1.0'
+      }
+    });
+    
+    clearTimeout(timeoutId);
+    
+    const data: UVIndexAPIResponse = await response.json();
+    
+    if (!data.ok) {
+      throw new Error(data.message || 'UV API error');
+    }
+    
+    return data;
+  } catch (error) {
+    clearTimeout(timeoutId);
+    
+    if (error instanceof Error && error.name === 'AbortError') {
+      throw new Error('UV API request timeout');
+    }
+    
+    throw error;
+  }
+}
+
+/**
+ * @swagger
+ * /v1/location/uv:
+ *   get:
+ *     summary: Get UV index for coordinates
+ *     description: Fetch current UV index and forecast for given coordinates
+ *     tags: [Location]
+ *     parameters:
+ *       - in: query
+ *         name: latitude
+ *         required: true
+ *         schema:
+ *           type: number
+ *           minimum: -90
+ *           maximum: 90
+ *         example: 40.6943
+ *       - in: query
+ *         name: longitude
+ *         required: true
+ *         schema:
+ *           type: number
+ *           minimum: -180
+ *           maximum: 180
+ *         example: -73.9249
+ *     responses:
+ *       200:
+ *         description: UV index retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 latitude:
+ *                   type: number
+ *                 longitude:
+ *                   type: number
+ *                 uv_index:
+ *                   type: number
+ *                   description: Current UV index value (0-11+)
+ *       400:
+ *         description: Invalid coordinates
+ *       429:
+ *         description: Rate limit exceeded
+ *       503:
+ *         description: UV service unavailable
+ */
+router.get('/uv', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const latitude = parseFloat(req.query.latitude as string);
+    const longitude = parseFloat(req.query.longitude as string);
+
+    const validationResult = locationWeatherRequestSchema.safeParse({
+      latitude,
+      longitude
+    });
+    
+    if (!validationResult.success) {
+      res.status(400).json({ 
+        error: 'Invalid coordinates',
+        details: validationResult.error.errors 
+      });
+      return;
+    }
+
+    const uvData = await fetchUVIndex(latitude, longitude);
+
+    res.json({
+      uv_index: uvData.now?.uvi || 0,
+      latitude: uvData.latitude,
+      longitude: uvData.longitude,
+    });
+  } catch (error) {
+    console.error('UV index error:', error);
+    
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    
+    if (errorMessage.includes('invalid latitude') || errorMessage.includes('invalid longitude')) {
+      res.status(400).json({ error: 'Invalid coordinates provided' });
+    } else if (errorMessage.includes('timeout')) {
+      res.status(503).json({ error: 'UV service temporarily unavailable' });
+    } else {
+      res.status(503).json({ error: 'Failed to fetch UV index data' });
+    }
+  }
+});
+
 export { router as locationRouter };
