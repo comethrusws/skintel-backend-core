@@ -3,8 +3,8 @@ import { authenticateUser, AuthenticatedRequest } from '../middleware/auth';
 import { profileUpdateRequestSchema } from '../lib/validation';
 import { prisma } from '../lib/prisma';
 import { Prisma } from '@prisma/client';
-import { hashPassword } from '../utils/auth';
 import { ProgressAnalysisItem } from '../types';
+import { getTaskProgress } from '../services/tasks';
 
 const router = Router();
 
@@ -50,6 +50,14 @@ const router = Router();
  *                 sso_provider:
  *                   type: string
  *                   nullable: true
+ *                 skin_score:
+ *                   type: number
+ *                   nullable: true
+ *                   description: Latest skin analysis score (0-100)
+ *                 tasks_score:
+ *                   type: number
+ *                   nullable: true
+ *                   description: Current skincare tasks completion score (0-100)
  *                 created_at:
  *                   type: string
  *                   format: date-time
@@ -118,6 +126,14 @@ const router = Router();
  *                 sso_provider:
  *                   type: string
  *                   nullable: true
+ *                 skin_score:
+ *                   type: number
+ *                   nullable: true
+ *                   description: Latest skin analysis score (0-100)
+ *                 tasks_score:
+ *                   type: number
+ *                   nullable: true
+ *                   description: Current skincare tasks completion score (0-100)
  *                 created_at:
  *                   type: string
  *                   format: date-time
@@ -276,6 +292,29 @@ router.get('/', authenticateUser, async (req: AuthenticatedRequest, res: Respons
       }
     }
 
+    let skinScore: number | null = null;
+    const latestAnalysis = await prisma.facialLandmarks.findFirst({
+      where: {
+        userId,
+        status: 'COMPLETED',
+        score: { not: null }
+      },
+      orderBy: { createdAt: 'desc' },
+      select: { score: true }
+    });
+
+    if (latestAnalysis) {
+      skinScore = latestAnalysis.score;
+    }
+
+    let tasksScore: number | null = null;
+    try {
+      const taskProgress = await getTaskProgress(userId);
+      tasksScore = taskProgress.overallScore;
+    } catch (error) {
+      console.log('No task progress found for user:', userId);
+    }
+
     const response = {
       user_id: user.userId,
       name: user.name,
@@ -284,6 +323,8 @@ router.get('/', authenticateUser, async (req: AuthenticatedRequest, res: Respons
       profile_image: profileImage,
       email: user.email,
       sso_provider: user.ssoProvider,
+      skin_score: skinScore,
+      tasks_score: tasksScore,
       created_at: user.createdAt.toISOString(),
       updated_at: user.updatedAt.toISOString()
     };
@@ -447,6 +488,29 @@ router.put('/', authenticateUser, async (req: AuthenticatedRequest, res: Respons
       }
     }
 
+    let skinScore: number | null = null;
+    const latestAnalysis = await prisma.facialLandmarks.findFirst({
+      where: {
+        userId,
+        status: 'COMPLETED',
+        score: { not: null }
+      },
+      orderBy: { createdAt: 'desc' },
+      select: { score: true }
+    });
+
+    if (latestAnalysis) {
+      skinScore = latestAnalysis.score;
+    }
+
+    let tasksScore: number | null = null;
+    try {
+      const taskProgress = await getTaskProgress(userId);
+      tasksScore = taskProgress.overallScore;
+    } catch (error) {
+      console.log('No task progress found for user:', userId);
+    }
+
     const response = {
       user_id: updatedUser.userId,
       name: updatedUser.name,
@@ -455,6 +519,8 @@ router.put('/', authenticateUser, async (req: AuthenticatedRequest, res: Respons
       profile_image: profileImage,
       email: updatedUser.email,
       sso_provider: updatedUser.ssoProvider,
+      skin_score: skinScore,
+      tasks_score: tasksScore,
       created_at: updatedUser.createdAt.toISOString(),
       updated_at: updatedUser.updatedAt.toISOString(),
       updated: true
