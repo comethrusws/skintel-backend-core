@@ -30,23 +30,25 @@ model AnonymousSession {
 }
 
 model User {
-  id                String             @id @default(cuid())
-  userId            String             @unique @map("user_id")
-  name              String?
-  phoneNumber       String?            @map("phone_number")
-  dateOfBirth       DateTime?          @map("date_of_birth")
-  email             String?            @unique
-  passwordHash      String?            @map("password_hash")
-  ssoProvider       String?            @map("sso_provider")
-  ssoId             String?            @map("sso_id")
-  createdAt         DateTime           @default(now()) @map("created_at")
-  updatedAt         DateTime           @updatedAt @map("updated_at")
-  refreshTokens     RefreshToken[]
-  answers           OnboardingAnswer[]
-  onboardingSession OnboardingSession?
-  facialLandmarks   FacialLandmarks[]
-  products          Product[]
+  id                  String               @id @default(cuid())
+  userId              String               @unique @map("user_id")
+  name                String?
+  phoneNumber         String?              @map("phone_number")
+  dateOfBirth         DateTime?            @map("date_of_birth")
+  email               String?              @unique
+  passwordHash        String?              @map("password_hash")
+  ssoProvider         String?              @map("sso_provider")
+  ssoId               String?              @map("sso_id")
+  createdAt           DateTime             @default(now()) @map("created_at")
+  updatedAt           DateTime             @updatedAt @map("updated_at")
+  refreshTokens       RefreshToken[]
+  answers             OnboardingAnswer[]
+  onboardingSession   OnboardingSession?
+  facialLandmarks     FacialLandmarks[]
+  products            Product[]
   passwordResetTokens PasswordResetToken[]
+  Task                Task[]
+  TaskCompletion      TaskCompletion[]
 
   @@unique([ssoProvider, ssoId])
   @@map("users")
@@ -110,21 +112,21 @@ model IdempotencyKey {
 }
 
 model FacialLandmarks {
-  id          String         @id @default(cuid())
-  answerId    String         @unique @map("answer_id")
-  userId      String?        @map("user_id")
-  landmarks   Json
-  analysis    Json?
-  progressUpdate     Json?          @map("progress_update")
-  status      LandmarkStatus @default(PROCESSING)
-  processedAt DateTime?      @map("processed_at")
-  error       String?
-  createdAt   DateTime       @default(now()) @map("created_at")
-  score              Int?
-  weeklyPlan         Json?
-  analysisType       AnalysisType?
-  planStartDate      DateTime?
-  planEndDate        DateTime?
+  id             String         @id @default(cuid())
+  answerId       String         @unique @map("answer_id")
+  userId         String?        @map("user_id")
+  landmarks      Json
+  analysis       Json?
+  progressUpdate Json?          @map("progress_update")
+  status         LandmarkStatus @default(PROCESSING)
+  processedAt    DateTime?      @map("processed_at")
+  error          String?
+  createdAt      DateTime       @default(now()) @map("created_at")
+  score          Int?
+  weeklyPlan     Json?
+  analysisType   AnalysisType?
+  planStartDate  DateTime?
+  planEndDate    DateTime?
 
   answer OnboardingAnswer @relation(fields: [answerId], references: [answerId], onDelete: Cascade)
   user   User?            @relation(fields: [userId], references: [userId], onDelete: Cascade)
@@ -136,7 +138,7 @@ model Product {
   id          String   @id @default(cuid())
   userId      String   @map("user_id")
   imageUrl    String   @map("image_url")
-  productData Json     @map("product_data") 
+  productData Json     @map("product_data")
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
 
@@ -153,6 +155,44 @@ model PasswordResetToken {
   createdAt DateTime @default(now())
 
   @@map("password_reset_tokens")
+}
+
+model Task {
+  id                  String   @id @default(cuid())
+  userId              String
+  week                Int // 1-4
+  title               String
+  description         String
+  timeOfDay           String // 'morning' | 'evening' | 'anytime'
+  category            String // 'cleansing' | 'treatment' | 'moisturizing' | 'protection' | 'lifestyle'
+  priority            String // 'critical' | 'important' | 'optional'
+  recommendedProducts Json? // array of product categories
+  userProducts        Json? // array of user product IDs
+  adaptations         Json? // adaptation metadata
+  isActive            Boolean  @default(true)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  user        User             @relation(fields: [userId], references: [userId], onDelete: Cascade)
+  completions TaskCompletion[]
+
+  @@index([userId, week])
+  @@index([userId, isActive])
+  @@index([userId, priority])
+}
+
+model TaskCompletion {
+  id          String   @id @default(cuid())
+  taskId      String
+  userId      String
+  completedAt DateTime 
+  timestamp   DateTime @default(now()) // exact time when marked complete
+
+  task Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [userId], onDelete: Cascade)
+
+  @@unique([taskId, userId, completedAt]) // prevent duplicate completions per day
+  @@index([userId, completedAt])
 }
 
 enum AnswerType {

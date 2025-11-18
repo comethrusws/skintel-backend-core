@@ -12,6 +12,7 @@ import { profileRouter } from './routes/profile';
 import { versionRouter } from './routes/version';
 import { prisma } from './lib/prisma';
 import { vanalyseRouter } from './routes/vanalyse';
+import { tasksRouter } from './routes/tasks';
 import { specs, swaggerUi } from './lib/swagger';
 import { locationRouter } from './routes/location';
 
@@ -58,6 +59,7 @@ app.use('/v1/upload', uploadRouter);
 app.use('/v1/profile', profileRouter);
 app.use('/v1/version', versionRouter);
 app.use('/v1/vanalyse', vanalyseRouter);
+app.use('/v1/tasks', tasksRouter);
 app.use('/v1/location', locationRouter);
 
 // Swagger documentation

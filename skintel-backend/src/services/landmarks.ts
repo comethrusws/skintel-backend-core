@@ -1,6 +1,7 @@
 import { LandmarkResponse, LandmarkProcessingResult } from '../types';
 import { maybePresignUrl } from '../lib/s3';
 import { analyzeSkin, analyzeWithLandmarks } from './analysis';
+import { generateTasksForUser } from './tasks';
 
 const LANDMARK_SERVICE_URL = process.env.LANDMARK_URL || 'http://localhost:8000';
 const LANDMARK_ENDPOINT = '/api/v1/landmarks';
@@ -127,6 +128,37 @@ export async function processLandmarksAsync(answerId: string, imageId: string): 
             planEndDate: new Date(Date.now() + 28 * 24 * 60 * 60 * 1000) // basically a 4 week end date rom current
           }
         });
+
+        try {
+          const userProducts = await prisma.product.findMany({
+            where: { userId: answer.userId || undefined },
+            select: {
+              id: true,
+              productData: true
+            }
+          });
+
+          const formattedProducts = userProducts.map(p => {
+            const data = p.productData as any;
+            return {
+              id: p.id,
+              name: data?.product_name || 'Unknown Product',
+              category: data?.category || 'unknown',
+              ingredients: data?.ingredients || []
+            };
+          });
+
+          if (analysis.care_plan_4_weeks && answer.userId) {
+            await generateTasksForUser({
+              userId: answer.userId,
+              weeklyPlan: analysis.care_plan_4_weeks,
+              userProducts: formattedProducts
+            });
+            console.log(`Auto-generated tasks for user ${answer.userId}`);
+          }
+        } catch (taskError) {
+          console.error('Failed to auto-generate tasks:', taskError);
+        }
       } catch (analysisError) {
         console.error('Skin analysis failed:', analysisError);
         await prisma.facialLandmarks.update({
@@ -272,6 +304,39 @@ export async function processLandmarksForAnswerWithUrl(answerId: string, imageUr
           planEndDate: new Date(Date.now() + 28 * 24 * 60 * 60 * 1000)
         }
       });
+
+      // Auto-generate tasks for the user after successful analysis
+      try {
+        const userProducts = await prisma.product.findMany({
+          where: { userId: answer.userId || undefined },
+          select: {
+            id: true,
+            productData: true
+          }
+        });
+
+        const formattedProducts = userProducts.map(p => {
+          const data = p.productData as any;
+          return {
+            id: p.id,
+            name: data?.product_name || 'Unknown Product',
+            category: data?.category || 'unknown',
+            ingredients: data?.ingredients || []
+          };
+        });
+
+        if (analysis.care_plan_4_weeks && answer.userId) {
+          await generateTasksForUser({
+            userId: answer.userId,
+            weeklyPlan: analysis.care_plan_4_weeks,
+            userProducts: formattedProducts
+          });
+          console.log(`Auto-generated tasks for user ${answer.userId}`);
+        }
+      } catch (taskError) {
+        console.error('Failed to auto-generate tasks:', taskError);
+        // Don't fail the entire process if task generation fails
+      }
     } catch (analysisError) {
       console.error('Skin analysis failed:', analysisError);
       await prisma.facialLandmarks.update({

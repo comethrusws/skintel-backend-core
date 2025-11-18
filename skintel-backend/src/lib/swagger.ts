@@ -18,8 +18,9 @@ const options = {
       { name: 'Analysis', description: 'Skin analysis for face images' },
       { name: 'Upload', description: 'Image upload to s3' },
       { name: 'Profile', description: 'User profile management' },
-      { name: 'Location', description: 'Location and weather services' },
+      { name: 'Location & UV', description: 'Location, UV and weather services' },
       { name: 'Version', description: 'App version check' },
+      { name: 'Tasks', description: 'Skincare task management' }
     ],
     servers: [
       {
