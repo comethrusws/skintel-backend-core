@@ -20,6 +20,7 @@ const options = {
       { name: 'Profile', description: 'User profile management' },
       { name: 'Location', description: 'Location and weather services' },
       { name: 'Version', description: 'App version check' },
+      { name: 'Tasks', description: 'Skincare task management' }
     ],
     servers: [
       {
