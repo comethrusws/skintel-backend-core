@@ -2,7 +2,7 @@ import { prisma } from '../lib/prisma';
 import OpenAI from 'openai';
 import { TaskGenerationRequest, TaskAdaptationResult } from '../types';
 
-const OPENAI_MODEL = process.env.OPENAI_MODEL || 'gpt-4';
+const OPENAI_MODEL = process.env.OPENAI_MODEL || 'gpt-4o';
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 function buildTaskGenerationPrompt(): string {

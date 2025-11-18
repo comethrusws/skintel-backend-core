@@ -1,6 +1,7 @@
 import { LandmarkResponse, LandmarkProcessingResult } from '../types';
 import { maybePresignUrl } from '../lib/s3';
 import { analyzeSkin, analyzeWithLandmarks } from './analysis';
+import { generateTasksForUser } from './tasks';
 
 const LANDMARK_SERVICE_URL = process.env.LANDMARK_URL || 'http://localhost:8000';
 const LANDMARK_ENDPOINT = '/api/v1/landmarks';
@@ -129,8 +130,6 @@ export async function processLandmarksAsync(answerId: string, imageId: string): 
         });
 
         try {
-          const { generateTasksForUser } = await import('./tasks');
-          
           const userProducts = await prisma.product.findMany({
             where: { userId: answer.userId || undefined },
             select: {
@@ -308,9 +307,6 @@ export async function processLandmarksForAnswerWithUrl(answerId: string, imageUr
 
       // Auto-generate tasks for the user after successful analysis
       try {
-        const { generateTasksForUser } = await import('./tasks');
-        
-        // Get user's products for task generation
         const userProducts = await prisma.product.findMany({
           where: { userId: answer.userId || undefined },
           select: {
