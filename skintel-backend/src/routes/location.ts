@@ -74,7 +74,7 @@ async function fetchWeatherData(lat: number, lon: number): Promise<WeatherAPIRes
  *   post:
  *     summary: Get weather condition range for coordinates
  *     description: Fetch current temperature for given coordinates and return appropriate weather condition range
- *     tags: [Location]
+ *     tags: [Location & UV]
  *     requestBody:
  *       required: true
  *       content:
@@ -227,7 +227,7 @@ async function fetchUVIndex(lat: number, lon: number): Promise<UVIndexAPIRespons
  *   get:
  *     summary: Get UV index for coordinates
  *     description: Fetch current UV index and forecast for given coordinates
- *     tags: [Location]
+ *     tags: [Location & UV]
  *     parameters:
  *       - in: query
  *         name: latitude
