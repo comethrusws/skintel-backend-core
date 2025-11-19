@@ -1,6 +1,6 @@
-import { Router, Request, Response } from 'express';
+import { Router, Response } from 'express';
 import { WaterIntakeService } from '../services/waterIntake';
-import { authenticateUser } from '../middleware/auth';
+import { authenticateUser, AuthenticatedRequest } from '../middleware/auth';
 
 const router = Router();
 
@@ -30,9 +30,9 @@ const router = Router();
  *                   type: string
  *                   example: "To maintain hydration for dry skin."
  */
-router.get('/', authenticateUser, async (req: Request, res: Response) => {
+router.get('/', authenticateUser, async (req: AuthenticatedRequest, res: Response) => {
     try {
-        const userId = (req as any).user.userId;
+        const userId = req.userId!;
         const suggestion = await WaterIntakeService.getWaterIntakeSuggestion(userId);
         res.json(suggestion);
     } catch (error) {

@@ -44,7 +44,7 @@ export class WaterIntakeService {
         Based on the following skin analysis summary, suggest a daily water intake amount (in ml) and provide a brief reason (under 20 words).
         Skin Analysis: "${analysisSummary}"
         
-        Respond strictly in the following JSON format:
+        Respond strictly in the following example JSON format:
         {
           "amount": 2500,
           "unit": "ml",
