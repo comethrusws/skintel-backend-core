@@ -127,6 +127,7 @@ model FacialLandmarks {
   analysisType   AnalysisType?
   planStartDate  DateTime?
   planEndDate    DateTime?
+  waterIntakeSuggestion Json? @map("water_intake_suggestion")
 
   answer OnboardingAnswer @relation(fields: [answerId], references: [answerId], onDelete: Cascade)
   user   User?            @relation(fields: [userId], references: [userId], onDelete: Cascade)
@@ -218,4 +219,14 @@ enum LandmarkStatus {
 enum AnalysisType {
   INITIAL
   PROGRESS
+}
+
+model SkinTip {
+  id        String   @id @default(cuid())
+  date      DateTime @unique @db.Date // Store date only
+  content   String
+  category  String?  // Optional category (e.g., "Hydration", "Sun Protection")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("skin_tips")
 }

@@ -15,6 +15,10 @@ import { vanalyseRouter } from './routes/vanalyse';
 import { tasksRouter } from './routes/tasks';
 import { specs, swaggerUi } from './lib/swagger';
 import { locationRouter } from './routes/location';
+import { initCronJobs } from './cron';
+import { skinTipRouter } from './routes/skinTip.routes';
+import { waterIntakeRouter } from './routes/waterIntake.routes';
+import { SkinTipService } from './services/skinTip';
 
 dotenv.config();
 
@@ -27,16 +31,16 @@ console.log(`Server starting with MAX_REQUEST_SIZE: ${maxRequestSize}`);
 app.use(helmet());
 app.use(cors());
 
-app.use(express.json({ 
+app.use(express.json({
   limit: maxRequestSize,
   verify: (req: any, res: any, buf: Buffer) => {
     req.rawBody = buf;
   }
 }));
 
-app.use(express.urlencoded({ 
-  extended: true, 
-  limit: maxRequestSize 
+app.use(express.urlencoded({
+  extended: true,
+  limit: maxRequestSize
 }));
 
 app.use((error: any, req: Request, res: Response, next: Function) => {
@@ -61,6 +65,8 @@ app.use('/v1/version', versionRouter);
 app.use('/v1/vanalyse', vanalyseRouter);
 app.use('/v1/tasks', tasksRouter);
 app.use('/v1/location', locationRouter);
+app.use('/v1/skin-tip', skinTipRouter);
+app.use('/v1/water-intake', waterIntakeRouter);
 
 // Swagger documentation
 app.use('/docs', swaggerUi.serve, swaggerUi.setup(specs, {
@@ -100,6 +106,8 @@ process.on('SIGTERM', async () => {
   process.exit(0);
 });
 
-app.listen(port, () => {
+app.listen(port, async () => {
   console.log(`Server is listening on port ${port}`);
+  initCronJobs();
+  await SkinTipService.ensureTipsForWeek();
 });

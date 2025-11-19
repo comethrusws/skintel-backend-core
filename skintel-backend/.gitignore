@@ -13,4 +13,5 @@ coverage/
 *.swp
 SYSTEM_DESIGN.md
 CLAUDE.md
+GEMINI.md
 /src/generated/prisma
