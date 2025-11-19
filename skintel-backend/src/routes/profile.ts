@@ -3,7 +3,6 @@ import { authenticateUser, AuthenticatedRequest } from '../middleware/auth';
 import { profileUpdateRequestSchema } from '../lib/validation';
 import { prisma } from '../lib/prisma';
 import { Prisma } from '@prisma/client';
-import { ProgressAnalysisItem } from '../types';
 import { getTaskProgress } from '../services/tasks';
 
 const router = Router();
@@ -50,14 +49,35 @@ const router = Router();
  *                 sso_provider:
  *                   type: string
  *                   nullable: true
+ *                 gender:
+ *                   type: string
+ *                   nullable: true
  *                 skin_score:
  *                   type: number
  *                   nullable: true
  *                   description: Latest skin analysis score (0-100)
+ *                 score_change:
+ *                   type: number
+ *                   description: Change in skin score from previous analysis
  *                 tasks_score:
  *                   type: number
  *                   nullable: true
  *                   description: Current skincare tasks completion score (0-100)
+ *                 tasks_count:
+ *                   type: object
+ *                   properties:
+ *                     completed:
+ *                       type: number
+ *                     total:
+ *                       type: number
+ *                 plan_details:
+ *                   type: object
+ *                   properties:
+ *                     type:
+ *                       type: string
+ *                       enum: [MONTHLY, WEEKLY]
+ *                 total_products_in_use:
+ *                   type: number
  *                 created_at:
  *                   type: string
  *                   format: date-time
@@ -260,6 +280,7 @@ router.get('/', authenticateUser, async (req: AuthenticatedRequest, res: Respons
         dateOfBirth: true,
         email: true,
         ssoProvider: true,
+        planType: true,
         createdAt: true,
         updatedAt: true
       }
@@ -287,25 +308,51 @@ router.get('/', authenticateUser, async (req: AuthenticatedRequest, res: Respons
       }
     }
 
+    const genderAnswer = await prisma.onboardingAnswer.findFirst({
+      where: {
+        userId,
+        questionId: 'q_profile_gender',
+        status: 'answered'
+      },
+      orderBy: { savedAt: 'desc' }
+    });
+    const gender = genderAnswer?.value as string | undefined;
+
+    const totalProducts = await prisma.product.count({
+      where: { userId }
+    });
+
     let skinScore: number | null = null;
-    const latestAnalysis = await prisma.facialLandmarks.findFirst({
+    let scoreChange: number = 0;
+
+    const landmarks = await prisma.facialLandmarks.findMany({
       where: {
         userId,
         status: 'COMPLETED',
         score: { not: null }
       },
       orderBy: { createdAt: 'desc' },
+      take: 2,
       select: { score: true }
     });
 
-    if (latestAnalysis) {
-      skinScore = latestAnalysis.score;
+    if (landmarks.length > 0) {
+      skinScore = landmarks[0].score;
+      if (landmarks.length > 1 && landmarks[0].score !== null && landmarks[1].score !== null) {
+        scoreChange = landmarks[0].score - landmarks[1].score;
+      }
     }
 
     let tasksScore: number | null = null;
+    let tasksCount = { completed: 0, total: 0 };
+
     try {
       const taskProgress = await getTaskProgress(userId);
       tasksScore = taskProgress.overallScore;
+      tasksCount = {
+        completed: taskProgress.totalTasksCompleted,
+        total: taskProgress.totalTasksPossible
+      };
     } catch (error) {
       console.log('No task progress found for user:', userId);
     }
@@ -318,8 +365,15 @@ router.get('/', authenticateUser, async (req: AuthenticatedRequest, res: Respons
       profile_image: profileImage,
       email: user.email,
       sso_provider: user.ssoProvider,
+      gender,
       skin_score: skinScore,
+      score_change: scoreChange,
       tasks_score: tasksScore,
+      tasks_count: tasksCount,
+      plan_details: {
+        type: user.planType
+      },
+      total_products_in_use: totalProducts,
       created_at: user.createdAt.toISOString(),
       updated_at: user.updatedAt.toISOString()
     };

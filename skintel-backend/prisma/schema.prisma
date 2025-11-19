@@ -39,6 +39,7 @@ model User {
   passwordHash        String?              @map("password_hash")
   ssoProvider         String?              @map("sso_provider")
   ssoId               String?              @map("sso_id")
+  planType            PlanType             @default(MONTHLY) @map("plan_type")
   createdAt           DateTime             @default(now()) @map("created_at")
   updatedAt           DateTime             @updatedAt @map("updated_at")
   refreshTokens       RefreshToken[]
@@ -219,6 +220,11 @@ enum LandmarkStatus {
 enum AnalysisType {
   INITIAL
   PROGRESS
+}
+
+enum PlanType {
+  WEEKLY
+  MONTHLY
 }
 
 model SkinTip {
