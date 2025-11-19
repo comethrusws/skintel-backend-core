@@ -127,6 +127,7 @@ model FacialLandmarks {
   analysisType   AnalysisType?
   planStartDate  DateTime?
   planEndDate    DateTime?
+  waterIntakeSuggestion Json? @map("water_intake_suggestion")
 
   answer OnboardingAnswer @relation(fields: [answerId], references: [answerId], onDelete: Cascade)
   user   User?            @relation(fields: [userId], references: [userId], onDelete: Cascade)
