@@ -77,8 +77,8 @@ router.get('/', authenticateUser, async (req: AuthenticatedRequest, res: Respons
  *       401:
  *         description: Authentication required
  *   post:
- *     summary: Submit skin feel update
- *     description: Record how the user's skin feels today
+ *     summary: Submit daily skin feel update
+ *     description: Record how the user's skin feels today. one entry per day  - subsequent submissions will update the existing entry.
  *     tags: [Dashboard]
  *     security:
  *       - BearerAuth: []
@@ -97,8 +97,8 @@ router.get('/', authenticateUser, async (req: AuthenticatedRequest, res: Respons
  *             required:
  *               - value
  *     responses:
- *       201:
- *         description: Skin feel recorded successfully
+ *       200:
+ *         description: Skin feel updated successfully (existing entry for today)
  *         content:
  *           application/json:
  *             schema:
@@ -114,6 +114,29 @@ router.get('/', authenticateUser, async (req: AuthenticatedRequest, res: Respons
  *                 created_at:
  *                   type: string
  *                   format: date-time
+ *                 updated:
+ *                   type: boolean
+ *                   description: Whether this was an update (true) or new entry (false)
+ *       201:
+ *         description: Skin feel recorded successfully (new entry for today)
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 id:
+ *                   type: string
+ *                 user_id:
+ *                   type: string
+ *                 value:
+ *                   type: string
+ *                   enum: [feeling_rough, not_great, feeling_good, feeling_fresh, glowing]
+ *                 created_at:
+ *                   type: string
+ *                   format: date-time
+ *                 updated:
+ *                   type: boolean
+ *                   description: Whether this was an update (true) or new entry (false)
  *       400:
  *         description: Invalid request data
  *       401:
@@ -135,23 +158,53 @@ router.post('/', authenticateUser, async (req: AuthenticatedRequest, res: Respon
 
     const { value } = validationResult.data;
 
-    const skinFeel = await prisma.skinFeel.create({
-      data: {
+    // Get start and end of today in user's timezone
+    const today = new Date();
+    const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+    const endOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1);
+
+    // Check if user already has a skin feel entry for today
+    const existingEntry = await prisma.skinFeel.findFirst({
+      where: {
         userId,
-        value: value as any
+        createdAt: {
+          gte: startOfDay,
+          lt: endOfDay
+        }
       }
     });
+
+    let skinFeel;
+    let isUpdate = false;
+
+    if (existingEntry) {
+      // Update existing entry
+      skinFeel = await prisma.skinFeel.update({
+        where: { id: existingEntry.id },
+        data: { value: value as any }
+      });
+      isUpdate = true;
+    } else {
+      // Create new entry
+      skinFeel = await prisma.skinFeel.create({
+        data: {
+          userId,
+          value: value as any
+        }
+      });
+    }
 
     const response = {
       id: skinFeel.id,
       user_id: skinFeel.userId,
       value: skinFeel.value,
-      created_at: skinFeel.createdAt.toISOString()
+      created_at: skinFeel.createdAt.toISOString(),
+      updated: isUpdate
     };
 
-    res.status(201).json(response);
+    res.status(isUpdate ? 200 : 201).json(response);
   } catch (error) {
-    console.error('Create skin feel error:', error);
+    console.error('Create/update skin feel error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
