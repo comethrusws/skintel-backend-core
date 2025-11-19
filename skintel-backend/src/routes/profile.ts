@@ -265,6 +265,48 @@ const router = Router();
  *         description: Authentication required
  *       404:
  *         description: No weekly plan found
+ * 
+ * /v1/profile/onboarding-status:
+ *   get:
+ *     summary: Get user onboarding status
+ *     description: Check the current onboarding status and progress for the authenticated user
+ *     tags: [Profile]
+ *     security:
+ *       - BearerAuth: []
+ *       - BasicAuth: []
+ *     responses:
+ *       200:
+ *         description: Onboarding status retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 user_id:
+ *                   type: string
+ *                 onboarding_status:
+ *                   type: string
+ *                   enum: [not_started, in_progress, completed, skipped]
+ *                 answers_count:
+ *                   type: number
+ *                   description: Total number of answered questions
+ *                 created_at:
+ *                   type: string
+ *                   format: date-time
+ *                   nullable: true
+ *                   description: When onboarding was started
+ *                 updated_at:
+ *                   type: string
+ *                   format: date-time
+ *                   nullable: true
+ *                   description: When onboarding was last updated
+ *                 completed_at:
+ *                   type: string
+ *                   format: date-time
+ *                   nullable: true
+ *                   description: When onboarding was completed (if status is completed)
+ *       401:
+ *         description: Authentication required
  */
 
 router.get('/', authenticateUser, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
@@ -629,6 +671,54 @@ router.delete('/', authenticateUser, async (req: AuthenticatedRequest, res: Resp
   }
 });
 
+
+router.get('/onboarding-status', authenticateUser, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const userId = req.userId!;
+
+    const onboardingSession = await prisma.onboardingSession.findUnique({
+      where: { userId }
+    });
+
+    let onboardingStatus = 'not_started';
+    let answersCount = 0;
+    let createdAt: string | null = null;
+    let updatedAt: string | null = null;
+    let completedAt: string | null = null;
+
+    if (onboardingSession) {
+      onboardingStatus = onboardingSession.status;
+      createdAt = onboardingSession.createdAt.toISOString();
+      updatedAt = onboardingSession.updatedAt.toISOString();
+      
+      if (onboardingSession.status === 'completed') {
+        completedAt = onboardingSession.updatedAt.toISOString();
+      }
+
+      const answers = await prisma.onboardingAnswer.count({
+        where: {
+          userId,
+          status: 'answered'
+        }
+      });
+      answersCount = answers;
+    }
+
+    const response = {
+      user_id: userId,
+      onboarding_status: onboardingStatus,
+      answers_count: answersCount,
+      created_at: createdAt,
+      updated_at: updatedAt,
+      completed_at: completedAt
+    };
+
+    res.json(response);
+  } catch (error) {
+    console.error('Get onboarding status error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
 
 router.get('/weekly', authenticateUser, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
