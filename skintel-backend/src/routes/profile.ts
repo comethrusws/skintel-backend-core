@@ -193,8 +193,8 @@ const router = Router();
  * 
  * /v1/profile/weekly:
  *   get:
- *     summary: Get user's weekly plan generated at onboarding
- *     description: Retrieve the most recent weekly improvement plan for the authenticated user
+ *     summary: Get user's weekly progress info
+ *     description: Retrieve the most recent weekly progress for the authenticated user
  *     tags: [Profile]
  *     security:
  *       - BearerAuth: []
@@ -220,6 +220,22 @@ const router = Router();
  *                 created_at:
  *                   type: string
  *                   format: date-time
+ *                 skin_score:
+ *                   type: number
+ *                 tasks_score:
+ *                   type: number
+ *                 tasks_missing:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                 tasks_completed:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                 improvements:
+ *                   type: array
+ *                   items:
+ *                     type: string
  *       401:
  *         description: Authentication required
  *       404:
