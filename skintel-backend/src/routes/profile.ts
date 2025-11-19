@@ -3,7 +3,6 @@ import { authenticateUser, AuthenticatedRequest } from '../middleware/auth';
 import { profileUpdateRequestSchema } from '../lib/validation';
 import { prisma } from '../lib/prisma';
 import { Prisma } from '@prisma/client';
-import { ProgressAnalysisItem } from '../types';
 import { getTaskProgress } from '../services/tasks';
 
 const router = Router();
@@ -309,7 +308,6 @@ router.get('/', authenticateUser, async (req: AuthenticatedRequest, res: Respons
       }
     }
 
-    // Fetch gender
     const genderAnswer = await prisma.onboardingAnswer.findFirst({
       where: {
         userId,
@@ -320,7 +318,6 @@ router.get('/', authenticateUser, async (req: AuthenticatedRequest, res: Respons
     });
     const gender = genderAnswer?.value as string | undefined;
 
-    // Fetch total products
     const totalProducts = await prisma.product.count({
       where: { userId }
     });
@@ -328,7 +325,6 @@ router.get('/', authenticateUser, async (req: AuthenticatedRequest, res: Respons
     let skinScore: number | null = null;
     let scoreChange: number = 0;
 
-    // Fetch last 2 landmarks for score and score change
     const landmarks = await prisma.facialLandmarks.findMany({
       where: {
         userId,
