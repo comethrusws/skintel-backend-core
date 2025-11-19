@@ -132,3 +132,7 @@ export const passwordResetConfirmSchema = z.object({
   new_password: z.string().min(8)
 });
 
+export const skinFeelRequestSchema = z.object({
+  value: z.enum(['feeling_rough', 'not_great', 'feeling_good', 'feeling_fresh', 'glowing'])
+});
+

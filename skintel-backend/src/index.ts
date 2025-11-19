@@ -18,6 +18,7 @@ import { locationRouter } from './routes/location';
 import { initCronJobs } from './cron';
 import { skinTipRouter } from './routes/skinTip.routes';
 import { waterIntakeRouter } from './routes/waterIntake.routes';
+import { skinFeelRouter } from './routes/skinFeel';
 import { SkinTipService } from './services/skinTip';
 
 dotenv.config();
@@ -67,6 +68,7 @@ app.use('/v1/tasks', tasksRouter);
 app.use('/v1/location', locationRouter);
 app.use('/v1/skin-tip', skinTipRouter);
 app.use('/v1/water-intake', waterIntakeRouter);
+app.use('/v1/skin-feel', skinFeelRouter);
 
 // Swagger documentation
 app.use('/docs', swaggerUi.serve, swaggerUi.setup(specs, {
