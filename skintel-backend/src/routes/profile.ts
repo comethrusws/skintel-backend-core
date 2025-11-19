@@ -191,21 +191,6 @@ const router = Router();
  *       401:
  *         description: Authentication required
  * 
- * /v1/profile/progress:
- *   get:
- *     summary: Get current 4-week plan progress
- *     description: Retrieve progress tracking data for the user's current active 4-week skin improvement plan
- *     tags: [Profile]
- *     security:
- *       - BearerAuth: []
- *     responses:
- *       200:
- *         description: Progress data retrieved successfully
- *       401:
- *         description: Authentication required
- *       404:
- *         description: No active plan found
- * 
  * /v1/profile/weekly:
  *   get:
  *     summary: Get user's weekly plan generated at onboarding
@@ -223,17 +208,6 @@ const router = Router();
  *               properties:
  *                 user_id:
  *                   type: string
- *                 weekly_plan:
- *                   type: array
- *                   items:
- *                     type: object
- *                     properties:
- *                       week:
- *                         type: number
- *                       preview:
- *                         type: string
- *                       improvement_expected:
- *                         type: string
  *                 analysis_type:
  *                   type: string
  *                   enum: [INITIAL, PROGRESS]
@@ -359,12 +333,12 @@ router.get('/analysis', authenticateUser, async (req: AuthenticatedRequest, res:
         answer_id: landmark.answerId,
         question_id: landmark.answer.questionId,
         screen_id: landmark.answer.screenId,
-        analysis: landmark.analysis ? 
-          (typeof landmark.analysis === 'string' ? JSON.parse(landmark.analysis) : landmark.analysis) 
+        analysis: landmark.analysis ?
+          (typeof landmark.analysis === 'string' ? JSON.parse(landmark.analysis) : landmark.analysis)
           : null,
         score: landmark.score,
-        weekly_plan: landmark.weeklyPlan ? 
-          (typeof landmark.weeklyPlan === 'string' ? JSON.parse(landmark.weeklyPlan) : landmark.weeklyPlan) 
+        weekly_plan: landmark.weeklyPlan ?
+          (typeof landmark.weeklyPlan === 'string' ? JSON.parse(landmark.weeklyPlan) : landmark.weeklyPlan)
           : null,
         analysis_type: landmark.analysisType,
         plan_start_date: landmark.planStartDate?.toISOString(),
@@ -424,13 +398,13 @@ router.get('/landmarks', authenticateUser, async (req: AuthenticatedRequest, res
 router.put('/', authenticateUser, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
     const userId = req.userId!;
-    
+
     const validationResult = profileUpdateRequestSchema.safeParse(req.body);
-    
+
     if (!validationResult.success) {
-      res.status(400).json({ 
+      res.status(400).json({
         error: 'Invalid request data',
-        details: validationResult.error.errors 
+        details: validationResult.error.errors
       });
       return;
     }
@@ -447,11 +421,11 @@ router.put('/', authenticateUser, async (req: AuthenticatedRequest, res: Respons
     }
 
     const updateData: any = {};
-    
+
     if (name !== undefined) {
       updateData.name = name;
     }
-    
+
     if (phone_number !== undefined) {
       updateData.phoneNumber = phone_number;
     }
@@ -580,122 +554,13 @@ router.delete('/', authenticateUser, async (req: AuthenticatedRequest, res: Resp
   }
 });
 
-router.get('/progress', authenticateUser, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
-  try {
-    const userId = req.userId!;
-
-    const currentPlan = await prisma.facialLandmarks.findFirst({
-      where: { 
-        userId,
-        planStartDate: { not: null },
-        planEndDate: { not: null }
-      },
-      orderBy: { planStartDate: 'desc' }
-    });
-
-    if (!currentPlan || !currentPlan.planStartDate || !currentPlan.planEndDate) {
-      res.json({
-        user_id: userId,
-        has_active_plan: false,
-        progress_analyses: [],
-        total_analyses_in_period: 0
-      });
-      return;
-    }
-
-    const now = new Date();
-    const isActivePlan = now <= currentPlan.planEndDate;
-    
-    const planStartDate = currentPlan.planStartDate;
-    const planEndDate = currentPlan.planEndDate;
-
-    const planAnalyses = await prisma.facialLandmarks.findMany({
-      where: {
-        userId,
-        planStartDate: planStartDate,
-        planEndDate: planEndDate,
-        status: 'COMPLETED'
-      },
-      include: {
-        answer: {
-          select: {
-            questionId: true,
-            screenId: true
-          }
-        }
-      },
-      orderBy: { createdAt: 'asc' }
-    });
-
-    const initialAnalysis = planAnalyses.find(a => a.analysisType === 'INITIAL');
-    const progressAnalyses = planAnalyses.filter(a => a.analysisType === 'PROGRESS');
-
-    const daysSincePlanStart = Math.floor(
-      (now.getTime() - planStartDate.getTime()) / (1000 * 60 * 60 * 24)
-    );
-    const daysRemaining = Math.max(0, Math.floor(
-      (planEndDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)
-    ));
-
-    const daysSinceLastAnalysis = planAnalyses.length > 0 
-      ? Math.floor((now.getTime() - planAnalyses[planAnalyses.length - 1].createdAt.getTime()) / (1000 * 60 * 60 * 24))
-      : 0;
-    
-    const nextRecommendedDays = 7 - (daysSinceLastAnalysis % 7);
-    const nextRecommendedDate = new Date();
-    nextRecommendedDate.setDate(nextRecommendedDate.getDate() + (daysSinceLastAnalysis >= 7 ? 0 : nextRecommendedDays));
-
-    const latestAnalysis = planAnalyses[planAnalyses.length - 1];
-    const scoreImprovement = (initialAnalysis?.score && latestAnalysis?.score) 
-      ? latestAnalysis.score - initialAnalysis.score 
-      : undefined;
-
-    const formatAnalysisItem = (analysis: any, planStartDate: Date): ProgressAnalysisItem => ({
-      answer_id: analysis.answerId,
-      question_id: analysis.answer.questionId,
-      screen_id: analysis.answer.screenId,
-      analysis: analysis.analysis ? 
-        (typeof analysis.analysis === 'string' ? JSON.parse(analysis.analysis) : analysis.analysis) 
-        : null,
-      score: analysis.score,
-      weekly_plan: analysis.weeklyPlan ? 
-        (typeof analysis.weeklyPlan === 'string' ? JSON.parse(analysis.weeklyPlan) : analysis.weeklyPlan) 
-        : null,
-      analysis_type: analysis.analysisType,
-      created_at: analysis.createdAt.toISOString(),
-      days_since_initial: Math.floor(
-        (analysis.createdAt.getTime() - planStartDate.getTime()) / (1000 * 60 * 60 * 24)
-      )
-    });
-
-    const response = {
-      user_id: userId,
-      has_active_plan: isActivePlan,
-      plan_start_date: planStartDate.toISOString(),
-      plan_end_date: planEndDate.toISOString(),
-      days_remaining: isActivePlan ? daysRemaining : 0,
-      days_elapsed: daysSincePlanStart,
-      initial_analysis: initialAnalysis ? formatAnalysisItem(initialAnalysis, planStartDate) : undefined,
-      progress_analyses: progressAnalyses.map(a => formatAnalysisItem(a, planStartDate)),
-      latest_score: latestAnalysis?.score,
-      score_improvement: scoreImprovement,
-      total_analyses_in_period: planAnalyses.length,
-      next_recommended_analysis: isActivePlan ? nextRecommendedDate.toISOString() : undefined
-    };
-
-    res.json(response);
-  } catch (error) {
-    console.error('Get progress error:', error);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
 
 router.get('/weekly', authenticateUser, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
     const userId = req.userId!;
 
     const facialLandmark = await prisma.facialLandmarks.findFirst({
-      where: { 
+      where: {
         userId,
         status: 'COMPLETED',
         weeklyPlan: { not: Prisma.DbNull }
@@ -708,17 +573,97 @@ router.get('/weekly', authenticateUser, async (req: AuthenticatedRequest, res: R
       return;
     }
 
-    const weeklyPlan = facialLandmark.weeklyPlan ? 
-      (typeof facialLandmark.weeklyPlan === 'string' ? JSON.parse(facialLandmark.weeklyPlan) : facialLandmark.weeklyPlan) 
+    const weeklyPlan = facialLandmark.weeklyPlan ?
+      (typeof facialLandmark.weeklyPlan === 'string' ? JSON.parse(facialLandmark.weeklyPlan) : facialLandmark.weeklyPlan)
       : null;
+
+    let tasksScore = 0;
+    let tasksMissing: any[] = [];
+    let tasksCompleted: any[] = [];
+
+    if (facialLandmark.planStartDate) {
+      const today = new Date();
+      const planStart = facialLandmark.planStartDate;
+      const daysSinceStart = Math.floor((today.getTime() - planStart.getTime()) / (1000 * 60 * 60 * 24));
+      const currentWeek = Math.min(Math.floor(daysSinceStart / 7) + 1, 4);
+
+      const weekTasks = await prisma.task.findMany({
+        where: {
+          userId,
+          week: currentWeek,
+          isActive: true
+        }
+      });
+
+      const weekStart = new Date(planStart);
+      weekStart.setDate(weekStart.getDate() + (currentWeek - 1) * 7);
+      const weekEnd = new Date(weekStart);
+      weekEnd.setDate(weekEnd.getDate() + 6);
+
+      const weekCompletions = await prisma.taskCompletion.findMany({
+        where: {
+          userId,
+          taskId: { in: weekTasks.map(t => t.id) },
+          completedAt: {
+            gte: weekStart,
+            lte: weekEnd
+          }
+        }
+      });
+
+      const completedTaskIds = new Set(weekCompletions.map(c => c.taskId));
+
+      let totalWeight = 0;
+      let weightedScore = 0;
+
+      weekTasks.forEach(task => {
+        const weight = task.priority === 'critical' ? 3 : task.priority === 'important' ? 2 : 1;
+        totalWeight += weight;
+
+        const isCompleted = completedTaskIds.has(task.id);
+        if (isCompleted) {
+          weightedScore += weight * 100;
+          tasksCompleted.push({
+            id: task.id,
+            title: task.title,
+            category: task.category,
+            priority: task.priority
+          });
+        } else {
+          tasksMissing.push({
+            id: task.id,
+            title: task.title,
+            category: task.category,
+            priority: task.priority
+          });
+        }
+      });
+
+      tasksScore = totalWeight > 0 ? Math.round(weightedScore / totalWeight) : 0;
+    }
+
+    let improvements: string[] = [];
+    if (facialLandmark.analysisType === 'PROGRESS') {
+      const analysis = facialLandmark.analysis ?
+        (typeof facialLandmark.analysis === 'string' ? JSON.parse(facialLandmark.analysis) : facialLandmark.analysis) as any
+        : null;
+
+      if (analysis && analysis.visual_improvements) {
+        improvements = analysis.visual_improvements;
+      }
+    }
 
     const response = {
       user_id: userId,
-      weekly_plan: weeklyPlan,
       analysis_type: facialLandmark.analysisType,
+      skin_score: facialLandmark.score,
+      tasks_score: tasksScore,
+      tasks_missing: tasksMissing,
+      tasks_completed: tasksCompleted,
+      improvements: improvements,
       plan_start_date: facialLandmark.planStartDate?.toISOString(),
       plan_end_date: facialLandmark.planEndDate?.toISOString(),
-      created_at: facialLandmark.createdAt.toISOString()
+      created_at: facialLandmark.createdAt.toISOString(),
     };
 
     res.json(response);
