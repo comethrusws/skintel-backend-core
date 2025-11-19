@@ -9,7 +9,7 @@ const router = Router();
  * /v1/water-intake:
  *   get:
  *     summary: Get personalized water intake suggestion
- *     tags: [Water Intake]
+ *     tags: [Dashboard]
  *     security:
  *       - BearerAuth: []
  *     responses:

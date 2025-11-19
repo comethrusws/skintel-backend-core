@@ -227,7 +227,7 @@ async function fetchUVIndex(lat: number, lon: number): Promise<UVIndexAPIRespons
  *   get:
  *     summary: Get UV index for coordinates
  *     description: Fetch current UV index and forecast for given coordinates
- *     tags: [Location & UV]
+ *     tags: [Dashboard]
  *     parameters:
  *       - in: query
  *         name: latitude
