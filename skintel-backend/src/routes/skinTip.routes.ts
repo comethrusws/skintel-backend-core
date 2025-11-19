@@ -8,7 +8,7 @@ const router = Router();
  * /v1/skin-tip:
  *   get:
  *     summary: Get the skin tip of the day
- *     tags: [SkinTips]
+ *     tags: [Skin Tip]
  *     responses:
  *       200:
  *         description: The skin tip for today
