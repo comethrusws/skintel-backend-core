@@ -211,6 +211,27 @@ const router = Router();
  *                 analysis_type:
  *                   type: string
  *                   enum: [INITIAL, PROGRESS]
+ *                 skin_score:
+ *                   type: number
+ *                 tasks_score:
+ *                   type: number
+ *                 tasks_missing:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       id:
+ *                         type: string
+ *                       title:
+ *                         type: string
+ *                       category:
+ *                         type: string
+ *                       priority:
+ *                         type: string
+ *                 improvements:
+ *                   type: array
+ *                   items:
+ *                     type: string
  *                 plan_start_date:
  *                   type: string
  *                   format: date-time
@@ -220,22 +241,6 @@ const router = Router();
  *                 created_at:
  *                   type: string
  *                   format: date-time
- *                 skin_score:
- *                   type: number
- *                 tasks_score:
- *                   type: number
- *                 tasks_missing:
- *                   type: array
- *                   items:
- *                     type: object
- *                 tasks_completed:
- *                   type: array
- *                   items:
- *                     type: object
- *                 improvements:
- *                   type: array
- *                   items:
- *                     type: string
  *       401:
  *         description: Authentication required
  *       404:
@@ -675,7 +680,6 @@ router.get('/weekly', authenticateUser, async (req: AuthenticatedRequest, res: R
       skin_score: facialLandmark.score,
       tasks_score: tasksScore,
       tasks_missing: tasksMissing,
-      tasks_completed: tasksCompleted,
       improvements: improvements,
       plan_start_date: facialLandmark.planStartDate?.toISOString(),
       plan_end_date: facialLandmark.planEndDate?.toISOString(),
