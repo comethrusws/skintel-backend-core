@@ -588,7 +588,14 @@ async function mergeSessionToUser(sessionId: string, userId: string): Promise<bo
         },
       }),
 
-      // marking session as merged
+      prisma.onboardingSession.updateMany({
+        where: { sessionId },
+        data: {
+          userId,
+          sessionId: null,
+        },
+      }),
+
       prisma.anonymousSession.update({
         where: { sessionId },
         data: { mergedToUserId: userId },
