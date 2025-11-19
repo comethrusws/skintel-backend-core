@@ -16,13 +16,12 @@ const options = {
       { name: 'Landmarks', description: 'Facial landmarks retrieval' },
       { name: 'Products', description: 'Skincare product identification and management' },
       { name: 'Analysis', description: 'Skin analysis for face images' },
+      { name: 'Dashboard', description: 'Dashboard APis' },
       { name: 'Upload', description: 'Image upload to s3' },
       { name: 'Profile', description: 'User profile management' },
       { name: 'Location & UV', description: 'Location, UV and weather services' },
       { name: 'Version', description: 'App version check' },
       { name: 'Tasks', description: 'Skincare task management' },
-      { name: 'Skin Tip', description: 'Skin tip management' },
-      { name: 'Water Intake', description: 'Water intake management' },
     ],
     servers: [
       {
