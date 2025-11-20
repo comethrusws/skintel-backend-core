@@ -513,6 +513,36 @@ router.get('/landmarks', authenticateUser, async (req: AuthenticatedRequest, res
   }
 });
 
+router.get('/annotated-image', authenticateUser, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const userId = req.userId!;
+
+    const latestLandmark = await prisma.facialLandmarks.findFirst({
+      where: {
+        userId,
+        annotatedImageUrl: { not: null }
+      },
+      orderBy: { createdAt: 'desc' }
+    });
+
+    if (!latestLandmark || !latestLandmark.annotatedImageUrl) {
+      res.status(404).json({ error: 'No annotated image found' });
+      return;
+    }
+
+    const presignedUrl = await maybePresignUrl(latestLandmark.annotatedImageUrl, 300);
+
+    res.json({
+      user_id: userId,
+      annotated_image_url: presignedUrl,
+      created_at: latestLandmark.createdAt
+    });
+  } catch (error) {
+    console.error('Get annotated image error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 router.put('/', authenticateUser, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
     const userId = req.userId!;
