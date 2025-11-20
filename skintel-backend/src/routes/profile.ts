@@ -308,6 +308,35 @@ const router = Router();
  *                   description: When onboarding was completed (if status is completed)
  *       401:
  *         description: Authentication required
+ * 
+ * /v1/profile/annotated-image:
+ *   get:
+ *     summary: Get user annotated image
+ *     description: Retrieve the latest annotated image URL for the authenticated user
+ *     tags: [Profile]
+ *     security:
+ *       - BearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Annotated image retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 user_id:
+ *                   type: string
+ *                 annotated_image_url:
+ *                   type: string
+ *                   format: uri
+ *                   description: Presigned URL for the annotated image
+ *                 created_at:
+ *                   type: string
+ *                   format: date-time
+ *       401:
+ *         description: Authentication required
+ *       404:
+ *         description: No annotated image found
  */
 
 router.get('/', authenticateUser, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
