@@ -430,14 +430,12 @@ async def annotate_skin_issues_from_url(
                 detail="Invalid image URL provided"
             )
         
-        # Download image from URL
-        try:
-            response = requests.get(image_url, timeout=10)
-            response.raise_for_status()
-        except requests.exceptions.RequestException as e:
+        # Download image
+        response = requests.get(image_url, stream=True)
+        if response.status_code != 200:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Failed to download image from URL: {str(e)}"
+                detail=f"Failed to download image from URL. Status code: {response.status_code}"
             )
         
         # Check if response contains image data
