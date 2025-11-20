@@ -115,10 +115,10 @@ export async function processLandmarksAsync(answerId: string, imageId: string): 
 
       try {
         const analysis = await analyzeSkin(answerId);
-        
+
         await prisma.facialLandmarks.update({
           where: { answerId },
-          data: { 
+          data: {
             status: 'COMPLETED',
             analysis: analysis as any,
             score: analysis.score || null,
@@ -290,18 +290,20 @@ export async function processLandmarksForAnswerWithUrl(answerId: string, imageUr
     });
 
     try {
-      const analysis = await analyzeWithLandmarks(imageUrl, result);
-      
+      const analysisResult = await analyzeWithLandmarks(imageUrl, result);
+      const { annotatedImageUrl, ...analysis } = analysisResult as any;
+
       await prisma.facialLandmarks.update({
         where: { answerId },
-        data: { 
+        data: {
           status: 'COMPLETED',
           analysis: analysis as any,
           score: analysis.score || null,
           weeklyPlan: analysis.care_plan_4_weeks as any,
           analysisType: 'INITIAL',
           planStartDate: new Date(),
-          planEndDate: new Date(Date.now() + 28 * 24 * 60 * 60 * 1000)
+          planEndDate: new Date(Date.now() + 28 * 24 * 60 * 60 * 1000),
+          annotatedImageUrl: annotatedImageUrl
         }
       });
 

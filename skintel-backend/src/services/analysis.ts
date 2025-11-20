@@ -289,30 +289,56 @@ export async function analyzeSkin(answerId: string) {
   // generation of annotated image
   let annotatedImageUrl: string | null = null;
   try {
+    console.log('Attempting to generate annotated image...');
+    console.log('Issues found:', parsed.issues?.length);
+    console.log('Front image available:', !!faceImages.front);
+
     if (parsed.issues && parsed.issues.length > 0 && faceImages.front) {
       const frontImagePresigned = await maybePresignUrl(faceImages.front, 300);
+      console.log('Presigned URL generated:', frontImagePresigned);
 
       const microserviceUrl = process.env.FACIAL_LANDMARKS_API_URL || 'http://localhost:8000';
+      console.log('Calling microservice at:', microserviceUrl);
 
       const annotationResponse = await axios.post(`${microserviceUrl}/api/v1/annotate-issues-from-url`, {
         image_url: frontImagePresigned,
         issues: parsed.issues
       });
 
+      console.log('Microservice response status:', annotationResponse.status);
+
       if (annotationResponse.data.status === 'success' && annotationResponse.data.annotated_image) {
+        console.log('Uploading annotated image to S3...');
         const uploadResult = await uploadImageToS3({
           imageBase64: annotationResponse.data.annotated_image,
           prefix: 'annotated-issues'
         });
         annotatedImageUrl = uploadResult.url;
+        console.log('Annotated image uploaded to:', annotatedImageUrl);
+      } else {
+        console.warn('Microservice returned success but no image or status not success', annotationResponse.data);
+        require('fs').appendFileSync('debug_log.txt', `Microservice returned success but no image: ${JSON.stringify(annotationResponse.data)}\n`);
       }
+    } else {
+      console.log('Skipping annotation: No issues or no front image');
+      require('fs').appendFileSync('debug_log.txt', `Skipping annotation: Issues=${parsed.issues?.length}, Front=${!!faceImages.front}\n`);
     }
   } catch (annotationError) {
     console.error('Failed to generate annotated image:', annotationError);
+    const fs = require('fs');
+    fs.appendFileSync('debug_log.txt', `Annotation Error: ${(annotationError as any).message}\n`);
+    if (axios.isAxiosError(annotationError)) {
+      console.error('Axios error details:', annotationError.response?.data);
+      fs.appendFileSync('debug_log.txt', `Axios Error Data: ${JSON.stringify(annotationError.response?.data)}\n`);
+      fs.appendFileSync('debug_log.txt', `Axios Error Status: ${annotationError.response?.status}\n`);
+    }
     // don't fail the whole analysis if annotation fails
   }
 
   try {
+    console.log('Updating DB with annotatedImageUrl:', annotatedImageUrl);
+    require('fs').appendFileSync('debug_log.txt', `Updating DB with annotatedImageUrl: ${annotatedImageUrl}\n`);
+
     await prisma.facialLandmarks.update({
       where: { answerId },
       data: {
@@ -476,12 +502,61 @@ export async function analyzeWithLandmarks(frontImageUrl: string, landmarks: obj
   });
 
   const content = completion.choices?.[0]?.message?.content ?? '';
+  let parsed: EnhancedAnalysisResult;
 
   try {
-    return JSON.parse(content) as EnhancedAnalysisResult;
+    parsed = JSON.parse(content) as EnhancedAnalysisResult;
   } catch {
     return { raw: content } as any;
   }
+
+  // generation of annotated image
+  let annotatedImageUrl: string | null = null;
+  try {
+    console.log('Attempting to generate annotated image (analyzeWithLandmarks)...');
+    console.log('Issues found:', parsed.issues?.length);
+
+    if (parsed.issues && parsed.issues.length > 0) {
+      const frontImagePresigned = await maybePresignUrl(frontImageUrl, 300);
+      console.log('Presigned URL generated:', frontImagePresigned);
+
+      const microserviceUrl = process.env.FACIAL_LANDMARKS_API_URL || 'http://localhost:8000';
+      console.log('Calling microservice at:', microserviceUrl);
+
+      const annotationResponse = await axios.post(`${microserviceUrl}/api/v1/annotate-issues-from-url`, {
+        image_url: frontImagePresigned,
+        issues: parsed.issues
+      });
+
+      console.log('Microservice response status:', annotationResponse.status);
+
+      if (annotationResponse.data.status === 'success' && annotationResponse.data.annotated_image) {
+        console.log('Uploading annotated image to S3...');
+        const uploadResult = await uploadImageToS3({
+          imageBase64: annotationResponse.data.annotated_image,
+          prefix: 'annotated-issues'
+        });
+        annotatedImageUrl = uploadResult.url;
+        console.log('Annotated image uploaded to:', annotatedImageUrl);
+      } else {
+        console.warn('Microservice returned success but no image or status not success', annotationResponse.data);
+        require('fs').appendFileSync('debug_log.txt', `Microservice returned success but no image: ${JSON.stringify(annotationResponse.data)}\n`);
+      }
+    } else {
+      console.log('Skipping annotation: No issues found');
+    }
+  } catch (annotationError) {
+    console.error('Failed to generate annotated image:', annotationError);
+    const fs = require('fs');
+    fs.appendFileSync('debug_log.txt', `Annotation Error: ${(annotationError as any).message}\n`);
+    if (axios.isAxiosError(annotationError)) {
+      console.error('Axios error details:', annotationError.response?.data);
+      fs.appendFileSync('debug_log.txt', `Axios Error Data: ${JSON.stringify(annotationError.response?.data)}\n`);
+    }
+  }
+
+
+  return { ...parsed, annotatedImageUrl };
 }
 
 // Export these for the optimized functions
