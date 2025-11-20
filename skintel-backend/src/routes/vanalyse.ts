@@ -346,14 +346,8 @@ async function analyzeProgressOptimized(
   let annotatedImageUrl: string | null = null;
   try {
     if (parsed.remaining_issues && parsed.remaining_issues.length > 0 && presignedUrls.front) {
-      // presignedUrls.front is already presigned, but might be short lived? 
-      // The original code presigned it with 300s. 
-      // The annotation service needs to download it. 300s should be enough.
-      // But wait, maybePresignUrl checks if it's a local path or s3 key.
-      // If it was already presigned in the caller, presignedUrls.front IS the url.
-      // However, the caller (line 99) calls maybePresignUrl(front_image_url, 300).
 
-      const microserviceUrl = process.env.FACIAL_LANDMARKS_API_URL || 'http://localhost:8000';
+      const microserviceUrl = process.env.LANDMARK_URL || 'http://localhost:8000';
 
       const annotationResponse = await axios.post(`${microserviceUrl}/api/v1/annotate-issues-from-url`, {
         image_url: presignedUrls.front,
