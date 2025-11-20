@@ -102,11 +102,11 @@ const productParamsSchema = z.object({
 router.post('/', authenticateUser, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
     const validationResult = createProductSchema.safeParse(req.body);
-    
+
     if (!validationResult.success) {
-      res.status(400).json({ 
+      res.status(400).json({
         error: 'Invalid request data',
-        details: validationResult.error.errors 
+        details: validationResult.error.errors
       });
       return;
     }
@@ -115,15 +115,18 @@ router.post('/', authenticateUser, async (req: AuthenticatedRequest, res: Respon
     const userId = req.userId!;
 
     const result = await createProduct(userId, image_urls);
-    
+
     res.status(201).json({
       id: result.id,
+      image_url: result.imageUrl,
       product_data: result.productData,
+      created_at: result.createdAt.toISOString(),
+      updated_at: result.updatedAt.toISOString(),
     });
   } catch (error) {
     console.error('Product creation error:', error);
-    res.status(500).json({ 
-      error: error instanceof Error ? error.message : 'Product analysis failed' 
+    res.status(500).json({
+      error: error instanceof Error ? error.message : 'Product analysis failed'
     });
   }
 });
@@ -132,7 +135,7 @@ router.get('/', authenticateUser, async (req: AuthenticatedRequest, res: Respons
   try {
     const userId = req.userId!;
     const products = await getUserProducts(userId);
-    
+
     res.json({
       user_id: userId,
       products: products.map((product: any) => ({
@@ -245,11 +248,11 @@ router.get('/', authenticateUser, async (req: AuthenticatedRequest, res: Respons
 router.get('/:productId', authenticateUser, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
     const validationResult = productParamsSchema.safeParse(req.params);
-    
+
     if (!validationResult.success) {
-      res.status(400).json({ 
+      res.status(400).json({
         error: 'Invalid product ID',
-        details: validationResult.error.errors 
+        details: validationResult.error.errors
       });
       return;
     }
@@ -258,7 +261,7 @@ router.get('/:productId', authenticateUser, async (req: AuthenticatedRequest, re
     const userId = req.userId!;
 
     const product = await getProductById(productId, userId);
-    
+
     if (!product) {
       res.status(404).json({ error: 'Product not found' });
       return;
@@ -281,19 +284,19 @@ router.put('/:productId', authenticateUser, async (req: AuthenticatedRequest, re
   try {
     const paramsValidation = productParamsSchema.safeParse(req.params);
     const bodyValidation = updateProductSchema.safeParse(req.body);
-    
+
     if (!paramsValidation.success) {
-      res.status(400).json({ 
+      res.status(400).json({
         error: 'Invalid product ID',
-        details: paramsValidation.error.errors 
+        details: paramsValidation.error.errors
       });
       return;
     }
 
     if (!bodyValidation.success) {
-      res.status(400).json({ 
+      res.status(400).json({
         error: 'Invalid request data',
-        details: bodyValidation.error.errors 
+        details: bodyValidation.error.errors
       });
       return;
     }
@@ -303,7 +306,7 @@ router.put('/:productId', authenticateUser, async (req: AuthenticatedRequest, re
     const userId = req.userId!;
 
     const result = await updateProductName(productId, userId, product_name);
-    
+
     if (!result) {
       res.status(404).json({ error: 'Product not found' });
       return;
@@ -311,7 +314,10 @@ router.put('/:productId', authenticateUser, async (req: AuthenticatedRequest, re
 
     res.json({
       id: result.id,
+      image_url: result.imageUrl,
       product_data: result.productData,
+      created_at: result.createdAt.toISOString(),
+      updated_at: result.updatedAt.toISOString(),
     });
   } catch (error) {
     console.error('Update product error:', error);
@@ -322,11 +328,11 @@ router.put('/:productId', authenticateUser, async (req: AuthenticatedRequest, re
 router.delete('/:productId', authenticateUser, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
     const validationResult = productParamsSchema.safeParse(req.params);
-    
+
     if (!validationResult.success) {
-      res.status(400).json({ 
+      res.status(400).json({
         error: 'Invalid product ID',
-        details: validationResult.error.errors 
+        details: validationResult.error.errors
       });
       return;
     }
@@ -335,7 +341,7 @@ router.delete('/:productId', authenticateUser, async (req: AuthenticatedRequest,
     const userId = req.userId!;
 
     const deleted = await deleteProduct(productId, userId);
-    
+
     if (!deleted) {
       res.status(404).json({ error: 'Product not found or could not be deleted' });
       return;
