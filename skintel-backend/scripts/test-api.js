@@ -52,11 +52,11 @@ function makeRequest(method, path, data = null, headers = {}) {
     });
 
     req.on('error', reject);
-    
+
     if (data) {
       req.write(JSON.stringify(data));
     }
-    
+
     req.end();
   });
 }
@@ -146,14 +146,14 @@ async function testCreateAnonymousSession() {
   });
 
   assertEquals(response.status, 201, 'Should create session with 201');
-  
+
   if (!response.data.session_id || !response.data.session_token) {
     throw new Error('Response should contain session_id and session_token');
   }
 
   sessionId = response.data.session_id;
   sessionToken = response.data.session_token;
-  
+
   log(`Session created: ${sessionId}`, 'yellow');
 }
 
@@ -343,7 +343,7 @@ async function testSaveOnboardingAnswers() {
       saved_at: new Date().toISOString()
     }
   ];
-  
+
   const response = await makeRequest('PUT', '/v1/onboarding', {
     session_id: sessionId,
     answers,
@@ -355,9 +355,9 @@ async function testSaveOnboardingAnswers() {
 
   assertEquals(response.status, 200, 'Should save answers with 200');
   assertEquals(response.data.saved, true, 'Should indicate answers were saved');
-  
+
   log(`Saved ${answers.length} onboarding answers including comprehensive questionnaire`, 'yellow');
-  
+
   // Wait for landmark processing to complete
   await new Promise(r => setTimeout(r, 20000));
 }
@@ -379,7 +379,7 @@ async function testInvalidQuestionValues() {
     'X-Session-Token': sessionToken,
     'Idempotency-Key': uuidv4()
   });
-  
+
   assertEquals(invalidResponse.status, 400, 'Should reject invalid question values');
 }
 
@@ -390,7 +390,7 @@ async function testGetOnboardingState() {
 
   assertEquals(response.status, 200, 'Should get onboarding state with 200');
   assertEquals(response.data.session_id, sessionId, 'Should return correct session ID');
-  
+
   if (!Array.isArray(response.data.answers)) {
     throw new Error('Response should contain answers array');
   }
@@ -398,7 +398,7 @@ async function testGetOnboardingState() {
 
 async function testUserSignup() {
   const uniqueEmail = `test_${Date.now()}_${Math.random().toString(36).substr(2, 9)}@example.com`;
-  
+
   const response = await makeRequest('POST', '/v1/auth/signup', {
     session_id: sessionId,
     email: uniqueEmail,
@@ -409,35 +409,44 @@ async function testUserSignup() {
   console.log('Signup response data:', JSON.stringify(response.data, null, 2));
 
   assertEquals(response.status, 201, 'Should create user with 201');
-  
+
   if (!response.data.access_token || !response.data.refresh_token) {
     throw new Error(`Response should contain tokens. Got: ${JSON.stringify(response.data)}`);
   }
 
   accessToken = response.data.access_token;
   refreshToken = response.data.refresh_token;
-  
+
   log(`User created with email: ${uniqueEmail}`, 'yellow');
 }
 
 async function testGetUserLandmarksAfterSignup() {
-  const response = await makeRequest('GET', '/v1/landmarks/user', null, {
-    'Authorization': `Bearer ${accessToken}`
-  });
-  assertEquals(response.status, 200, 'Should get user landmarks with 200');
-  if (!Array.isArray(response.data.landmarks)) {
-    throw new Error('Response should contain landmarks array');
-  }
-  if (response.data.landmarks.length === 0) {
-    log('No landmarks found yet (processing may still be running). Waiting 5s and retrying...', 'yellow');
-    await new Promise(r => setTimeout(r, 10000));
-    const retry = await makeRequest('GET', '/v1/landmarks/user', null, {
+  const maxRetries = 24; // 2 minutes total (5s interval)
+  const pollInterval = 5000;
+
+  log('Polling for user landmarks and analysis results...', 'yellow');
+
+  for (let i = 0; i < maxRetries; i++) {
+    const response = await makeRequest('GET', '/v1/landmarks/user', null, {
       'Authorization': `Bearer ${accessToken}`
     });
-    if (!Array.isArray(retry.data.landmarks) || retry.data.landmarks.length === 0) {
-      throw new Error('Expected at least one completed landmark record after signup merge');
+
+    if (response.status === 200 && Array.isArray(response.data.landmarks) && response.data.landmarks.length > 0) {
+      const landmark = response.data.landmarks[0];
+
+      // Check if analysis is complete
+      if (landmark.analysis && landmark.annotated_image_url) {
+        log(`✅ Found completed landmark analysis with annotated image after ${i * 5}s`, 'green');
+        return;
+      } else {
+        process.stdout.write('.');
+      }
     }
+
+    await new Promise(r => setTimeout(r, pollInterval));
   }
+
+  throw new Error('Timeout waiting for landmark analysis and annotated image generation');
 }
 
 async function testRefreshToken() {
@@ -446,21 +455,21 @@ async function testRefreshToken() {
   });
 
   assertEquals(response.status, 200, 'Should refresh token with 200');
-  
+
   if (!response.data.access_token || !response.data.refresh_token) {
     throw new Error('Response should contain new tokens');
   }
 
   const newAccessToken = response.data.access_token;
   const newRefreshToken = response.data.refresh_token;
-  
+
   if (newAccessToken === accessToken) {
     throw new Error('New access token should be different');
   }
 
   accessToken = newAccessToken;
   refreshToken = newRefreshToken;
-  
+
   log(`Tokens refreshed successfully`, 'yellow');
 }
 
@@ -484,7 +493,7 @@ async function testInvalidRequests() {
       // missing required fields
     }
   });
-  
+
   assertEquals(invalidSessionResponse.status, 400, 'Should reject invalid session data');
 
   // Test unauthorized onboarding access
@@ -492,7 +501,7 @@ async function testInvalidRequests() {
     session_id: 'fake_session',
     answers: []
   });
-  
+
   assertEquals(unauthorizedResponse.status, 401, 'Should reject unauthorized access');
 
   // Test invalid question values
@@ -501,7 +510,7 @@ async function testInvalidRequests() {
 
 async function runAllTests() {
   log('🚀 Starting API Tests', 'blue');
-  
+
   try {
     await test('Health Check', testHealthCheck);
     await test('Create Anonymous Session', testCreateAnonymousSession);
@@ -512,7 +521,7 @@ async function runAllTests() {
     await test('Refresh Token', testRefreshToken);
     await test('User Logout', testLogout);
     await test('Invalid Requests', testInvalidRequests);
-    
+
     log('\n🎉 All tests passed!', 'green');
   } catch (error) {
     log(`\n💥 Test suite failed: ${error.message}`, 'red');
