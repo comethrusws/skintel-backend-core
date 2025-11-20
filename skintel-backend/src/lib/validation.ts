@@ -1,8 +1,8 @@
 import { z } from 'zod';
 import { OnboardingAnswerValue } from '../types';
-import { 
-  VALID_QUESTION_IDS, 
-  validateQuestionValue, 
+import {
+  VALID_QUESTION_IDS,
+  validateQuestionValue,
   getExpectedType,
   getValidValues
 } from '../utils/validation';
@@ -50,7 +50,7 @@ export const onboardingAnswerSchema = z.object({
     const expectedType = getExpectedType(data.question_id);
     return expectedType === data.type;
   },
-  { 
+  {
     message: "Answer type doesn't match expected type for question_id",
     path: ["type"]
   }
@@ -67,7 +67,7 @@ export const onboardingAnswerSchema = z.object({
     }
     return isValid;
   },
-  { 
+  {
     message: "Invalid value for question_id",
     path: ["value"]
   }
@@ -136,3 +136,24 @@ export const skinFeelRequestSchema = z.object({
   value: z.enum(['feeling_rough', 'not_great', 'feeling_good', 'feeling_fresh', 'glowing'])
 });
 
+// profile questions validation
+export const profileQuestionAnswerSchema = z.object({
+  question_id: z.string().min(1),
+  value: z.union([z.string(), z.number(), z.null()]),
+  status: z.enum(['answered', 'skipped']),
+}).refine(
+  (data) => {
+    if (data.status === 'skipped') {
+      return data.value === null;
+    }
+    return data.value !== null;
+  },
+  {
+    message: "Answered questions must have a value, skipped questions must have null value",
+    path: ["value"]
+  }
+);
+
+export const profileQuestionsAnswerRequestSchema = z.object({
+  answers: z.array(profileQuestionAnswerSchema).min(1),
+});

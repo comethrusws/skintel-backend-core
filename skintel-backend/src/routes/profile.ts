@@ -1,10 +1,11 @@
 import { Router, Response } from 'express';
 import { authenticateUser, AuthenticatedRequest } from '../middleware/auth';
-import { profileUpdateRequestSchema } from '../lib/validation';
+import { profileUpdateRequestSchema, profileQuestionsAnswerRequestSchema } from '../lib/validation';
 import { prisma } from '../lib/prisma';
 import { Prisma } from '@prisma/client';
 import { getTaskProgress } from '../services/tasks';
 import { maybePresignUrl } from '../lib/s3';
+import { PROFILE_QUESTIONS, PROFILE_SCREEN_ID, getProfileQuestion, validateProfileQuestionValue } from '../lib/profileQuestions';
 
 const router = Router();
 
@@ -337,6 +338,120 @@ const router = Router();
  *         description: Authentication required
  *       404:
  *         description: No annotated image found
+ * 
+ * /v1/profile/questions:
+ *   get:
+ *     summary: Get profile questions with status
+ *     description: Retrieve all profile questions for "Tell Us A Bit More About You" section with their current status (answered/skipped/new)
+ *     tags: [Profile]
+ *     security:
+ *       - BearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Profile questions retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 user_id:
+ *                   type: string
+ *                 questions:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       question_id:
+ *                         type: string
+ *                       question_text:
+ *                         type: string
+ *                       type:
+ *                         type: string
+ *                         enum: [single, slider]
+ *                       status:
+ *                         type: string
+ *                         enum: [answered, skipped, new]
+ *                       value:
+ *                         oneOf:
+ *                           - type: string
+ *                           - type: number
+ *                           - type: 'null'
+ *                       options:
+ *                         type: array
+ *                         items:
+ *                           type: string
+ *                       min_value:
+ *                         type: number
+ *                       max_value:
+ *                         type: number
+ *                       default_value:
+ *                         type: number
+ *                       saved_at:
+ *                         type: string
+ *                         format: date-time
+ *                         nullable: true
+ *       401:
+ *         description: Authentication required
+ * 
+ * /v1/profile/questions/answer:
+ *   post:
+ *     summary: Save profile question answers
+ *     description: Save or update answers to profile questions
+ *     tags: [Profile]
+ *     security:
+ *       - BearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               answers:
+ *                 type: array
+ *                 items:
+ *                   type: object
+ *                   properties:
+ *                     question_id:
+ *                       type: string
+ *                     value:
+ *                       oneOf:
+ *                         - type: string
+ *                         - type: number
+ *                         - type: 'null'
+ *                     status:
+ *                       type: string
+ *                       enum: [answered, skipped]
+ *             required:
+ *               - answers
+ *     responses:
+ *       200:
+ *         description: Answers saved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 user_id:
+ *                   type: string
+ *                 saved:
+ *                   type: boolean
+ *                 answers:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       question_id:
+ *                         type: string
+ *                       saved:
+ *                         type: boolean
+ *                       saved_at:
+ *                         type: string
+ *                         format: date-time
+ *       400:
+ *         description: Invalid request data
+ *       401:
+ *         description: Authentication required
  */
 
 router.get('/', authenticateUser, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
@@ -893,6 +1008,198 @@ router.get('/weekly', authenticateUser, async (req: AuthenticatedRequest, res: R
     res.json(response);
   } catch (error) {
     console.error('Get weekly plan error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+router.get('/questions', authenticateUser, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const userId = req.userId!;
+
+    const savedAnswers = await prisma.onboardingAnswer.findMany({
+      where: {
+        userId,
+        screenId: PROFILE_SCREEN_ID,
+      },
+      orderBy: { savedAt: 'desc' },
+    });
+
+    const answerMap = new Map();
+    savedAnswers.forEach(answer => {
+      if (!answerMap.has(answer.questionId)) {
+        answerMap.set(answer.questionId, answer);
+      }
+    });
+
+    const questions = PROFILE_QUESTIONS.map(question => {
+      const savedAnswer = answerMap.get(question.question_id);
+
+      const questionResponse: any = {
+        question_id: question.question_id,
+        question_text: question.question_text,
+        type: question.type,
+        status: savedAnswer ? savedAnswer.status : 'new',
+        value: savedAnswer ? savedAnswer.value : null,
+      };
+
+      if (question.type === 'single' && question.options) {
+        questionResponse.options = question.options;
+      } else if (question.type === 'slider') {
+        questionResponse.min_value = question.min_value;
+        questionResponse.max_value = question.max_value;
+        questionResponse.default_value = question.default_value;
+      }
+
+      if (savedAnswer) {
+        questionResponse.saved_at = savedAnswer.savedAt.toISOString();
+      }
+
+      return questionResponse;
+    });
+
+    answerMap.forEach((answer, questionId) => {
+      const isPredefined = PROFILE_QUESTIONS.some(q => q.question_id === questionId);
+      if (!isPredefined) {
+        questions.push({
+          question_id: questionId,
+          question_text: questionId, 
+          type: answer.type,
+          status: answer.status,
+          value: answer.value,
+          saved_at: answer.savedAt.toISOString(),
+        });
+      }
+    });
+
+    res.json({
+      user_id: userId,
+      questions,
+    });
+  } catch (error) {
+    console.error('Get profile questions error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+router.post('/questions/answer', authenticateUser, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const userId = req.userId!;
+
+    const validationResult = profileQuestionsAnswerRequestSchema.safeParse(req.body);
+    if (!validationResult.success) {
+      res.status(400).json({
+        error: 'Invalid request data',
+        details: validationResult.error.errors
+      });
+      return;
+    }
+
+    const { answers } = validationResult.data;
+    const savedAnswers = [];
+    const now = new Date();
+
+    for (const answer of answers) {
+      const { question_id, value, status } = answer;
+
+      const question = getProfileQuestion(question_id);
+
+      if (status === 'answered' && value !== null && question) {
+        const isValid = validateProfileQuestionValue(question_id, value);
+        if (!isValid) {
+          res.status(400).json({
+            error: `Invalid value for question ${question_id}`,
+            details: {
+              question_id,
+              value,
+              expected_type: question.type,
+              ...(question.type === 'single' && { valid_options: question.options }),
+              ...(question.type === 'slider' && {
+                min_value: question.min_value,
+                max_value: question.max_value
+              })
+            }
+          });
+          return;
+        }
+      }
+
+      if (status === 'answered' && value !== null && !question) {
+        if (typeof value !== 'string' && typeof value !== 'number') {
+          res.status(400).json({
+            error: `Invalid value type for question ${question_id}. Must be string or number.`,
+            details: {
+              question_id,
+              value,
+              received_type: typeof value
+            }
+          });
+          return;
+        }
+      }
+
+      const answerId = `ans_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
+      let answerType: 'single' | 'slider' | 'derived';
+      if (question) {
+        answerType = question.type === 'single' ? 'single' : 'slider';
+      } else {
+        answerType = 'derived';
+      }
+
+      const existingAnswer = await prisma.onboardingAnswer.findFirst({
+        where: {
+          userId,
+          questionId: question_id,
+          screenId: PROFILE_SCREEN_ID,
+        },
+        orderBy: { savedAt: 'desc' },
+      });
+
+      if (existingAnswer) {
+        await prisma.onboardingAnswer.update({
+          where: { answerId: existingAnswer.answerId },
+          data: {
+            value: value as any,
+            status: status as any,
+            savedAt: now,
+          },
+        });
+
+        savedAnswers.push({
+          question_id,
+          saved: true,
+          saved_at: now.toISOString(),
+        });
+      } else {
+        // Create new answer
+        await prisma.onboardingAnswer.create({
+          data: {
+            answerId,
+            userId,
+            screenId: PROFILE_SCREEN_ID,
+            questionId: question_id,
+            type: answerType,
+            value: value as any,
+            status: status as any,
+            savedAt: now,
+          },
+        });
+
+        savedAnswers.push({
+          question_id,
+          saved: true,
+          saved_at: now.toISOString(),
+        });
+      }
+    }
+
+    res.json({
+      user_id: userId,
+      saved: true,
+      answers: savedAnswers,
+    });
+  } catch (error) {
+    console.error('Save profile questions error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
