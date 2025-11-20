@@ -3,11 +3,11 @@ import { authenticateUser, AuthenticatedRequest } from '../middleware/auth';
 import { prisma } from '../lib/prisma';
 import { Prisma } from '@prisma/client';
 import { z } from 'zod';
-import { 
-  generateTasksForUser, 
-  getTodaysTasks, 
-  completeTask, 
-  uncompleteTask, 
+import {
+  generateTasksForUser,
+  getTodaysTasks,
+  completeTask,
+  uncompleteTask,
   getTaskProgress,
   adaptTasksForUser
 } from '../services/tasks';
@@ -82,7 +82,7 @@ router.get('/week/:week', authenticateUser, async (req: AuthenticatedRequest, re
     }
 
     const userId = req.userId!;
-    
+
     const tasks = await prisma.task.findMany({
       where: {
         userId,
@@ -104,7 +104,7 @@ router.get('/week/:week', authenticateUser, async (req: AuthenticatedRequest, re
     });
 
     const formattedTasks = tasks.map(task => {
-      const taskUserProducts = task.userProducts ? 
+      const taskUserProducts = task.userProducts ?
         userProducts.filter(p => (task.userProducts as string[]).includes(p.id))
           .map(p => {
             const data = p.productData as any;
@@ -180,22 +180,22 @@ router.post('/:taskId/complete', authenticateUser, async (req: AuthenticatedRequ
 
     const validationResult = taskCompletionSchema.safeParse(req.body);
     if (!validationResult.success) {
-      return res.status(400).json({ 
+      return res.status(400).json({
         error: 'Invalid request data',
-        details: validationResult.error.errors 
+        details: validationResult.error.errors
       });
     }
 
     const { completedAt } = validationResult.data;
-    
+
     const success = await completeTask(userId, taskId, completedAt);
-    
+
     if (!success) {
       return res.status(400).json({ error: 'Task already completed for this date' });
     }
 
-    res.json({ 
-      success: true, 
+    res.json({
+      success: true,
       message: 'Task completed successfully',
       taskId,
       completedAt: completedAt || new Date().toISOString()
@@ -237,15 +237,15 @@ router.delete('/:taskId/complete', authenticateUser, async (req: AuthenticatedRe
     const { taskId } = req.params;
     const userId = req.userId!;
     const { date } = req.query;
-    
+
     const success = await uncompleteTask(userId, taskId, date as string);
-    
+
     if (!success) {
       return res.status(404).json({ error: 'Task completion not found for this date' });
     }
 
-    res.json({ 
-      success: true, 
+    res.json({
+      success: true,
       message: 'Task completion removed successfully',
       taskId
     });
@@ -309,7 +309,7 @@ router.post('/generate', authenticateUser, async (req: AuthenticatedRequest, res
 
     // Get user's latest weekly plan
     const latestAnalysis = await prisma.facialLandmarks.findFirst({
-      where: { 
+      where: {
         userId,
         status: 'COMPLETED',
         weeklyPlan: { not: Prisma.DbNull }
@@ -339,8 +339,8 @@ router.post('/generate', authenticateUser, async (req: AuthenticatedRequest, res
       };
     });
 
-    const weeklyPlan = typeof latestAnalysis.weeklyPlan === 'string' 
-      ? JSON.parse(latestAnalysis.weeklyPlan) 
+    const weeklyPlan = typeof latestAnalysis.weeklyPlan === 'string'
+      ? JSON.parse(latestAnalysis.weeklyPlan)
       : latestAnalysis.weeklyPlan;
 
     await generateTasksForUser({
@@ -349,9 +349,9 @@ router.post('/generate', authenticateUser, async (req: AuthenticatedRequest, res
       userProducts: formattedProducts
     });
 
-    res.json({ 
-      success: true, 
-      message: 'Tasks generated successfully' 
+    res.json({
+      success: true,
+      message: 'Tasks generated successfully'
     });
   } catch (error) {
     console.error('Generate tasks error:', error);
@@ -378,7 +378,7 @@ router.post('/adapt', authenticateUser, async (req: AuthenticatedRequest, res: R
   try {
     const userId = req.userId!;
     const adaptations = await adaptTasksForUser(userId);
-    
+
     res.json({
       success: true,
       adaptations,
@@ -387,6 +387,40 @@ router.post('/adapt', authenticateUser, async (req: AuthenticatedRequest, res: R
   } catch (error) {
     console.error('Adapt tasks error:', error);
     res.status(500).json({ error: 'Failed to adapt tasks' });
+  }
+});
+
+/**
+ * @swagger
+ * /v1/tasks/history:
+ *   get:
+ *     summary: Get task completion history
+ *     description: Retrieve the user's task completion history
+ *     tags: [Tasks]
+ *     security:
+ *       - BearerAuth: []
+ *     responses:
+ *       200:
+ *         description: History retrieved successfully
+ *       401:
+ *         description: Authentication required
+ */
+router.get('/history', authenticateUser, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const userId = req.userId!;
+
+    const history = await prisma.taskCompletion.findMany({
+      where: { userId },
+      orderBy: { completedAt: 'desc' },
+      include: {
+        task: true
+      }
+    });
+
+    res.json(history);
+  } catch (error) {
+    console.error('Get task history error:', error);
+    res.status(500).json({ error: 'Failed to retrieve task history' });
   }
 });
 

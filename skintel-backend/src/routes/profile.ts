@@ -308,6 +308,35 @@ const router = Router();
  *                   description: When onboarding was completed (if status is completed)
  *       401:
  *         description: Authentication required
+ * 
+ * /v1/profile/annotated-image:
+ *   get:
+ *     summary: Get user annotated image
+ *     description: Retrieve the latest annotated image URL for the authenticated user
+ *     tags: [Profile]
+ *     security:
+ *       - BearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Annotated image retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 user_id:
+ *                   type: string
+ *                 annotated_image_url:
+ *                   type: string
+ *                   format: uri
+ *                   description: Presigned URL for the annotated image
+ *                 created_at:
+ *                   type: string
+ *                   format: date-time
+ *       401:
+ *         description: Authentication required
+ *       404:
+ *         description: No annotated image found
  */
 
 router.get('/', authenticateUser, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
@@ -347,7 +376,7 @@ router.get('/', authenticateUser, async (req: AuthenticatedRequest, res: Respons
     if (frontFaceAnswer && frontFaceAnswer.value) {
       const value = frontFaceAnswer.value as any;
       if (value.image_url) {
-        profileImage = await maybePresignUrl(value.image_url, 300);
+        profileImage = await maybePresignUrl(value.image_url, 86400);
       }
     }
 
@@ -509,6 +538,36 @@ router.get('/landmarks', authenticateUser, async (req: AuthenticatedRequest, res
     res.json(response);
   } catch (error) {
     console.error('Get profile landmarks error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+router.get('/annotated-image', authenticateUser, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const userId = req.userId!;
+
+    const latestLandmark = await prisma.facialLandmarks.findFirst({
+      where: {
+        userId,
+        annotatedImageUrl: { not: null }
+      },
+      orderBy: { createdAt: 'desc' }
+    });
+
+    if (!latestLandmark || !latestLandmark.annotatedImageUrl) {
+      res.status(404).json({ error: 'No annotated image found' });
+      return;
+    }
+
+    const presignedUrl = await maybePresignUrl(latestLandmark.annotatedImageUrl, 300);
+
+    res.json({
+      user_id: userId,
+      annotated_image_url: presignedUrl,
+      created_at: latestLandmark.createdAt
+    });
+  } catch (error) {
+    console.error('Get annotated image error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
