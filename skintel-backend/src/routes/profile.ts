@@ -4,6 +4,7 @@ import { profileUpdateRequestSchema } from '../lib/validation';
 import { prisma } from '../lib/prisma';
 import { Prisma } from '@prisma/client';
 import { getTaskProgress } from '../services/tasks';
+import { maybePresignUrl } from '../lib/s3';
 
 const router = Router();
 
@@ -346,7 +347,7 @@ router.get('/', authenticateUser, async (req: AuthenticatedRequest, res: Respons
     if (frontFaceAnswer && frontFaceAnswer.value) {
       const value = frontFaceAnswer.value as any;
       if (value.image_url) {
-        profileImage = value.image_url;
+        profileImage = await maybePresignUrl(value.image_url, 300);
       }
     }
 
@@ -575,7 +576,7 @@ router.put('/', authenticateUser, async (req: AuthenticatedRequest, res: Respons
     if (frontFaceAnswer && frontFaceAnswer.value) {
       const value = frontFaceAnswer.value as any;
       if (value.image_url) {
-        profileImage = value.image_url;
+        profileImage = await maybePresignUrl(value.image_url, 300);
       }
     }
 
@@ -690,7 +691,7 @@ router.get('/onboarding-status', authenticateUser, async (req: AuthenticatedRequ
       onboardingStatus = onboardingSession.status;
       createdAt = onboardingSession.createdAt.toISOString();
       updatedAt = onboardingSession.updatedAt.toISOString();
-      
+
       if (onboardingSession.status === 'completed') {
         completedAt = onboardingSession.updatedAt.toISOString();
       }
