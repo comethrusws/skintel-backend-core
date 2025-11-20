@@ -1,6 +1,7 @@
 import { prisma } from '../lib/prisma';
 import OpenAI from 'openai';
-import { maybePresignUrl } from '../lib/s3';
+import { maybePresignUrl, uploadImageToS3 } from '../lib/s3';
+import axios from 'axios';
 import { EnhancedAnalysisResult } from '../types';
 
 const OPENAI_MODEL = process.env.OPENAI_MODEL || 'gpt-5';
@@ -93,7 +94,7 @@ interface FaceImages {
 
 async function getUserFaceImages(userId: string | null, sessionId: string | null): Promise<FaceImages> {
   const faceQuestions = ['q_face_photo_front', 'q_face_photo_left', 'q_face_photo_right'];
-  
+
   const answers = await prisma.onboardingAnswer.findMany({
     where: {
       OR: [
@@ -143,7 +144,7 @@ async function determineAnalysisType(userId: string | null, sessionId: string | 
     const startDate = new Date();
     const endDate = new Date(startDate);
     endDate.setDate(endDate.getDate() + 28);
-    
+
     return {
       type: 'INITIAL',
       planStartDate: startDate,
@@ -162,7 +163,7 @@ async function determineAnalysisType(userId: string | null, sessionId: string | 
     const startDate = new Date();
     const endDate = new Date(startDate);
     endDate.setDate(endDate.getDate() + 28);
-    
+
     return {
       type: 'INITIAL',
       planStartDate: startDate,
@@ -193,7 +194,7 @@ export async function analyzeSkin(answerId: string) {
   }
 
   const faceImages = await getUserFaceImages(record.answer?.userId, record.answer?.sessionId);
-  
+
   if (!faceImages.front && !faceImages.left && !faceImages.right) {
     console.error('No face images found for analysis');
     throw new Error('No face images found for analysis');
@@ -224,7 +225,7 @@ export async function analyzeSkin(answerId: string) {
       })
     );
   }
-  
+
   if (faceImages.left) {
     imagePromises.push(
       maybePresignUrl(faceImages.left, 300).then(presignedUrl => {
@@ -233,7 +234,7 @@ export async function analyzeSkin(answerId: string) {
       })
     );
   }
-  
+
   if (faceImages.right) {
     imagePromises.push(
       maybePresignUrl(faceImages.right, 300).then(presignedUrl => {
@@ -259,9 +260,9 @@ export async function analyzeSkin(answerId: string) {
         {
           role: 'user',
           content: [
-            { 
-              type: 'text', 
-              text: `Analyze these face images (${availableImages.join(', ')}) with facial landmarks. Provide comprehensive skin analysis with score and 4-week plan.` 
+            {
+              type: 'text',
+              text: `Analyze these face images (${availableImages.join(', ')}) with facial landmarks. Provide comprehensive skin analysis with score and 4-week plan.`
             },
             ...imageContent,
             { type: 'text', text: `Landmarks: ${JSON.stringify(landmarks)}` }
@@ -285,16 +286,43 @@ export async function analyzeSkin(answerId: string) {
     parsed = { raw: content } as any;
   }
 
+  // generation of annotated image
+  let annotatedImageUrl: string | null = null;
+  try {
+    if (parsed.issues && parsed.issues.length > 0 && faceImages.front) {
+      const frontImagePresigned = await maybePresignUrl(faceImages.front, 300);
+
+      const microserviceUrl = process.env.FACIAL_LANDMARKS_API_URL || 'http://localhost:8000';
+
+      const annotationResponse = await axios.post(`${microserviceUrl}/api/v1/annotate-issues-from-url`, {
+        image_url: frontImagePresigned,
+        issues: parsed.issues
+      });
+
+      if (annotationResponse.data.status === 'success' && annotationResponse.data.annotated_image) {
+        const uploadResult = await uploadImageToS3({
+          imageBase64: annotationResponse.data.annotated_image,
+          prefix: 'annotated-issues'
+        });
+        annotatedImageUrl = uploadResult.url;
+      }
+    }
+  } catch (annotationError) {
+    console.error('Failed to generate annotated image:', annotationError);
+    // don't fail the whole analysis if annotation fails
+  }
+
   try {
     await prisma.facialLandmarks.update({
       where: { answerId },
-      data: { 
+      data: {
         analysis: parsed as any,
         score: parsed.score || null,
         weeklyPlan: parsed.care_plan_4_weeks as any,
         analysisType: analysisTypeInfo.type,
         planStartDate: analysisTypeInfo.planStartDate,
-        planEndDate: analysisTypeInfo.planEndDate
+        planEndDate: analysisTypeInfo.planEndDate,
+        annotatedImageUrl: annotatedImageUrl
       }
     });
   } catch (dbError) {
@@ -360,19 +388,19 @@ export async function analyzeProgress(
       {
         role: 'user',
         content: [
-          { 
-            type: 'text', 
-            text: `Analyze progress in these current images (${availableImages.join(', ')}) compared to initial analysis and return your response in JSON.` 
+          {
+            type: 'text',
+            text: `Analyze progress in these current images (${availableImages.join(', ')}) compared to initial analysis and return your response in JSON.`
           },
           ...imageContent,
-          { 
-            type: 'text', 
+          {
+            type: 'text',
             text: `Current landmarks: ${JSON.stringify(currentLandmarks)}\n` +
-                  `Initial analysis: ${JSON.stringify(initialAnalysis)}\n` +
-                  `Initial score: ${initialScore}\n` +
-                  `Weekly plan: ${JSON.stringify(weeklyPlan)}\n` +
-                  `Days elapsed: ${daysElapsed}\n` +
-                  `Current week plan: ${JSON.stringify(currentWeekPlan)}`
+              `Initial analysis: ${JSON.stringify(initialAnalysis)}\n` +
+              `Initial score: ${initialScore}\n` +
+              `Weekly plan: ${JSON.stringify(weeklyPlan)}\n` +
+              `Days elapsed: ${daysElapsed}\n` +
+              `Current week plan: ${JSON.stringify(currentWeekPlan)}`
           }
         ]
       }
@@ -395,7 +423,7 @@ export async function analyzeWithLandmarks(frontImageUrl: string, landmarks: obj
   }
 
   const prompt = buildPrompt();
-  
+
   const imageContent: any[] = [];
   const availableImages: string[] = [];
 
@@ -435,9 +463,9 @@ export async function analyzeWithLandmarks(frontImageUrl: string, landmarks: obj
       {
         role: 'user',
         content: [
-          { 
-            type: 'text', 
-            text: `Analyze these face images (${availableImages.join(', ')}) with facial landmarks for comprehensive skin analysis.` 
+          {
+            type: 'text',
+            text: `Analyze these face images (${availableImages.join(', ')}) with facial landmarks for comprehensive skin analysis.`
           },
           ...imageContent,
           { type: 'text', text: `Landmarks: ${JSON.stringify(landmarks)}` }

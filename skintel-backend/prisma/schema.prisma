@@ -130,6 +130,7 @@ model FacialLandmarks {
   planStartDate         DateTime?
   planEndDate           DateTime?
   waterIntakeSuggestion Json?          @map("water_intake_suggestion")
+  annotatedImageUrl     String?        @map("annotated_image_url")
 
   answer OnboardingAnswer @relation(fields: [answerId], references: [answerId], onDelete: Cascade)
   user   User?            @relation(fields: [userId], references: [userId], onDelete: Cascade)
