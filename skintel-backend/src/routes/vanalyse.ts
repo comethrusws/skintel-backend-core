@@ -2,8 +2,9 @@ import { Router, Response } from 'express';
 import { processLandmarks } from '../services/landmarks';
 import { authenticateUser, AuthenticatedRequest } from '../middleware/auth';
 import { prisma } from '../lib/prisma';
-import { maybePresignUrl } from '../lib/s3';
+import { maybePresignUrl, uploadImageToS3 } from '../lib/s3';
 import { z } from 'zod';
+import axios from 'axios';
 
 export const vanalyseRouter = Router();
 
@@ -74,11 +75,11 @@ const progressAnalysisSchema = z.object({
 vanalyseRouter.post('/progress', authenticateUser, async (req: AuthenticatedRequest, res: Response) => {
   try {
     const validationResult = progressAnalysisSchema.safeParse(req.body);
-    
+
     if (!validationResult.success) {
-      return res.status(400).json({ 
+      return res.status(400).json({
         error: 'Invalid request data',
-        details: validationResult.error.errors 
+        details: validationResult.error.errors
       });
     }
 
@@ -87,32 +88,32 @@ vanalyseRouter.post('/progress', authenticateUser, async (req: AuthenticatedRequ
 
     const [activePlan, presignedUrls, landmarkResult] = await Promise.all([
       prisma.facialLandmarks.findFirst({
-        where: { 
+        where: {
           userId,
           planStartDate: { not: null },
           planEndDate: { gt: new Date() }
         },
         orderBy: { createdAt: 'desc' }
       }),
-      
+
       Promise.all([
         maybePresignUrl(front_image_url, 300),
         left_image_url ? maybePresignUrl(left_image_url, 300) : Promise.resolve(null),
         right_image_url ? maybePresignUrl(right_image_url, 300) : Promise.resolve(null)
       ]).then(([front, left, right]) => ({ front, left, right })),
-      
+
       processLandmarks(front_image_url)
     ]);
 
     if (!activePlan) {
-      return res.status(400).json({ 
-        error: 'No active improvement plan found. Complete initial analysis first.' 
+      return res.status(400).json({
+        error: 'No active improvement plan found. Complete initial analysis first.'
       });
     }
 
     if (!landmarkResult.success || !landmarkResult.data) {
-      return res.status(500).json({ 
-        error: landmarkResult.error || 'Landmark processing failed' 
+      return res.status(500).json({
+        error: landmarkResult.error || 'Landmark processing failed'
       });
     }
 
@@ -133,10 +134,10 @@ vanalyseRouter.post('/progress', authenticateUser, async (req: AuthenticatedRequ
       });
     }
 
-    const initialAnalysisData = typeof initialAnalysis.analysis === 'string' 
-      ? JSON.parse(initialAnalysis.analysis) 
+    const initialAnalysisData = typeof initialAnalysis.analysis === 'string'
+      ? JSON.parse(initialAnalysis.analysis)
       : initialAnalysis.analysis;
-    
+
     const initialWeeklyPlan = typeof initialAnalysis.weeklyPlan === 'string'
       ? JSON.parse(initialAnalysis.weeklyPlan)
       : initialAnalysis.weeklyPlan;
@@ -152,7 +153,7 @@ vanalyseRouter.post('/progress', authenticateUser, async (req: AuthenticatedRequ
         presignedUrls.left,
         presignedUrls.right
       ),
-      
+
       analyzeProgressOptimized(
         presignedUrls,
         landmarkResult.data,
@@ -164,7 +165,7 @@ vanalyseRouter.post('/progress', authenticateUser, async (req: AuthenticatedRequ
     ]);
 
     const answerId = `progress_${Date.now()}_${userId.slice(-6)}`;
-    
+
     await prisma.$transaction([
       prisma.onboardingAnswer.create({
         data: {
@@ -216,21 +217,21 @@ vanalyseRouter.post('/progress', authenticateUser, async (req: AuthenticatedRequ
 
   } catch (error) {
     console.error('Progress analysis error:', error);
-    return res.status(500).json({ 
-      error: error instanceof Error ? error.message : 'Progress analysis failed' 
+    return res.status(500).json({
+      error: error instanceof Error ? error.message : 'Progress analysis failed'
     });
   }
 });
 
 // herlper to avoid duplicate presigning and landmark processing
 async function analyzeWithLandmarksOptimized(
-  frontPresignedUrl: string, 
-  landmarks: object, 
-  leftPresignedUrl?: string | null, 
+  frontPresignedUrl: string,
+  landmarks: object,
+  leftPresignedUrl?: string | null,
   rightPresignedUrl?: string | null
 ) {
   const { buildPrompt, openai, OPENAI_MODEL } = await import('../services/analysis');
-  
+
   const imageContent: any[] = [];
   const availableImages: string[] = [];
 
@@ -254,9 +255,9 @@ async function analyzeWithLandmarksOptimized(
       {
         role: 'user',
         content: [
-          { 
-            type: 'text', 
-            text: `Analyze these face images (${availableImages.join(', ')}) with facial landmarks for comprehensive skin analysis.` 
+          {
+            type: 'text',
+            text: `Analyze these face images (${availableImages.join(', ')}) with facial landmarks for comprehensive skin analysis.`
           },
           ...imageContent,
           { type: 'text', text: `Landmarks: ${JSON.stringify(landmarks)}` }
@@ -267,7 +268,7 @@ async function analyzeWithLandmarksOptimized(
   });
 
   const content = completion.choices?.[0]?.message?.content ?? '';
-  
+
   try {
     return JSON.parse(content);
   } catch {
@@ -284,7 +285,7 @@ async function analyzeProgressOptimized(
   daysElapsed: number
 ) {
   const { buildProgressPrompt, openai, OPENAI_MODEL } = await import('../services/analysis');
-  
+
   const imageContent: any[] = [];
   const availableImages: string[] = [];
 
@@ -311,19 +312,19 @@ async function analyzeProgressOptimized(
       {
         role: 'user',
         content: [
-          { 
-            type: 'text', 
-            text: `Analyze progress in these current images (${availableImages.join(', ')}) compared to initial analysis and return your response in JSON.` 
+          {
+            type: 'text',
+            text: `Analyze progress in these current images (${availableImages.join(', ')}) compared to initial analysis and return your response in JSON.`
           },
           ...imageContent,
-          { 
-            type: 'text', 
+          {
+            type: 'text',
             text: `Current landmarks: ${JSON.stringify(currentLandmarks)}\n` +
-                  `Initial analysis: ${JSON.stringify(initialAnalysis)}\n` +
-                  `Initial score: ${initialScore}\n` +
-                  `Weekly plan: ${JSON.stringify(weeklyPlan)}\n` +
-                  `Days elapsed: ${daysElapsed}\n` +
-                  `Current week plan: ${JSON.stringify(currentWeekPlan)}`
+              `Initial analysis: ${JSON.stringify(initialAnalysis)}\n` +
+              `Initial score: ${initialScore}\n` +
+              `Weekly plan: ${JSON.stringify(weeklyPlan)}\n` +
+              `Days elapsed: ${daysElapsed}\n` +
+              `Current week plan: ${JSON.stringify(currentWeekPlan)}`
           }
         ]
       }
@@ -332,12 +333,45 @@ async function analyzeProgressOptimized(
   });
 
   const content = completion.choices?.[0]?.message?.content ?? '';
+  let parsed: any;
 
   try {
-    return JSON.parse(content);
+    parsed = JSON.parse(content);
   } catch {
-    return { raw: content };
+    parsed = { raw: content };
   }
+
+  // generation of annotated image
+  let annotatedImageUrl: string | null = null;
+  try {
+    if (parsed.remaining_issues && parsed.remaining_issues.length > 0 && presignedUrls.front) {
+      // presignedUrls.front is already presigned, but might be short lived? 
+      // The original code presigned it with 300s. 
+      // The annotation service needs to download it. 300s should be enough.
+      // But wait, maybePresignUrl checks if it's a local path or s3 key.
+      // If it was already presigned in the caller, presignedUrls.front IS the url.
+      // However, the caller (line 99) calls maybePresignUrl(front_image_url, 300).
+
+      const microserviceUrl = process.env.FACIAL_LANDMARKS_API_URL || 'http://localhost:8000';
+
+      const annotationResponse = await axios.post(`${microserviceUrl}/api/v1/annotate-issues-from-url`, {
+        image_url: presignedUrls.front,
+        issues: parsed.remaining_issues
+      });
+
+      if (annotationResponse.data.status === 'success' && annotationResponse.data.annotated_image) {
+        const uploadResult = await uploadImageToS3({
+          imageBase64: annotationResponse.data.annotated_image,
+          prefix: 'annotated-issues-progress'
+        });
+        annotatedImageUrl = uploadResult.url;
+      }
+    }
+  } catch (annotationError) {
+    console.error('Failed to generate annotated image in analyzeProgressOptimized:', annotationError);
+  }
+
+  return { ...parsed, annotatedImageUrl };
 }
 
 

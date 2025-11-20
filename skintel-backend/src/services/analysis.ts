@@ -81,7 +81,13 @@ function buildProgressPrompt(): string {
     '  "visual_improvements": ["reduced under-eye puffiness", "clearer T-zone"],\n' +
     '  "areas_needing_attention": ["forehead texture", "jawline breakouts"],\n' +
     '  "updated_recommendations": ["increase retinol frequency", "add exfoliation"],\n' +
-    '  "next_week_focus": "Focus on consistency with evening routine and add gentle exfoliation twice weekly"\n' +
+    '  "next_week_focus": "Focus on consistency with evening routine and add gentle exfoliation twice weekly",\n' +
+    '  "remaining_issues": [\n' +
+    '    {"type": "dark_circles", "region": "under_eye_left", "severity": "mild", "visible_in": ["front"], "dlib_68_facial_landmarks": [\n' +
+    '      {"x": 30, "y": 40},\n' +
+    '      {"x": 32, "y": 42}\n' +
+    '    ]}\n' +
+    '  ]\n' +
     '}'
   );
 }
@@ -409,12 +415,40 @@ export async function analyzeProgress(
   });
 
   const content = completion.choices?.[0]?.message?.content ?? '';
+  let parsed: any;
 
   try {
-    return JSON.parse(content);
+    parsed = JSON.parse(content);
   } catch {
-    return { raw: content };
+    parsed = { raw: content };
   }
+
+  // generation of annotated image
+  let annotatedImageUrl: string | null = null;
+  try {
+    if (parsed.remaining_issues && parsed.remaining_issues.length > 0 && currentImages.front) {
+      const frontImagePresigned = await maybePresignUrl(currentImages.front, 86400);
+
+      const microserviceUrl = process.env.FACIAL_LANDMARKS_API_URL || 'http://localhost:8000';
+
+      const annotationResponse = await axios.post(`${microserviceUrl}/api/v1/annotate-issues-from-url`, {
+        image_url: frontImagePresigned,
+        issues: parsed.remaining_issues
+      });
+
+      if (annotationResponse.data.status === 'success' && annotationResponse.data.annotated_image) {
+        const uploadResult = await uploadImageToS3({
+          imageBase64: annotationResponse.data.annotated_image,
+          prefix: 'annotated-issues-progress'
+        });
+        annotatedImageUrl = uploadResult.url;
+      }
+    }
+  } catch (annotationError) {
+    console.error('Failed to generate annotated image in analyzeProgress:', annotationError);
+  }
+
+  return { ...parsed, annotatedImageUrl };
 }
 
 export async function analyzeWithLandmarks(frontImageUrl: string, landmarks: object, leftImageUrl?: string, rightImageUrl?: string) {
