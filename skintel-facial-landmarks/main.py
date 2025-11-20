@@ -56,8 +56,8 @@ class SkinIssue(BaseModel):
     region: str
     severity: str
     visible_in: List[str]
-    explanation: str
-    recommendations: List[str]
+    explanation: Optional[str] = None
+    recommendations: Optional[List[str]] = None
     dlib_68_facial_landmarks: List[IssuePoint]
 
 class IssueAnnotationResponse(BaseModel):
@@ -408,19 +408,21 @@ async def create_landmarks_detection(request: ImageUrlRequest):
         )
 
 
-@app.post("/api/v1/annotate-issues-from-url", response_model=IssueAnnotationResponse)
-async def annotate_skin_issues_from_url(
-    image_url: str,
+class AnnotationRequest(BaseModel):
+    image_url: str
     issues: List[SkinIssue]
-):
+
+@app.post("/api/v1/annotate-issues-from-url", response_model=IssueAnnotationResponse)
+async def annotate_skin_issues_from_url(request: AnnotationRequest):
     """
     Annotate skin issues on an image from URL
     
-    - **image_url**: URL to image file
-    - **issues**: List of skin issues with their landmarks, severity, and descriptions
+    - **request**: JSON body containing image_url and list of issues
     
     Returns an annotated image with colored regions highlighting each issue.
     """
+    image_url = request.image_url
+    issues = request.issues
     try:
         # Validate URL
         parsed_url = urlparse(image_url)
