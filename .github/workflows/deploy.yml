@@ -52,6 +52,7 @@ jobs:
           S3_PUBLIC_BASE_URL="${{ secrets.S3_PUBLIC_BASE_URL }}"
           S3_OBJECT_ACL="${{ secrets.S3_OBJECT_ACL }}"
           OPENWEATHER_API_KEY="${{ secrets.OPENWEATHER_API_KEY }}"
+          SLACK_WEBHOOK_URL="${{ secrets.SLACK_WEBHOOK_URL }}"
           ENVEOF
             
             # Stop existing services and start new ones

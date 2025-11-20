@@ -22,6 +22,7 @@ const options = {
       { name: 'Location & UV', description: 'Location, UV and weather services' },
       { name: 'Version', description: 'App version check' },
       { name: 'Tasks', description: 'Skincare task management' },
+      { name: 'Report', description: 'Email/Report Issues' },
     ],
     servers: [
       {
