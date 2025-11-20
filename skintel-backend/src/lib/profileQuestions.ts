@@ -18,13 +18,13 @@ export const PROFILE_QUESTIONS: ProfileQuestion[] = [
         question_id: 'q_profile_sleep_hours',
         question_text: 'How many hours of sleep do you usually get?',
         type: 'single',
-        options: ['<3 hrs', '3-6 hrs', '>8 hrs']
+        options: ['less_than_3_hrs', '3_to_6_hrs', 'greater_than_8_hrs']
     },
     {
         question_id: 'q_profile_exercise_frequency',
         question_text: 'How often do you exercise weekly?',
         type: 'single',
-        options: ['Never', 'Once', '>3 days']
+        options: ['never', 'once', 'greater_than_3_days']
     },
     {
         question_id: 'q_profile_water_intake',
@@ -38,7 +38,7 @@ export const PROFILE_QUESTIONS: ProfileQuestion[] = [
         question_id: 'q_profile_diet_type',
         question_text: 'Do you follow any specific diet',
         type: 'single',
-        options: ['Veg', 'Non-Veg', 'Vegan']
+        options: ['veg', 'non_veg', 'vegan']
     }
 ];
 
