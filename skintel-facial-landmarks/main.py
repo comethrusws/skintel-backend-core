@@ -149,6 +149,26 @@ def annotate_image_with_issues(image_array: np.ndarray, issues: List[SkinIssue])
     # Store legend items
     legend_items = []
     
+    # Helper to draw dotted polylines
+    def draw_dotted_poly(img, pts, color, thickness=2, dash_len=5):
+        for i in range(len(pts)):
+            p1 = pts[i]
+            p2 = pts[(i + 1) % len(pts)]
+            
+            dist = np.linalg.norm(p2 - p1)
+            if dist == 0: continue
+            
+            dashes = int(dist / dash_len)
+            if dashes == 0: continue
+            
+            dx = (p2[0] - p1[0]) / dashes
+            dy = (p2[1] - p1[1]) / dashes
+            
+            for j in range(0, dashes, 2):
+                start = (int(p1[0] + dx * j), int(p1[1] + dy * j))
+                end = (int(p1[0] + dx * (j + 1)), int(p1[1] + dy * (j + 1)))
+                cv2.line(img, start, end, color, thickness)
+
     # Process each issue
     for idx, issue in enumerate(issues, start=1):
         # Get color based on severity
@@ -159,18 +179,16 @@ def annotate_image_with_issues(image_array: np.ndarray, issues: List[SkinIssue])
         
         if len(points) == 0:
             continue
+            
+        # Expand region if it's an eye region
+        if 'eye' in issue.region.lower():
+            centroid = np.mean(points, axis=0)
+            scale = 1.4  # 40% larger for eye regions
+            points = (points - centroid) * scale + centroid
+            points = points.astype(np.int32)
         
-        # Create overlay for semi-transparent fill
-        overlay = annotated_bgr.copy()
-        
-        # Draw filled polygon for the issue region
-        cv2.fillPoly(overlay, [points], color)
-        
-        # Blend overlay with original (15% opacity)
-        cv2.addWeighted(overlay, 0.15, annotated_bgr, 0.85, 0, annotated_bgr)
-        
-        # Draw polygon outline
-        cv2.polylines(annotated_bgr, [points], isClosed=True, color=color, thickness=3)
+        # Draw dotted polygon outline (thinner border)
+        draw_dotted_poly(annotated_bgr, points, color, thickness=2, dash_len=8)
         
         # Calculate centroid for number marker placement
         centroid_x = int(np.mean(points[:, 0]))
