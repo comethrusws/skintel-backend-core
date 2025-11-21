@@ -298,7 +298,7 @@ export async function analyzeSkin(answerId: string) {
     if (parsed.issues && parsed.issues.length > 0 && faceImages.front) {
       const frontImagePresigned = await maybePresignUrl(faceImages.front, 300);
 
-      const microserviceUrl = process.env.FACIAL_LANDMARKS_API_URL || 'http://localhost:8000';
+      const microserviceUrl = process.env.FACIAL_LANDMARKS_API_URL || process.env.LANDMARK_URL || 'http://localhost:8000';
 
       const annotationResponse = await axios.post(`${microserviceUrl}/api/v1/annotate-issues-from-url`, {
         image_url: frontImagePresigned,
@@ -429,7 +429,7 @@ export async function analyzeProgress(
     if (parsed.remaining_issues && parsed.remaining_issues.length > 0 && currentImages.front) {
       const frontImagePresigned = await maybePresignUrl(currentImages.front, 86400);
 
-      const microserviceUrl = process.env.FACIAL_LANDMARKS_API_URL || 'http://localhost:8000';
+      const microserviceUrl = process.env.FACIAL_LANDMARKS_API_URL || process.env.LANDMARK_URL || 'http://localhost:8000';
 
       const annotationResponse = await axios.post(`${microserviceUrl}/api/v1/annotate-issues-from-url`, {
         image_url: frontImagePresigned,
@@ -524,7 +524,7 @@ export async function analyzeWithLandmarks(frontImageUrl: string, landmarks: obj
     if (parsed.issues && parsed.issues.length > 0) {
       const frontImagePresigned = await maybePresignUrl(frontImageUrl, 300);
 
-      const microserviceUrl = process.env.FACIAL_LANDMARKS_API_URL || 'http://localhost:8000';
+      const microserviceUrl = process.env.FACIAL_LANDMARKS_API_URL || process.env.LANDMARK_URL || 'http://localhost:8000';
 
       const annotationResponse = await axios.post(`${microserviceUrl}/api/v1/annotate-issues-from-url`, {
         image_url: frontImagePresigned,

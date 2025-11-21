@@ -1,15 +1,15 @@
 import { Router, Request, Response } from 'express';
 import { AuthResponse, RefreshTokenResponse, LogoutResponse } from '../types';
-import { 
-  generateUserId, 
-  generateAccessToken, 
+import {
+  generateUserId,
+  generateAccessToken,
   generateRefreshToken,
   generatePasswordResetToken,
   hashPassword,
   verifyPassword
 } from '../utils/auth';
 import { authenticateUser, AuthenticatedRequest } from '../middleware/auth';
-import { 
+import {
   authSignupRequestSchema,
   authLoginRequestSchema,
   authSSORequestSchema,
@@ -178,11 +178,11 @@ const router = Router();
 router.post('/signup', async (req: Request, res: Response): Promise<void> => {
   try {
     const validationResult = authSignupRequestSchema.safeParse(req.body);
-    
+
     if (!validationResult.success) {
-      res.status(400).json({ 
+      res.status(400).json({
         error: 'Invalid request data',
-        details: validationResult.error.errors 
+        details: validationResult.error.errors
       });
       return;
     }
@@ -249,11 +249,11 @@ router.post('/signup', async (req: Request, res: Response): Promise<void> => {
 router.post('/login', async (req: Request, res: Response): Promise<void> => {
   try {
     const validationResult = authLoginRequestSchema.safeParse(req.body);
-    
+
     if (!validationResult.success) {
-      res.status(400).json({ 
+      res.status(400).json({
         error: 'Invalid request data',
-        details: validationResult.error.errors 
+        details: validationResult.error.errors
       });
       return;
     }
@@ -315,11 +315,11 @@ router.post('/login', async (req: Request, res: Response): Promise<void> => {
 router.post('/sso', async (req: Request, res: Response): Promise<void> => {
   try {
     const validationResult = authSSORequestSchema.safeParse(req.body);
-    
+
     if (!validationResult.success) {
-      res.status(400).json({ 
+      res.status(400).json({
         error: 'Invalid request data',
-        details: validationResult.error.errors 
+        details: validationResult.error.errors
       });
       return;
     }
@@ -387,11 +387,11 @@ router.post('/sso', async (req: Request, res: Response): Promise<void> => {
 router.post('/token/refresh', async (req: Request, res: Response): Promise<void> => {
   try {
     const validationResult = refreshTokenRequestSchema.safeParse(req.body);
-    
+
     if (!validationResult.success) {
-      res.status(400).json({ 
+      res.status(400).json({
         error: 'Invalid request data',
-        details: validationResult.error.errors 
+        details: validationResult.error.errors
       });
       return;
     }
@@ -440,11 +440,11 @@ router.post('/token/refresh', async (req: Request, res: Response): Promise<void>
 router.post('/logout', authenticateUser, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
     const validationResult = logoutRequestSchema.safeParse(req.body);
-    
+
     if (!validationResult.success) {
-      res.status(400).json({ 
+      res.status(400).json({
         error: 'Invalid request data',
-        details: validationResult.error.errors 
+        details: validationResult.error.errors
       });
       return;
     }
@@ -473,11 +473,11 @@ router.post('/logout', authenticateUser, async (req: AuthenticatedRequest, res: 
 router.post('/password-reset/request', async (req: Request, res: Response): Promise<void> => {
   try {
     const validationResult = passwordResetRequestSchema.safeParse(req.body);
-    
+
     if (!validationResult.success) {
-      res.status(400).json({ 
+      res.status(400).json({
         error: 'Invalid request data',
-        details: validationResult.error.errors 
+        details: validationResult.error.errors
       });
       return;
     }
@@ -521,11 +521,11 @@ router.post('/password-reset/request', async (req: Request, res: Response): Prom
 router.post('/password-reset/confirm', async (req: Request, res: Response): Promise<void> => {
   try {
     const validationResult = passwordResetConfirmSchema.safeParse(req.body);
-    
+
     if (!validationResult.success) {
-      res.status(400).json({ 
+      res.status(400).json({
         error: 'Invalid request data',
-        details: validationResult.error.errors 
+        details: validationResult.error.errors
       });
       return;
     }
@@ -574,6 +574,10 @@ async function mergeSessionToUser(sessionId: string, userId: string): Promise<bo
     });
     const answerIds = answers.map((a: { answerId: string }) => a.answerId);
 
+    const existingUserSession = await prisma.onboardingSession.findUnique({
+      where: { userId },
+    });
+
     await prisma.$transaction([
       prisma.facialLandmarks.updateMany({
         where: { answerId: { in: answerIds } },
@@ -582,19 +586,28 @@ async function mergeSessionToUser(sessionId: string, userId: string): Promise<bo
 
       prisma.onboardingAnswer.updateMany({
         where: { sessionId },
-        data: { 
-          userId,
-          sessionId: null,
-        },
-      }),
-
-      prisma.onboardingSession.updateMany({
-        where: { sessionId },
         data: {
           userId,
           sessionId: null,
         },
       }),
+
+      ...(existingUserSession
+        ? [
+          prisma.onboardingSession.deleteMany({
+            where: { sessionId },
+          })
+        ]
+        : [
+          prisma.onboardingSession.updateMany({
+            where: { sessionId },
+            data: {
+              userId,
+              sessionId: null,
+            },
+          })
+        ]
+      ),
 
       prisma.anonymousSession.update({
         where: { sessionId },
