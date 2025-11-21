@@ -305,16 +305,22 @@ export async function analyzeSkin(answerId: string) {
         issues: parsed.issues
       });
 
+      console.log(`[Analysis] Annotation service response status: ${annotationResponse.data.status}`);
+
       if (annotationResponse.data.status === 'success' && annotationResponse.data.annotated_image) {
+        console.log(`[Analysis] Uploading annotated image to S3...`);
         const uploadResult = await uploadImageToS3({
           imageBase64: annotationResponse.data.annotated_image,
           prefix: 'annotated-issues'
         });
         annotatedImageUrl = uploadResult.url;
+        console.log(`[Analysis] Annotated image uploaded: ${annotatedImageUrl}`);
+      } else {
+        console.warn(`[Analysis] Annotation service failed or no image returned:`, annotationResponse.data);
       }
     }
   } catch (annotationError) {
-    console.error('Failed to generate annotated image:', annotationError);
+    console.error('[Analysis] Failed to generate annotated image:', annotationError);
     // don't fail the whole analysis if annotation fails
   }
 

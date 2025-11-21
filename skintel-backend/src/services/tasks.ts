@@ -49,21 +49,29 @@ export async function generateTasksForUser(request: TaskGenerationRequest): Prom
     throw new Error('OPENAI_API_KEY is not set');
   }
 
-  const { userId, weeklyPlan, userProducts } = request;
+  const { userId, weeklyPlan, userProducts, force } = request;
 
   const existingTasks = await prisma.task.findMany({
     where: { userId, isActive: true }
   });
 
   if (existingTasks.length > 0) {
-    console.log(`Tasks already exist for user ${userId}, skipping generation`);
-    return;
+    if (force) {
+      console.log(`Forcing task regeneration for user ${userId}, deactivating ${existingTasks.length} existing tasks`);
+      await prisma.task.updateMany({
+        where: { userId, isActive: true },
+        data: { isActive: false }
+      });
+    } else {
+      console.log(`Tasks already exist for user ${userId}, skipping generation`);
+      return;
+    }
   }
 
   const prompt = buildTaskGenerationPrompt();
   const planText = weeklyPlan.map(w => `Week ${w.week}: "${w.preview}"`).join('\n');
-  
-  const userProductsText = userProducts?.length 
+
+  const userProductsText = userProducts?.length
     ? `User's available products: ${userProducts.map(p => `${p.name} (${p.category})`).join(', ')}`
     : 'No user products available';
 
@@ -80,18 +88,18 @@ export async function generateTasksForUser(request: TaskGenerationRequest): Prom
   });
 
   const content = completion.choices?.[0]?.message?.content ?? '';
-  
+
   try {
     const generatedTasks = JSON.parse(content);
-    
+
     const tasksToCreate: any[] = [];
-    
+
     for (let week = 1; week <= 4; week++) {
       const weekTasks = generatedTasks[`week_${week}_tasks`] || [];
-      
+
       for (const task of weekTasks) {
-        const matchedUserProducts = userProducts?.filter(product => 
-          task.recommendedProducts?.some((rec: string) => 
+        const matchedUserProducts = userProducts?.filter(product =>
+          task.recommendedProducts?.some((rec: string) =>
             product.category.toLowerCase().includes(rec.toLowerCase()) ||
             product.name.toLowerCase().includes(rec.toLowerCase())
           )
@@ -119,7 +127,7 @@ export async function generateTasksForUser(request: TaskGenerationRequest): Prom
       await prisma.task.createMany({
         data: tasksToCreate
       });
-      
+
       console.log(`Generated ${tasksToCreate.length} tasks for user ${userId}`);
     }
 
@@ -134,7 +142,7 @@ export async function getTodaysTasks(userId: string): Promise<any> {
   const todayStr = today.toISOString().split('T')[0];
 
   const activePlan = await prisma.facialLandmarks.findFirst({
-    where: { 
+    where: {
       userId,
       planStartDate: { not: null },
       planEndDate: { gt: new Date() }
@@ -183,7 +191,7 @@ export async function getTodaysTasks(userId: string): Promise<any> {
 
   const formattedTasks = await Promise.all(tasks.map(async task => {
     const completion = completionMap.get(task.id);
-    const taskUserProducts = task.userProducts ? 
+    const taskUserProducts = task.userProducts ?
       userProducts.filter(p => (task.userProducts as string[]).includes(p.id))
         .map(p => {
           const data = p.productData as any;
@@ -216,7 +224,7 @@ export async function getTodaysTasks(userId: string): Promise<any> {
   if (totalCount > 0) {
     let totalWeight = 0;
     let weightedScore = 0;
-    
+
     formattedTasks.forEach(task => {
       const weight = task.priority === 'critical' ? 3 : task.priority === 'important' ? 2 : 1;
       totalWeight += weight;
@@ -224,7 +232,7 @@ export async function getTodaysTasks(userId: string): Promise<any> {
         weightedScore += weight * 100;
       }
     });
-    
+
     dailyScore = totalWeight > 0 ? weightedScore / totalWeight : 0;
   }
 
@@ -307,7 +315,7 @@ export async function uncompleteTask(userId: string, taskId: string, date?: stri
 
 export async function getTaskProgress(userId: string): Promise<any> {
   const activePlan = await prisma.facialLandmarks.findFirst({
-    where: { 
+    where: {
       userId,
       planStartDate: { not: null }
     },
@@ -343,7 +351,7 @@ export async function getTaskProgress(userId: string): Promise<any> {
     const weekEnd = new Date(weekStart);
     weekEnd.setDate(weekEnd.getDate() + 6);
 
-    const weekCompletions = allCompletions.filter(c => 
+    const weekCompletions = allCompletions.filter(c =>
       c.completedAt >= weekStart && c.completedAt <= weekEnd
     );
 
@@ -353,7 +361,7 @@ export async function getTaskProgress(userId: string): Promise<any> {
       return task?.priority === 'critical';
     });
 
-    const weekDaysPassed = Math.min(7, Math.max(0, 
+    const weekDaysPassed = Math.min(7, Math.max(0,
       Math.floor((today.getTime() - weekStart.getTime()) / (1000 * 60 * 60 * 24)) + 1
     ));
 
@@ -375,15 +383,15 @@ export async function getTaskProgress(userId: string): Promise<any> {
     const date = new Date(today);
     date.setDate(date.getDate() - i);
     const dateStr = date.toISOString().split('T')[0];
-    
+
     const dayWeek = Math.min(Math.floor((date.getTime() - planStart.getTime()) / (1000 * 60 * 60 * 24 * 7)) + 1, 4);
     const dayTasks = allTasks.filter(t => t.week === dayWeek);
-    const dayCompletions = allCompletions.filter(c => 
+    const dayCompletions = allCompletions.filter(c =>
       c.completedAt.toISOString().split('T')[0] === dateStr
     );
 
     const dayScore = dayTasks.length > 0 ? (dayCompletions.length / dayTasks.length) * 100 : 0;
-    
+
     last7Days.push({
       date: dateStr,
       score: Math.round(dayScore),
@@ -429,7 +437,7 @@ export async function getTaskProgress(userId: string): Promise<any> {
 
 export async function adaptTasksForUser(userId: string): Promise<TaskAdaptationResult[]> {
   const adaptations: TaskAdaptationResult[] = [];
-  
+
   const tasks = await prisma.task.findMany({
     where: { userId, isActive: true }
   });
@@ -454,7 +462,7 @@ export async function adaptTasksForUser(userId: string): Promise<TaskAdaptationR
       if (task.timeOfDay === 'evening') {
         adaptationType = 'time_adjusted';
         reason = 'Switching to morning routine for better adherence';
-        
+
         await prisma.task.update({
           where: { id: task.id },
           data: {

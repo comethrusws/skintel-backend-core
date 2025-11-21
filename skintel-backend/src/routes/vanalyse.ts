@@ -5,6 +5,7 @@ import { prisma } from '../lib/prisma';
 import { maybePresignUrl, uploadImageToS3 } from '../lib/s3';
 import { z } from 'zod';
 import axios from 'axios';
+import { generateTasksForUser } from '../services/tasks';
 
 export const vanalyseRouter = Router();
 
@@ -197,6 +198,36 @@ vanalyseRouter.post('/progress', authenticateUser, async (req: AuthenticatedRequ
         }
       })
     ]);
+
+    try {
+      const userProducts = await prisma.product.findMany({
+        where: { userId },
+        select: {
+          id: true,
+          productData: true
+        }
+      });
+
+      const formattedProducts = userProducts.map(p => {
+        const data = p.productData as any;
+        return {
+          id: p.id,
+          category: data?.category || 'unknown',
+          name: data?.product_name || 'Unknown Product',
+          ingredients: data?.ingredients
+        };
+      });
+
+      await generateTasksForUser({
+        userId,
+        weeklyPlan: currentAnalysis.care_plan_4_weeks,
+        userProducts: formattedProducts,
+        force: true
+      });
+
+    } catch (taskError) {
+      console.error('Failed to regenerate tasks after progress analysis:', taskError);
+    }
 
     const imagesAnalyzed = ['front'];
     if (left_image_url) imagesAnalyzed.push('left');

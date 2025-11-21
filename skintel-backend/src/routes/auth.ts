@@ -9,6 +9,7 @@ import {
   verifyPassword
 } from '../utils/auth';
 import { authenticateUser, AuthenticatedRequest } from '../middleware/auth';
+import { generateTasksForUser } from '../services/tasks';
 import {
   authSignupRequestSchema,
   authLoginRequestSchema,
@@ -19,6 +20,7 @@ import {
   passwordResetConfirmSchema
 } from '../lib/validation';
 import { prisma } from '../lib/prisma';
+import { Prisma } from '@prisma/client';
 
 const router = Router();
 
@@ -614,6 +616,59 @@ async function mergeSessionToUser(sessionId: string, userId: string): Promise<bo
         data: { mergedToUserId: userId },
       }),
     ]);
+
+    // trigger task generation for any new user
+    try {
+      console.log(`[TaskGen] Attempting to generate tasks for user ${userId}`);
+      const facialLandmark = await prisma.facialLandmarks.findFirst({
+        where: {
+          userId,
+          status: 'COMPLETED',
+          weeklyPlan: { not: Prisma.DbNull }
+        },
+        orderBy: { createdAt: 'desc' }
+      });
+
+      console.log(`[TaskGen] Found landmark:`, facialLandmark ? 'yes' : 'no');
+
+      if (facialLandmark && facialLandmark.weeklyPlan) {
+        console.log(`[TaskGen] Landmark has weekly plan, proceeding...`);
+        const weeklyPlan = typeof facialLandmark.weeklyPlan === 'string'
+          ? JSON.parse(facialLandmark.weeklyPlan)
+          : facialLandmark.weeklyPlan;
+
+        const userProducts = await prisma.product.findMany({
+          where: { userId },
+          select: {
+            id: true,
+            productData: true
+          }
+        });
+
+        const formattedProducts = userProducts.map(p => {
+          const data = p.productData as any;
+          return {
+            id: p.id,
+            category: data?.category || 'unknown',
+            name: data?.product_name || 'Unknown Product',
+            ingredients: data?.ingredients
+          };
+        });
+
+        await generateTasksForUser({
+          userId,
+          weeklyPlan,
+          userProducts: formattedProducts
+        });
+        console.log(`[TaskGen] Task generation triggered successfully`);
+      } else {
+        console.log(`[TaskGen] Skipping task generation: No weekly plan found (Plan exists: ${!!facialLandmark?.weeklyPlan})`);
+      }
+    } catch (taskError) {
+      console.error('[TaskGen] Failed to generate tasks after signup/login:', taskError);
+      // Don't fail the auth request if task generation fails
+    }
+
     return true;
   } catch (error) {
     console.error('Session merge error:', error);
