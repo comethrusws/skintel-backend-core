@@ -19,8 +19,9 @@ services:
       - AWS_REGION=${AWS_REGION}
       - S3_BUCKET_NAME=${S3_BUCKET_NAME}
       - S3_PUBLIC_BASE_URL=${S3_PUBLIC_BASE_URL}
-      - S3_OBJECT_ACL=${S3_OBJECT_ACL}
+      - S3_OBJECT_ACL=${S3_OBJ{ECT_ACL}
       - OPENWEATHER_API_KEY=${OPENWEATHER_API_KEY}
+      - SLACK_WEBHOOK_URL=${SLACK_WEBHOOK_URL}
     depends_on:
       skintel-database:
         condition: service_healthy

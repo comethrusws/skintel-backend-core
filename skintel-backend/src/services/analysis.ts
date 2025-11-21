@@ -298,7 +298,7 @@ export async function analyzeSkin(answerId: string) {
     if (parsed.issues && parsed.issues.length > 0 && faceImages.front) {
       const frontImagePresigned = await maybePresignUrl(faceImages.front, 300);
 
-      const microserviceUrl = process.env.LANDMARK_URL || 'http://localhost:8000';
+      const microserviceUrl = process.env.LANDMARK_URL || 'http://skintel-facial-landmarks:8000';
 
       const annotationResponse = await axios.post(`${microserviceUrl}/api/v1/annotate-issues-from-url`, {
         image_url: frontImagePresigned,
