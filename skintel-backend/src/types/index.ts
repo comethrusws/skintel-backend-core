@@ -121,11 +121,11 @@ export interface StoredUser {
   merged_session_id?: string;
 }
 
-export type OnboardingAnswerValue = 
-  | string 
-  | number 
-  | boolean 
-  | string[] 
+export type OnboardingAnswerValue =
+  | string
+  | number
+  | boolean
+  | string[]
   | { image_id: string } | { image_url: string };
 
 export interface LandmarkPoint {
@@ -380,15 +380,15 @@ export interface DailyTasksResponse {
     isCompleted: boolean;
     completedAt?: string;
   }>;
-  completionRate: number; 
-  dailyScore: number; 
+  completionRate: number;
+  dailyScore: number;
 }
 
 export interface TaskProgressResponse {
   userId: string;
   currentWeek: number;
   currentDay: number; // 1-28
-  overallScore: number; 
+  overallScore: number;
   weeklyScores: Array<{
     week: number;
     score: number;
@@ -420,6 +420,7 @@ export interface TaskGenerationRequest {
     name: string;
     ingredients?: string[];
   }>;
+  force?: boolean;
 }
 
 export interface TaskCompletionRequest {

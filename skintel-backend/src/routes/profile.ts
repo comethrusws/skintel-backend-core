@@ -750,7 +750,7 @@ router.put('/', authenticateUser, async (req: AuthenticatedRequest, res: Respons
     if (frontFaceAnswer && frontFaceAnswer.value) {
       const value = frontFaceAnswer.value as any;
       if (value.image_url) {
-        profileImage = await maybePresignUrl(value.image_url, 300);
+        profileImage = await maybePresignUrl(value.image_url, 86400);
       }
     }
 

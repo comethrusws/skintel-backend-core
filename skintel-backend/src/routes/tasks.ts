@@ -38,7 +38,58 @@ const taskCompletionSchema = z.object({
 router.get('/today', authenticateUser, async (req: AuthenticatedRequest, res: Response) => {
   try {
     const userId = req.userId!;
-    const todaysTasks = await getTodaysTasks(userId);
+    let todaysTasks = await getTodaysTasks(userId);
+
+    if (todaysTasks.tasks.length === 0) {
+      const activeTasksCount = await prisma.task.count({
+        where: { userId, isActive: true }
+      });
+
+      if (activeTasksCount === 0) {
+
+        const latestAnalysis = await prisma.facialLandmarks.findFirst({
+          where: {
+            userId,
+            status: 'COMPLETED',
+            weeklyPlan: { not: Prisma.DbNull }
+          },
+          orderBy: { createdAt: 'desc' }
+        });
+
+        if (latestAnalysis && latestAnalysis.weeklyPlan) {
+          const userProducts = await prisma.product.findMany({
+            where: { userId },
+            select: {
+              id: true,
+              productData: true
+            }
+          });
+
+          const formattedProducts = userProducts.map(p => {
+            const data = p.productData as any;
+            return {
+              id: p.id,
+              name: data?.product_name || 'Unknown Product',
+              category: data?.category || 'unknown',
+              ingredients: data?.ingredients || []
+            };
+          });
+
+          const weeklyPlan = typeof latestAnalysis.weeklyPlan === 'string'
+            ? JSON.parse(latestAnalysis.weeklyPlan)
+            : latestAnalysis.weeklyPlan;
+
+          await generateTasksForUser({
+            userId,
+            weeklyPlan,
+            userProducts: formattedProducts
+          });
+
+          todaysTasks = await getTodaysTasks(userId);
+        }
+      }
+    }
+
     res.json(todaysTasks);
   } catch (error) {
     console.error('Get today tasks error:', error);

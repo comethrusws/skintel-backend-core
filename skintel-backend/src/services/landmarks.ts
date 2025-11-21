@@ -251,7 +251,7 @@ export async function processLandmarksForAnswerWithUrl(answerId: string, imageUr
     const presignedUrl = await maybePresignUrl(imageUrl, 300);
     const url = `${LANDMARK_SERVICE_URL}${LANDMARK_ENDPOINT}`;
 
-    console.log(`Processing landmarks for image URL: ${imageUrl} (presigned) at ${url}`);
+    console.log(`[Landmarks] Processing landmarks for image URL: ${imageUrl} (presigned) at ${url}`);
 
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT);
@@ -277,8 +277,11 @@ export async function processLandmarksForAnswerWithUrl(answerId: string, imageUr
     const result: LandmarkResponse = await response.json();
 
     if (result.status !== 'success') {
+      console.error(`[Landmarks] Service returned error status: ${result.error}`);
       throw new Error(`Landmark processing failed: ${result.error || 'Unknown error'}`);
     }
+
+    console.log(`[Landmarks] Service success. Updating DB...`);
 
     await prisma.facialLandmarks.update({
       where: { answerId },
@@ -290,7 +293,9 @@ export async function processLandmarksForAnswerWithUrl(answerId: string, imageUr
     });
 
     try {
+      console.log(`[Landmarks] Starting skin analysis...`);
       const analysisResult = await analyzeWithLandmarks(imageUrl, result);
+      console.log(`[Landmarks] Skin analysis completed. Annotated image: ${!!(analysisResult as any).annotatedImageUrl}`);
       const { annotatedImageUrl, ...analysis } = analysisResult as any;
 
       await prisma.facialLandmarks.update({
