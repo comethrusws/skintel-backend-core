@@ -674,7 +674,7 @@ router.get('/annotated-image', authenticateUser, async (req: AuthenticatedReques
       return;
     }
 
-    const presignedUrl = await maybePresignUrl(latestLandmark.annotatedImageUrl, 300);
+    const presignedUrl = await maybePresignUrl(latestLandmark.annotatedImageUrl, 86400);
 
     res.json({
       user_id: userId,
