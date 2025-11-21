@@ -19,6 +19,18 @@ const productParamsSchema = z.object({
 });
 
 /**
+ * Helper to presign URLs inside product data
+ */
+async function presignProductData(productData: any) {
+  if (!productData || typeof productData !== 'object') return productData;
+  const newData = { ...productData };
+  if (Array.isArray(newData.images)) {
+    newData.images = await Promise.all(newData.images.map((url: string) => maybePresignUrl(url, 86400)));
+  }
+  return newData;
+}
+
+/**
  * @swagger
  * /v1/products:
  *   post:
@@ -118,11 +130,12 @@ router.post('/', authenticateUser, async (req: AuthenticatedRequest, res: Respon
     const result = await createProduct(userId, image_urls);
 
     const presignedImageUrl = await maybePresignUrl(result.imageUrl, 86400);
+    const presignedProductData = await presignProductData(result.productData);
 
     res.status(201).json({
       id: result.id,
       image_url: presignedImageUrl,
-      product_data: result.productData,
+      product_data: presignedProductData,
       created_at: result.createdAt.toISOString(),
       updated_at: result.updatedAt.toISOString(),
     });
@@ -143,7 +156,7 @@ router.get('/', authenticateUser, async (req: AuthenticatedRequest, res: Respons
       products.map(async (product: any) => ({
         id: product.id,
         image_url: await maybePresignUrl(product.imageUrl, 86400),
-        product_data: product.productData,
+        product_data: await presignProductData(product.productData),
         created_at: product.createdAt.toISOString(),
         updated_at: product.updatedAt.toISOString()
       }))
@@ -275,11 +288,12 @@ router.get('/:productId', authenticateUser, async (req: AuthenticatedRequest, re
     }
 
     const presignedImageUrl = await maybePresignUrl(product.imageUrl, 86400);
+    const presignedProductData = await presignProductData(product.productData);
 
     res.json({
       id: product.id,
       image_url: presignedImageUrl,
-      product_data: product.productData,
+      product_data: presignedProductData,
       created_at: product.createdAt.toISOString(),
       updated_at: product.updatedAt.toISOString(),
     });
@@ -322,11 +336,12 @@ router.put('/:productId', authenticateUser, async (req: AuthenticatedRequest, re
     }
 
     const presignedImageUrl = await maybePresignUrl(result.imageUrl, 86400);
+    const presignedProductData = await presignProductData(result.productData);
 
     res.json({
       id: result.id,
       image_url: presignedImageUrl,
-      product_data: result.productData,
+      product_data: presignedProductData,
       created_at: result.createdAt.toISOString(),
       updated_at: result.updatedAt.toISOString(),
     });
