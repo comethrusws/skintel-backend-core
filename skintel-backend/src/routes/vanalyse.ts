@@ -147,24 +147,6 @@ vanalyseRouter.post('/progress', authenticateUser, async (req: AuthenticatedRequ
       (new Date().getTime() - initialAnalysis.createdAt.getTime()) / (1000 * 60 * 60 * 24)
     );
 
-    const [currentAnalysis, progressUpdate] = await Promise.all([
-      analyzeWithLandmarksOptimized(
-        presignedUrls.front,
-        landmarkResult.data,
-        presignedUrls.left,
-        presignedUrls.right
-      ),
-
-      analyzeProgressOptimized(
-        presignedUrls,
-        landmarkResult.data,
-        initialAnalysisData,
-        initialAnalysis.score || 0,
-        initialWeeklyPlan,
-        daysElapsed
-      )
-    ]);
-
     const answerId = `progress_${Date.now()}_${userId.slice(-6)}`;
 
     await prisma.$transaction([
@@ -185,19 +167,47 @@ vanalyseRouter.post('/progress', authenticateUser, async (req: AuthenticatedRequ
           answerId,
           userId,
           landmarks: landmarkResult.data as unknown as any,
-          analysis: currentAnalysis,
-          progressUpdate: progressUpdate ?? null,
-          status: 'COMPLETED',
+          analysis: {}, 
+          status: 'PROCESSING',
           processedAt: new Date(),
           analysisType: 'PROGRESS',
           planStartDate: activePlan.planStartDate,
           planEndDate: activePlan.planEndDate,
-          score: currentAnalysis.score || null,
-          weeklyPlan: currentAnalysis.care_plan_4_weeks as any,
-          annotatedImageUrl: progressUpdate.annotatedImageUrl || null
+          weeklyPlan: {}, 
         }
       })
     ]);
+
+    const [currentAnalysis, progressUpdate] = await Promise.all([
+      analyzeWithLandmarksOptimized(
+        presignedUrls.front,
+        landmarkResult.data,
+        presignedUrls.left,
+        presignedUrls.right
+      ),
+
+      analyzeProgressOptimized(
+        presignedUrls,
+        landmarkResult.data,
+        initialAnalysisData,
+        initialAnalysis.score || 0,
+        initialWeeklyPlan,
+        daysElapsed,
+        userId,
+        answerId
+      )
+    ]);
+
+    await prisma.facialLandmarks.update({
+      where: { answerId },
+      data: {
+        analysis: currentAnalysis,
+        progressUpdate: progressUpdate ?? null,
+        status: 'COMPLETED',
+        score: currentAnalysis.score || null,
+        weeklyPlan: currentAnalysis.care_plan_4_weeks as any,
+      }
+    });
 
     try {
       const userProducts = await prisma.product.findMany({
@@ -255,7 +265,6 @@ vanalyseRouter.post('/progress', authenticateUser, async (req: AuthenticatedRequ
   }
 });
 
-// herlper to avoid duplicate presigning and landmark processing
 async function analyzeWithLandmarksOptimized(
   frontPresignedUrl: string,
   landmarks: object,
@@ -314,7 +323,9 @@ async function analyzeProgressOptimized(
   initialAnalysis: any,
   initialScore: number,
   weeklyPlan: any[],
-  daysElapsed: number
+  daysElapsed: number,
+  userId: string,
+  answerId: string
 ) {
   const { buildProgressPrompt, openai, OPENAI_MODEL } = await import('../services/analysis');
 
@@ -373,31 +384,47 @@ async function analyzeProgressOptimized(
     parsed = { raw: content };
   }
 
-  // generation of annotated image
-  let annotatedImageUrl: string | null = null;
-  try {
-    if (parsed.remaining_issues && parsed.remaining_issues.length > 0 && presignedUrls.front) {
-
-      const microserviceUrl = process.env.LANDMARK_URL || 'http://localhost:8000';
-
-      const annotationResponse = await axios.post(`${microserviceUrl}/api/v1/annotate-issues-from-url`, {
-        image_url: presignedUrls.front,
-        issues: parsed.remaining_issues
-      });
-
-      if (annotationResponse.data.status === 'success' && annotationResponse.data.annotated_image) {
-        const uploadResult = await uploadImageToS3({
-          imageBase64: annotationResponse.data.annotated_image,
-          prefix: 'annotated-issues-progress'
-        });
-        annotatedImageUrl = uploadResult.url;
-      }
-    }
-  } catch (annotationError) {
-    console.error('Failed to generate annotated image in analyzeProgressOptimized:', annotationError);
+  if (parsed.remaining_issues && parsed.remaining_issues.length > 0 && presignedUrls.front) {
+    generateAnnotatedImageBackground(presignedUrls.front, parsed.remaining_issues, userId, answerId).catch(err => {
+      console.error('Background annotation failed:', err);
+    });
   }
 
-  return { ...parsed, annotatedImageUrl };
+  return { ...parsed, annotatedImageUrl: null };
+}
+
+async function generateAnnotatedImageBackground(
+  imageUrl: string,
+  issues: any[],
+  userId: string,
+  answerId: string
+) {
+  try {
+    const microserviceUrl = process.env.LANDMARK_URL || 'http://localhost:8000';
+
+    const annotationResponse = await axios.post(`${microserviceUrl}/api/v1/annotate-issues-from-url`, {
+      image_url: imageUrl,
+      issues: issues
+    });
+
+    if (annotationResponse.data.status === 'success' && annotationResponse.data.annotated_image) {
+      const uploadResult = await uploadImageToS3({
+        imageBase64: annotationResponse.data.annotated_image,
+        prefix: 'annotated-issues-progress'
+      });
+
+      await prisma.facialLandmarks.update({
+        where: { answerId },
+        data: {
+          annotatedImageUrl: uploadResult.url
+        }
+      });
+
+      console.log(`[Background] Annotated image updated for answer ${answerId}`);
+    }
+  } catch (annotationError) {
+    console.error('Failed to generate annotated image in background:', annotationError);
+  }
 }
 
 

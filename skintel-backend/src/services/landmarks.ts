@@ -294,7 +294,7 @@ export async function processLandmarksForAnswerWithUrl(answerId: string, imageUr
 
     try {
       console.log(`[Landmarks] Starting skin analysis...`);
-      const analysisResult = await analyzeWithLandmarks(imageUrl, result);
+      const analysisResult = await analyzeWithLandmarks(imageUrl, result, answerId);
       console.log(`[Landmarks] Skin analysis completed. Annotated image: ${!!(analysisResult as any).annotatedImageUrl}`);
       const { annotatedImageUrl, ...analysis } = analysisResult as any;
 
@@ -312,7 +312,6 @@ export async function processLandmarksForAnswerWithUrl(answerId: string, imageUr
         }
       });
 
-      // Auto-generate tasks for the user after successful analysis
       try {
         const userProducts = await prisma.product.findMany({
           where: { userId: answer.userId || undefined },
@@ -342,7 +341,6 @@ export async function processLandmarksForAnswerWithUrl(answerId: string, imageUr
         }
       } catch (taskError) {
         console.error('Failed to auto-generate tasks:', taskError);
-        // Don't fail the entire process if task generation fails
       }
     } catch (analysisError) {
       console.error('Skin analysis failed:', analysisError);
@@ -355,7 +353,6 @@ export async function processLandmarksForAnswerWithUrl(answerId: string, imageUr
       });
     }
 
-    // reconcile user link in case merge happened after we created the record
     try {
       const latest = await prisma.onboardingAnswer.findUnique({ where: { answerId }, select: { userId: true } });
       if (latest?.userId) {
