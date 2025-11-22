@@ -167,13 +167,13 @@ vanalyseRouter.post('/progress', authenticateUser, async (req: AuthenticatedRequ
           answerId,
           userId,
           landmarks: landmarkResult.data as unknown as any,
-          analysis: {}, 
+          analysis: {},
           status: 'PROCESSING',
           processedAt: new Date(),
           analysisType: 'PROGRESS',
           planStartDate: activePlan.planStartDate,
           planEndDate: activePlan.planEndDate,
-          weeklyPlan: {}, 
+          weeklyPlan: {},
         }
       })
     ]);
@@ -197,6 +197,13 @@ vanalyseRouter.post('/progress', authenticateUser, async (req: AuthenticatedRequ
         answerId
       )
     ]);
+
+    if (progressUpdate && typeof progressUpdate === 'object' && 'score_change' in progressUpdate) {
+      const currentScore = currentAnalysis.score || 0;
+      const initialScore = initialAnalysis.score || 0;
+      progressUpdate.score_change = currentScore - initialScore;
+      progressUpdate.overall_progress_score = currentScore;
+    }
 
     await prisma.facialLandmarks.update({
       where: { answerId },
