@@ -100,22 +100,50 @@ async def startup_event():
 
 def extract_landmarks(image_array: np.ndarray) -> List[Dict[str, int]]:
     """extract all 68 facial landmarks from img"""
-    gray = cv2.cvtColor(image_array, cv2.COLOR_RGB2GRAY)
+    # Optimization: Resize image for faster detection
+    height, width = image_array.shape[:2]
+    max_width = 800
+    scale = 1.0
+    
+    processing_image = image_array
+    if width > max_width:
+        scale = max_width / width
+        new_height = int(height * scale)
+        processing_image = cv2.resize(image_array, (max_width, new_height))
+    
+    gray = cv2.cvtColor(processing_image, cv2.COLOR_RGB2GRAY)
     faces = detector(gray)
     
     if len(faces) == 0:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="No face detected in the image"
-        )
+        # If detection fails on resized image, try original if it was resized
+        if scale != 1.0:
+            gray = cv2.cvtColor(image_array, cv2.COLOR_RGB2GRAY)
+            faces = detector(gray)
+            scale = 1.0 # Reset scale as we are using original
+            
+        if len(faces) == 0:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="No face detected in the image"
+            )
     
     face = faces[0]
+    # If we fell back to original, we need to use the original image for predictor too
+    if scale == 1.0 and processing_image.shape != image_array.shape:
+         processing_image = image_array
+         
     landmarks = predictor(gray, face)
     
     landmark_points = []
     for i in range(68):
         x = landmarks.part(i).x
         y = landmarks.part(i).y
+        
+        # Scale back to original coordinates
+        if scale != 1.0:
+            x = int(x / scale)
+            y = int(y / scale)
+            
         landmark_points.append({"x": int(x), "y": int(y), "index": i})
     
     return landmark_points
@@ -480,6 +508,21 @@ async def annotate_skin_issues_from_url(request: AnnotationRequest):
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="No issues provided for annotation"
             )
+            
+        # Optimization: Resize image for annotation to reduce size and processing time
+        max_annotation_width = 1024
+        height, width = image_array.shape[:2]
+        
+        if width > max_annotation_width:
+            scale = max_annotation_width / width
+            new_height = int(height * scale)
+            image_array = cv2.resize(image_array, (max_annotation_width, new_height))
+            
+            # Scale the issue points to match resized image
+            for issue in issues:
+                for point in issue.dlib_68_facial_landmarks:
+                    point.x = int(point.x * scale)
+                    point.y = int(point.y * scale)
         
         # Create annotated image
         annotated_image_data = annotate_image_with_issues(image_array, issues)
