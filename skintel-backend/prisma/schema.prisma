@@ -273,6 +273,17 @@ model SkinTip {
   @@map("skin_tips")
 }
 
+model QuestionOfTheDay {
+  id        String   @id @default(cuid())
+  date      DateTime @unique @db.Date // Store date only
+  question  String
+  options   Json? // Optional array of strings for multiple choice
+  category  String? // Optional category
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("questions_of_the_day")
+}
+
 model SkinFeel {
   id        String        @id @default(cuid())
   userId    String        @map("user_id")

@@ -1,6 +1,7 @@
 import cron from 'node-cron';
 import { SkinTipService } from './services/skinTip';
 import { NotificationService } from './services/notifications';
+import { QuestionOfTheDayService } from './services/questionOfTheDay';
 
 export function initCronJobs() {
     console.log('Initializing cron jobs...');
@@ -32,6 +33,21 @@ export function initCronJobs() {
     // Tip of the Day (10:00 AM)
     cron.schedule('0 10 * * *', async () => {
         await NotificationService.sendTipOfTheDay();
+    });
+
+    // Weekly Question of the Day Generation (Sunday at midnight)
+    cron.schedule('0 0 * * 0', async () => {
+        console.log('Running weekly question generation cron job...');
+        try {
+            await QuestionOfTheDayService.generateWeeklyQuestions();
+        } catch (error) {
+            console.error('Error in weekly question generation cron job:', error);
+        }
+    });
+
+    // Question of the Day Notification (11:00 AM)
+    cron.schedule('0 11 * * *', async () => {
+        await NotificationService.sendQuestionOfTheDay();
     });
 
     console.log('Cron jobs initialized.');

@@ -22,6 +22,7 @@ import { skinTipRouter } from './routes/skinTip.routes';
 import { waterIntakeRouter } from './routes/waterIntake.routes';
 import { skinFeelRouter } from './routes/skinFeel';
 import { SkinTipService } from './services/skinTip';
+import { QuestionOfTheDayService } from './services/questionOfTheDay';
 import { reportRouter } from './routes/report';
 import { notificationsRouter } from './routes/notifications';
 
@@ -119,4 +120,5 @@ app.listen(port, async () => {
   console.log(`Server is listening on port ${port}`);
   initCronJobs();
   await SkinTipService.ensureTipsForWeek();
+  await QuestionOfTheDayService.ensureQuestionsForWeek();
 });

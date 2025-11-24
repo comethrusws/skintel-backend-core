@@ -206,4 +206,43 @@ export class NotificationService {
             console.error('Error sending tip of the day:', error);
         }
     }
+
+    /**
+     * Send question of the day
+     */
+    static async sendQuestionOfTheDay() {
+        try {
+            console.log('Sending question of the day...');
+            const tokens = await prisma.deviceToken.findMany({
+                where: {
+                    user: {
+                        notificationPreferences: {
+                            questionsOfTheDay: true,
+                        },
+                    },
+                },
+                select: { token: true },
+            });
+
+            // Fetch today's question
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+
+            const q = await prisma.questionOfTheDay.findUnique({
+                where: { date: today },
+            });
+
+            const body = q ? q.question : 'Check out today\'s question!';
+
+            const tokenStrings = tokens.map((t) => t.token);
+            await this.sendMulticastNotification(
+                tokenStrings,
+                'Question of the Day ❓',
+                body,
+                { type: 'question' }
+            );
+        } catch (error) {
+            console.error('Error sending question of the day:', error);
+        }
+    }
 }
