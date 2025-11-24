@@ -12,7 +12,6 @@ export class NotificationService {
         data?: Record<string, string>
     ) {
         try {
-            // Get user's device tokens
             const deviceTokens = await prisma.deviceToken.findMany({
                 where: { userId },
                 select: { token: true },
@@ -25,7 +24,6 @@ export class NotificationService {
 
             const tokens = deviceTokens.map((dt) => dt.token);
 
-            // Send multicast message
             await this.sendMulticastNotification(tokens, title, body, data);
         } catch (error) {
             console.error('Error sending notification:', error);
@@ -56,7 +54,6 @@ export class NotificationService {
 
             const response = await firebaseAdmin.messaging().sendEachForMulticast(message);
 
-            // Handle invalid tokens
             if (response.failureCount > 0) {
                 const failedTokens: string[] = [];
                 response.responses.forEach((resp, idx) => {
