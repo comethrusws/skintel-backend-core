@@ -21,6 +21,7 @@ import {
 } from '../lib/validation';
 import { prisma } from '../lib/prisma';
 import { Prisma } from '@prisma/client';
+import { verifyClerkSessionToken } from '../lib/clerk';
 
 const router = Router();
 
@@ -326,7 +327,7 @@ router.post('/sso', async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
-    const { session_id, provider, sso_token } = validationResult.data;
+    const { session_id, provider, clerk_token } = validationResult.data;
 
     const session = await prisma.anonymousSession.findUnique({
       where: { sessionId: session_id },
@@ -337,11 +338,20 @@ router.post('/sso', async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
-    const ssoId = sso_token;
+    const clerkUserInfo = await verifyClerkSessionToken(clerk_token);
+
+    if (!clerkUserInfo) {
+      res.status(401).json({ error: 'Invalid or expired Clerk token' });
+      return;
+    }
+
+    const ssoId = clerkUserInfo.clerkUserId;
+    const detectedProvider = clerkUserInfo.provider;
+
     let user = await prisma.user.findUnique({
       where: {
         ssoProvider_ssoId: {
-          ssoProvider: provider,
+          ssoProvider: detectedProvider,
           ssoId,
         },
       },
@@ -352,8 +362,12 @@ router.post('/sso', async (req: Request, res: Response): Promise<void> => {
       user = await prisma.user.create({
         data: {
           userId,
-          ssoProvider: provider,
+          ssoProvider: detectedProvider,
           ssoId,
+          email: clerkUserInfo.email || undefined,
+          name: clerkUserInfo.firstName && clerkUserInfo.lastName
+            ? `${clerkUserInfo.firstName} ${clerkUserInfo.lastName}`.trim()
+            : clerkUserInfo.firstName || clerkUserInfo.lastName || undefined,
         },
       });
     }
