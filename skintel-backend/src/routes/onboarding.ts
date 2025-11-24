@@ -1,6 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { OnboardingResponse, OnboardingStateResponse } from '../types';
-import { authenticateSession, AuthenticatedRequest } from '../middleware/auth';
+import { authenticateSession, authenticateSessionOptional, AuthenticatedRequest } from '../middleware/auth';
 import { idempotencyMiddleware } from '../middleware/idempotency';
 import { onboardingRequestSchema } from '../lib/validation';
 import { prisma } from '../lib/prisma';
@@ -198,12 +198,18 @@ router.put('/', idempotencyMiddleware, authenticateSession, async (req: Authenti
   }
 });
 
-router.get('/', authenticateSession, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+router.get('/', authenticateSessionOptional, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
-    const sessionId = req.query.session_id as string || req.sessionId!;
+    const querySessionId = req.query.session_id as string;
 
-    // we will only validate session ID mismatch if the user has an authenticated session so user apna data access kar payega
-    if (req.sessionId && sessionId !== req.sessionId) {
+    const sessionId = req.sessionId || querySessionId;
+
+    if (!sessionId) {
+      res.status(400).json({ error: 'Session ID required (either via query param or authentication token)' });
+      return;
+    }
+
+    if (req.sessionId && querySessionId && querySessionId !== req.sessionId) {
       res.status(400).json({ error: 'Session ID mismatch' });
       return;
     }
