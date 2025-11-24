@@ -15,7 +15,7 @@ if (!admin.apps.length) {
             admin.initializeApp({
                 credential: admin.credential.applicationDefault(),
             });
-            console.log('Firebase Admin initialized with default credentials');
+            console.log('Firebase Admin initialized with no env');
         }
     } catch (error) {
         console.error('Firebase Admin initialization failed:', error);

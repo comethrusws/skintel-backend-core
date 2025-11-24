@@ -21,7 +21,7 @@ notificationsRouter.use(authenticateUser);
  *     summary: Upload a device token for push notifications
  *     tags: [Notifications]
  *     security:
- *       - bearerAuth: []
+ *       - BearerAuth: []
  *     requestBody:
  *       required: true
  *       content:
@@ -82,7 +82,7 @@ notificationsRouter.post('/device-token', async (req: AuthenticatedRequest, res:
  *     summary: Remove a device token
  *     tags: [Notifications]
  *     security:
- *       - bearerAuth: []
+ *       - BearerAuth: []
  *     requestBody:
  *       required: true
  *       content:
@@ -133,7 +133,7 @@ notificationsRouter.delete('/device-token', async (req: AuthenticatedRequest, re
  *     summary: Get user notification preferences
  *     tags: [Notifications]
  *     security:
- *       - bearerAuth: []
+ *       - BearerAuth: []
  *     responses:
  *       200:
  *         description: User preferences
@@ -169,7 +169,7 @@ notificationsRouter.get('/preferences', async (req: AuthenticatedRequest, res: R
  *     summary: Update user notification preferences
  *     tags: [Notifications]
  *     security:
- *       - bearerAuth: []
+ *       - BearerAuth: []
  *     requestBody:
  *       required: true
  *       content:
@@ -246,7 +246,7 @@ notificationsRouter.patch('/preferences', async (req: AuthenticatedRequest, res:
  *     summary: Trigger a test notification (Dev only)
  *     tags: [Notifications]
  *     security:
- *       - bearerAuth: []
+ *       - BearerAuth: []
  *     requestBody:
  *       content:
  *         application/json:
