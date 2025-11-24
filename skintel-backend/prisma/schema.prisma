@@ -30,30 +30,64 @@ model AnonymousSession {
 }
 
 model User {
-  id                  String               @id @default(cuid())
-  userId              String               @unique @map("user_id")
-  name                String?
-  phoneNumber         String?              @map("phone_number")
-  dateOfBirth         DateTime?            @map("date_of_birth")
-  email               String?              @unique
-  passwordHash        String?              @map("password_hash")
-  ssoProvider         String?              @map("sso_provider")
-  ssoId               String?              @map("sso_id")
-  planType            PlanType             @default(MONTHLY) @map("plan_type")
-  createdAt           DateTime             @default(now()) @map("created_at")
-  updatedAt           DateTime             @updatedAt @map("updated_at")
-  refreshTokens       RefreshToken[]
-  answers             OnboardingAnswer[]
-  onboardingSession   OnboardingSession?
-  facialLandmarks     FacialLandmarks[]
-  products            Product[]
-  passwordResetTokens PasswordResetToken[]
-  Task                Task[]
-  TaskCompletion      TaskCompletion[]
-  skinFeels           SkinFeel[]
+  id                      String                  @id @default(cuid())
+  userId                  String                  @unique @map("user_id")
+  name                    String?
+  phoneNumber             String?                 @map("phone_number")
+  dateOfBirth             DateTime?               @map("date_of_birth")
+  email                   String?                 @unique
+  passwordHash            String?                 @map("password_hash")
+  ssoProvider             String?                 @map("sso_provider")
+  ssoId                   String?                 @map("sso_id")
+  planType                PlanType                @default(MONTHLY) @map("plan_type")
+  createdAt               DateTime                @default(now()) @map("created_at")
+  updatedAt               DateTime                @updatedAt @map("updated_at")
+  refreshTokens           RefreshToken[]
+  answers                 OnboardingAnswer[]
+  onboardingSession       OnboardingSession?
+  facialLandmarks         FacialLandmarks[]
+  products                Product[]
+  passwordResetTokens     PasswordResetToken[]
+  Task                    Task[]
+  TaskCompletion          TaskCompletion[]
+  skinFeels               SkinFeel[]
+  notificationPreferences NotificationPreference?
+  deviceTokens            DeviceToken[]
 
   @@unique([ssoProvider, ssoId])
   @@map("users")
+}
+
+model NotificationPreference {
+  id                        String   @id @default(cuid())
+  userId                    String   @unique @map("user_id")
+  dailyRoutineReminders     Boolean  @default(false) @map("daily_routine_reminders")
+  hydrationAlerts           Boolean  @default(true) @map("hydration_alerts")
+  uvIndexAlerts             Boolean  @default(false) @map("uv_index_alerts")
+  tipOfTheDay               Boolean  @default(false) @map("tip_of_the_day")
+  questionsOfTheDay         Boolean  @default(true) @map("questions_of_the_day")
+  smartInsights             Boolean  @default(false) @map("smart_insights")
+  ingredientRecommendations Boolean  @default(true) @map("ingredient_recommendations")
+  notificationSound         Boolean  @default(true) @map("notification_sound")
+  createdAt                 DateTime @default(now()) @map("created_at")
+  updatedAt                 DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [userId], onDelete: Cascade)
+
+  @@map("notification_preferences")
+}
+
+model DeviceToken {
+  id        String   @id @default(cuid())
+  userId    String   @map("user_id")
+  token     String   @unique
+  platform  String   @default("unknown") // android, ios, web
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [userId], onDelete: Cascade)
+
+  @@map("device_tokens")
 }
 
 model RefreshToken {
@@ -237,6 +271,17 @@ model SkinTip {
   createdAt DateTime @default(now()) @map("created_at")
 
   @@map("skin_tips")
+}
+
+model QuestionOfTheDay {
+  id        String   @id @default(cuid())
+  date      DateTime @unique @db.Date // Store date only
+  question  String
+  options   Json? // Optional array of strings for multiple choice
+  category  String? // Optional category
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("questions_of_the_day")
 }
 
 model SkinFeel {

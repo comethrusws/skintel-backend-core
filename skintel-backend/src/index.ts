@@ -22,7 +22,9 @@ import { skinTipRouter } from './routes/skinTip.routes';
 import { waterIntakeRouter } from './routes/waterIntake.routes';
 import { skinFeelRouter } from './routes/skinFeel';
 import { SkinTipService } from './services/skinTip';
+import { QuestionOfTheDayService } from './services/questionOfTheDay';
 import { reportRouter } from './routes/report';
+import { notificationsRouter } from './routes/notifications';
 
 dotenv.config();
 
@@ -72,7 +74,9 @@ app.use('/v1/location', locationRouter);
 app.use('/v1/skin-tip', skinTipRouter);
 app.use('/v1/water-intake', waterIntakeRouter);
 app.use('/v1/skin-feel', skinFeelRouter);
+app.use('/v1/skin-feel', skinFeelRouter);
 app.use('/v1/report', reportRouter);
+app.use('/v1/notifications', notificationsRouter);
 
 // Swagger documentation
 app.use('/docs', swaggerUi.serve, swaggerUi.setup(specs, {
@@ -116,4 +120,5 @@ app.listen(port, async () => {
   console.log(`Server is listening on port ${port}`);
   initCronJobs();
   await SkinTipService.ensureTipsForWeek();
+  await QuestionOfTheDayService.ensureQuestionsForWeek();
 });
