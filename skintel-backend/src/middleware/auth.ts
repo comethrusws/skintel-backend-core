@@ -10,7 +10,7 @@ export interface AuthenticatedRequest extends Request {
 export const authenticateSession = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
   try {
     const sessionToken = req.headers['x-session-token'] as string;
-    
+
     if (!sessionToken) {
       res.status(401).json({ error: 'Session token required' });
       return;
@@ -38,10 +38,47 @@ export const authenticateSession = async (req: AuthenticatedRequest, res: Respon
   }
 };
 
+
+/**
+ * Optional session authentication - doesn't block if no token is provided
+ * Sets sessionId if valid token exists, otherwise continues without it
+ */
+export const authenticateSessionOptional = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const sessionToken = req.headers['x-session-token'] as string;
+
+    if (!sessionToken) {
+      next();
+      return;
+    }
+
+    const decoded = verifySessionToken(sessionToken);
+    if (!decoded) {
+      next();
+      return;
+    }
+
+    const session = await prisma.anonymousSession.findUnique({
+      where: { sessionId: decoded.sessionId },
+    });
+
+    if (!session || session.expiresAt < new Date()) {
+      next();
+      return;
+    }
+
+    req.sessionId = decoded.sessionId;
+    next();
+  } catch (error) {
+    console.error('Optional authentication error:', error);
+    next();
+  }
+};
+
 export const authenticateUser = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
   try {
     const authHeader = req.headers.authorization;
-    
+
     if (!authHeader) {
       res.status(401).json({ error: 'Authorization header required' });
       return;
@@ -51,7 +88,7 @@ export const authenticateUser = async (req: AuthenticatedRequest, res: Response,
     if (authHeader.startsWith('Bearer ')) {
       const token = authHeader.slice(7);
       const decoded = verifyAccessToken(token);
-      
+
       if (!decoded) {
         res.status(401).json({ error: 'Invalid access token' });
         return;
