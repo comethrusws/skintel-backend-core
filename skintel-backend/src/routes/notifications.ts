@@ -5,7 +5,6 @@ import { NotificationService } from '../services/notifications';
 
 export const notificationsRouter = express.Router();
 
-// Apply authentication middleware to all routes
 notificationsRouter.use(authenticateUser);
 
 /**
