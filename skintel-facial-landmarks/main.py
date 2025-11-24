@@ -209,45 +209,20 @@ def annotate_image_with_issues(image_array: np.ndarray, issues: List[SkinIssue])
             continue
             
         # Expand region if it's an eye region
+        # Expand region
+        centroid = np.mean(points, axis=0)
         if 'eye' in issue.region.lower():
-            centroid = np.mean(points, axis=0)
-            scale = 1.4  # 40% larger for eye regions
-            points = (points - centroid) * scale + centroid
-            points = points.astype(np.int32)
+            scale = 2.1  # User defined scale for eyes
+        else:
+            scale = 1.9  # 30% larger for other regions
+            
+        points = (points - centroid) * scale + centroid
+        points = points.astype(np.int32)
         
         # Draw dotted polygon outline (thinner border)
-        draw_dotted_poly(annotated_bgr, points, color, thickness=2, dash_len=8)
+        draw_dotted_poly(annotated_bgr, points, color, thickness=2, dash_len=4)
         
-        # Calculate centroid for number marker placement
-        centroid_x = int(np.mean(points[:, 0]))
-        centroid_y = int(np.mean(points[:, 1]))
-        
-        # Draw number marker at centroid
-        marker_size = 30
-        
-        # Draw circle for number
-        cv2.circle(annotated_bgr, (centroid_x, centroid_y), 
-                   marker_size // 2, color, -1)
-        cv2.circle(annotated_bgr, (centroid_x, centroid_y), 
-                   marker_size // 2, (255, 255, 255), 2)
-        
-        # Draw number
-        font = cv2.FONT_HERSHEY_SIMPLEX
-        number_text = str(idx)
-        (text_width, text_height), _ = cv2.getTextSize(number_text, font, 0.7, 2)
-        text_x = centroid_x - text_width // 2
-        text_y = centroid_y + text_height // 2
-        
-        cv2.putText(
-            annotated_bgr,
-            number_text,
-            (text_x, text_y),
-            font,
-            0.7,
-            (255, 255, 255),
-            2,
-            cv2.LINE_AA
-        )
+
         
         # Add to legend
         issue_label = issue.type.replace('_', ' ').title()
@@ -265,7 +240,7 @@ def annotate_image_with_issues(image_array: np.ndarray, issues: List[SkinIssue])
         legend_y = annotated_bgr.shape[0] - legend_padding
         line_height = 28
         font = cv2.FONT_HERSHEY_SIMPLEX
-        font_scale = 0.45
+        font_scale = 0.35
         thickness = 1
         
         # Calculate legend dimensions
@@ -319,13 +294,13 @@ def annotate_image_with_issues(image_array: np.ndarray, issues: List[SkinIssue])
             
             # Draw number
             num_text = str(item['number'])
-            (num_width, num_height), _ = cv2.getTextSize(num_text, font, 0.4, 1)
+            (num_width, num_height), _ = cv2.getTextSize(num_text, font, 0.3, 1)
             cv2.putText(
                 annotated_bgr,
                 num_text,
                 (circle_x - num_width // 2, circle_y + num_height // 2),
                 font,
-                0.4,
+                0.3,
                 (255, 255, 255),
                 1,
                 cv2.LINE_AA
