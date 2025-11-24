@@ -72,11 +72,11 @@ const router = Router();
 router.put('/', idempotencyMiddleware, authenticateSession, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
     const validationResult = onboardingRequestSchema.safeParse(req.body);
-    
+
     if (!validationResult.success) {
-      res.status(400).json({ 
+      res.status(400).json({
         error: 'Invalid request data',
-        details: validationResult.error.errors 
+        details: validationResult.error.errors
       });
       return;
     }
@@ -137,9 +137,9 @@ router.put('/', idempotencyMiddleware, authenticateSession, async (req: Authenti
       }
 
       // process facial landmarks for image questions
-      if (answer.type === 'image' && answer.status === 'answered' && 
-          typeof answer.value === 'object' && answer.value !== null && 
-          ('image_id' in answer.value || 'image_url' in answer.value)) {
+      if (answer.type === 'image' && answer.status === 'answered' &&
+        typeof answer.value === 'object' && answer.value !== null &&
+        ('image_id' in answer.value || 'image_url' in answer.value)) {
 
         //  front face image only goes for landmark
         if (answer.question_id === 'q_face_photo_front') {
@@ -202,7 +202,8 @@ router.get('/', authenticateSession, async (req: AuthenticatedRequest, res: Resp
   try {
     const sessionId = req.query.session_id as string || req.sessionId!;
 
-    if (sessionId !== req.sessionId) {
+    // we will only validate session ID mismatch if the user has an authenticated session so user apna data access kar payega
+    if (req.sessionId && sessionId !== req.sessionId) {
       res.status(400).json({ error: 'Session ID mismatch' });
       return;
     }
@@ -237,8 +238,8 @@ router.get('/', authenticateSession, async (req: AuthenticatedRequest, res: Resp
  * that stores all answers as a single json object in the db for us
  */
 async function updateOnboardingSession(
-  sessionId: string | null, 
-  userId: string | null, 
+  sessionId: string | null,
+  userId: string | null,
   isCompleted?: boolean
 ): Promise<void> {
   try {

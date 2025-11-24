@@ -4,7 +4,7 @@ import { maybePresignUrl, uploadImageToS3 } from '../lib/s3';
 import axios from 'axios';
 import { EnhancedAnalysisResult } from '../types';
 
-const OPENAI_MODEL = process.env.OPENAI_MODEL || 'gpt-5';
+const OPENAI_MODEL = process.env.OPENAI_MODEL || 'gpt-5-mini';
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 function getImageUrl(imageId: string): string {
@@ -292,36 +292,10 @@ export async function analyzeSkin(answerId: string) {
     parsed = { raw: content } as any;
   }
 
-  // generation of annotated image
-  let annotatedImageUrl: string | null = null;
-  try {
-    if (parsed.issues && parsed.issues.length > 0 && faceImages.front) {
-      const frontImagePresigned = await maybePresignUrl(faceImages.front, 300);
-
-      const microserviceUrl = process.env.LANDMARK_URL || 'http://skintel-facial-landmarks:8000';
-
-      const annotationResponse = await axios.post(`${microserviceUrl}/api/v1/annotate-issues-from-url`, {
-        image_url: frontImagePresigned,
-        issues: parsed.issues
-      });
-
-      console.log(`[Analysis] Annotation service response status: ${annotationResponse.data.status}`);
-
-      if (annotationResponse.data.status === 'success' && annotationResponse.data.annotated_image) {
-        console.log(`[Analysis] Uploading annotated image to S3...`);
-        const uploadResult = await uploadImageToS3({
-          imageBase64: annotationResponse.data.annotated_image,
-          prefix: 'annotated-issues'
-        });
-        annotatedImageUrl = uploadResult.url;
-        console.log(`[Analysis] Annotated image uploaded: ${annotatedImageUrl}`);
-      } else {
-        console.warn(`[Analysis] Annotation service failed or no image returned:`, annotationResponse.data);
-      }
-    }
-  } catch (annotationError) {
-    console.error('[Analysis] Failed to generate annotated image:', annotationError);
-    // don't fail the whole analysis if annotation fails
+  if (parsed.issues && parsed.issues.length > 0 && faceImages.front) {
+    generateAnnotatedImageBackground(faceImages.front, parsed.issues, answerId).catch(err => {
+      console.error('Background annotation failed for analyzeSkin:', err);
+    });
   }
 
   try {
@@ -334,7 +308,7 @@ export async function analyzeSkin(answerId: string) {
         analysisType: analysisTypeInfo.type,
         planStartDate: analysisTypeInfo.planStartDate,
         planEndDate: analysisTypeInfo.planEndDate,
-        annotatedImageUrl: annotatedImageUrl
+        annotatedImageUrl: null
       }
     });
   } catch (dbError) {
@@ -457,7 +431,7 @@ export async function analyzeProgress(
   return { ...parsed, annotatedImageUrl };
 }
 
-export async function analyzeWithLandmarks(frontImageUrl: string, landmarks: object, leftImageUrl?: string, rightImageUrl?: string) {
+export async function analyzeWithLandmarks(frontImageUrl: string, landmarks: object, answerId: string, leftImageUrl?: string, rightImageUrl?: string) {
   if (!process.env.OPENAI_API_KEY) {
     throw new Error('OPENAI_API_KEY is not set');
   }
@@ -524,33 +498,52 @@ export async function analyzeWithLandmarks(frontImageUrl: string, landmarks: obj
     return { raw: content } as any;
   }
 
-  // generation of annotated image
-  let annotatedImageUrl: string | null = null;
-  try {
-    if (parsed.issues && parsed.issues.length > 0) {
-      const frontImagePresigned = await maybePresignUrl(frontImageUrl, 300);
-
-      const microserviceUrl = process.env.LANDMARK_URL || process.env.FACIAL_LANDMARKS_API_URL || 'http://localhost:8000';
-
-      const annotationResponse = await axios.post(`${microserviceUrl}/api/v1/annotate-issues-from-url`, {
-        image_url: frontImagePresigned,
-        issues: parsed.issues
-      });
-
-      if (annotationResponse.data.status === 'success' && annotationResponse.data.annotated_image) {
-        const uploadResult = await uploadImageToS3({
-          imageBase64: annotationResponse.data.annotated_image,
-          prefix: 'annotated-issues'
-        });
-        annotatedImageUrl = uploadResult.url;
-      }
-    }
-  } catch (annotationError) {
-    console.error('Failed to generate annotated image:', annotationError);
+  // generation of annotated image in background
+  if (parsed.issues && parsed.issues.length > 0) {
+    generateAnnotatedImageBackground(frontImageUrl, parsed.issues, answerId).catch(err => {
+      console.error('Background annotation failed for analyzeWithLandmarks:', err);
+    });
   }
 
 
-  return { ...parsed, annotatedImageUrl };
+  return { ...parsed, annotatedImageUrl: null };
+}
+
+async function generateAnnotatedImageBackground(
+  imageUrl: string,
+  issues: any[],
+  answerId: string
+) {
+  try {
+    const presignedUrl = await maybePresignUrl(imageUrl, 300);
+    const microserviceUrl = process.env.LANDMARK_URL || process.env.FACIAL_LANDMARKS_API_URL || 'http://localhost:8000';
+
+    const annotationResponse = await axios.post(`${microserviceUrl}/api/v1/annotate-issues-from-url`, {
+      image_url: presignedUrl,
+      issues: issues
+    });
+
+    if (annotationResponse.data.status === 'success' && annotationResponse.data.annotated_image) {
+      const uploadResult = await uploadImageToS3({
+        imageBase64: annotationResponse.data.annotated_image,
+        prefix: 'annotated-issues'
+      });
+
+      await prisma.facialLandmarks.update({
+        where: { answerId },
+        data: {
+          annotatedImageUrl: uploadResult.url
+        }
+      });
+
+      console.log(`[Background] Annotated image updated for answer ${answerId}`);
+    }
+  } catch (annotationError) {
+    console.error('Failed to generate annotated image in background:', annotationError);
+  }
+
+
+
 }
 
 // Export these for the optimized functions

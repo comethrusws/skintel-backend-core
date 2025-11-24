@@ -16,7 +16,6 @@ import base64
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# response models
 class LandmarkPoint(BaseModel):
     x: int
     y: int
@@ -62,7 +61,7 @@ class SkinIssue(BaseModel):
 
 class IssueAnnotationResponse(BaseModel):
     status: str
-    annotated_image: str  # Base64 encoded annotated image
+    annotated_image: str
     total_issues: int
     image_info: ImageInfo
 
@@ -77,7 +76,7 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # todo: config for prod later
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["GET", "POST", "OPTIONS"],
     allow_headers=["*"],
@@ -100,22 +99,46 @@ async def startup_event():
 
 def extract_landmarks(image_array: np.ndarray) -> List[Dict[str, int]]:
     """extract all 68 facial landmarks from img"""
-    gray = cv2.cvtColor(image_array, cv2.COLOR_RGB2GRAY)
+    height, width = image_array.shape[:2]
+    max_width = 800
+    scale = 1.0
+    
+    processing_image = image_array
+    if width > max_width:
+        scale = max_width / width
+        new_height = int(height * scale)
+        processing_image = cv2.resize(image_array, (max_width, new_height))
+    
+    gray = cv2.cvtColor(processing_image, cv2.COLOR_RGB2GRAY)
     faces = detector(gray)
     
     if len(faces) == 0:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="No face detected in the image"
-        )
+        if scale != 1.0:
+            gray = cv2.cvtColor(image_array, cv2.COLOR_RGB2GRAY)
+            faces = detector(gray)
+            scale = 1.0
+            
+        if len(faces) == 0:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="No face detected in the image"
+            )
     
     face = faces[0]
+    if scale == 1.0 and processing_image.shape != image_array.shape:
+         processing_image = image_array
+         
     landmarks = predictor(gray, face)
     
     landmark_points = []
     for i in range(68):
         x = landmarks.part(i).x
         y = landmarks.part(i).y
+        
+        if scale != 1.0:
+            x = int(x / scale)
+            y = int(y / scale)
+            
         landmark_points.append({"x": int(x), "y": int(y), "index": i})
     
     return landmark_points
@@ -132,24 +155,19 @@ def annotate_image_with_issues(image_array: np.ndarray, issues: List[SkinIssue])
     Returns:
         Base64 encoded PNG image with data URI prefix
     """
-    # Create a copy to avoid modifying original
     annotated = image_array.copy()
     
-    # Convert RGB to BGR for cv2
     annotated_bgr = cv2.cvtColor(annotated, cv2.COLOR_RGB2BGR)
     
-    # Severity color mapping (BGR format)
     severity_colors = {
-        'mild': (0, 255, 255),      # Yellow
-        'moderate': (0, 165, 255),  # Orange
-        'severe': (0, 0, 255),      # Red
-        'critical': (128, 0, 128)   # Purple
+        'mild': (0, 255, 255),
+        'moderate': (0, 165, 255),
+        'severe': (0, 0, 255),
+        'critical': (128, 0, 128)
     }
     
-    # Store legend items
     legend_items = []
     
-    # Helper to draw dotted polylines
     def draw_dotted_poly(img, pts, color, thickness=2, dash_len=5):
         for i in range(len(pts)):
             p1 = pts[i]
@@ -169,59 +187,25 @@ def annotate_image_with_issues(image_array: np.ndarray, issues: List[SkinIssue])
                 end = (int(p1[0] + dx * (j + 1)), int(p1[1] + dy * (j + 1)))
                 cv2.line(img, start, end, color, thickness)
 
-    # Process each issue
     for idx, issue in enumerate(issues, start=1):
-        # Get color based on severity
         color = severity_colors.get(issue.severity.lower(), (255, 255, 255))
         
-        # Extract points from landmarks
         points = np.array([[pt.x, pt.y] for pt in issue.dlib_68_facial_landmarks], dtype=np.int32)
         
         if len(points) == 0:
             continue
             
-        # Expand region if it's an eye region
+        centroid = np.mean(points, axis=0)
         if 'eye' in issue.region.lower():
-            centroid = np.mean(points, axis=0)
-            scale = 1.4  # 40% larger for eye regions
-            points = (points - centroid) * scale + centroid
-            points = points.astype(np.int32)
+            scale = 2.1
+        else:
+            scale = 1.9
+            
+        points = (points - centroid) * scale + centroid
+        points = points.astype(np.int32)
         
-        # Draw dotted polygon outline (thinner border)
-        draw_dotted_poly(annotated_bgr, points, color, thickness=2, dash_len=8)
+        draw_dotted_poly(annotated_bgr, points, color, thickness=2, dash_len=4)
         
-        # Calculate centroid for number marker placement
-        centroid_x = int(np.mean(points[:, 0]))
-        centroid_y = int(np.mean(points[:, 1]))
-        
-        # Draw number marker at centroid
-        marker_size = 30
-        
-        # Draw circle for number
-        cv2.circle(annotated_bgr, (centroid_x, centroid_y), 
-                   marker_size // 2, color, -1)
-        cv2.circle(annotated_bgr, (centroid_x, centroid_y), 
-                   marker_size // 2, (255, 255, 255), 2)
-        
-        # Draw number
-        font = cv2.FONT_HERSHEY_SIMPLEX
-        number_text = str(idx)
-        (text_width, text_height), _ = cv2.getTextSize(number_text, font, 0.7, 2)
-        text_x = centroid_x - text_width // 2
-        text_y = centroid_y + text_height // 2
-        
-        cv2.putText(
-            annotated_bgr,
-            number_text,
-            (text_x, text_y),
-            font,
-            0.7,
-            (255, 255, 255),
-            2,
-            cv2.LINE_AA
-        )
-        
-        # Add to legend
         issue_label = issue.type.replace('_', ' ').title()
         legend_items.append({
             'number': idx,
@@ -230,17 +214,15 @@ def annotate_image_with_issues(image_array: np.ndarray, issues: List[SkinIssue])
             'color': color
         })
     
-    # Draw legend in bottom-left corner
     if legend_items:
         legend_padding = 15
         legend_x = legend_padding
         legend_y = annotated_bgr.shape[0] - legend_padding
         line_height = 28
         font = cv2.FONT_HERSHEY_SIMPLEX
-        font_scale = 0.45
+        font_scale = 0.35
         thickness = 1
         
-        # Calculate legend dimensions
         max_text_width = 0
         for item in legend_items:
             text = f"{item['number']}. {item['label']} ({item['severity']})"
@@ -250,7 +232,6 @@ def annotate_image_with_issues(image_array: np.ndarray, issues: List[SkinIssue])
         legend_width = max_text_width + 50
         legend_height = len(legend_items) * line_height + 25
         
-        # Draw semi-transparent background for legend
         legend_bg_x1 = legend_x - 8
         legend_bg_y1 = legend_y - legend_height
         legend_bg_x2 = legend_x + legend_width
@@ -261,11 +242,9 @@ def annotate_image_with_issues(image_array: np.ndarray, issues: List[SkinIssue])
                       (0, 0, 0), -1)
         cv2.addWeighted(overlay, 0.7, annotated_bgr, 0.3, 0, annotated_bgr)
         
-        # Draw border
         cv2.rectangle(annotated_bgr, (legend_bg_x1, legend_bg_y1), (legend_bg_x2, legend_bg_y2), 
                       (255, 255, 255), 2)
         
-        # Draw legend title
         title_y = legend_bg_y1 + 20
         cv2.putText(
             annotated_bgr,
@@ -278,32 +257,28 @@ def annotate_image_with_issues(image_array: np.ndarray, issues: List[SkinIssue])
             cv2.LINE_AA
         )
         
-        # Draw each legend item
         current_y = title_y + 12
         for item in legend_items:
             current_y += line_height
             
-            # Draw colored circle
             circle_x = legend_x + 10
             circle_y = current_y - 8
             cv2.circle(annotated_bgr, (circle_x, circle_y), 10, item['color'], -1)
             cv2.circle(annotated_bgr, (circle_x, circle_y), 10, (255, 255, 255), 1)
             
-            # Draw number
             num_text = str(item['number'])
-            (num_width, num_height), _ = cv2.getTextSize(num_text, font, 0.4, 1)
+            (num_width, num_height), _ = cv2.getTextSize(num_text, font, 0.3, 1)
             cv2.putText(
                 annotated_bgr,
                 num_text,
                 (circle_x - num_width // 2, circle_y + num_height // 2),
                 font,
-                0.4,
+                0.3,
                 (255, 255, 255),
                 1,
                 cv2.LINE_AA
             )
             
-            # Draw text
             text = f"{item['label']} ({item['severity']})"
             cv2.putText(
                 annotated_bgr,
@@ -316,18 +291,14 @@ def annotate_image_with_issues(image_array: np.ndarray, issues: List[SkinIssue])
                 cv2.LINE_AA
             )
     
-    # Convert back to RGB
     annotated_rgb = cv2.cvtColor(annotated_bgr, cv2.COLOR_BGR2RGB)
     
-    # Convert to PIL Image
     pil_image = Image.fromarray(annotated_rgb)
     
-    # Save to bytes buffer
     img_buffer = io.BytesIO()
     pil_image.save(img_buffer, format='PNG')
     img_buffer.seek(0)
     
-    # Encode to base64 with data URI prefix
     img_base64 = base64.b64encode(img_buffer.read()).decode('utf-8')
     return f"data:image/png;base64,{img_base64}"
 
@@ -365,7 +336,6 @@ async def create_landmarks_detection(request: ImageUrlRequest):
     this will return facial landmarks with x, y coordinates and index for each point.
     """
     try:
-        # Validate URL
         parsed_url = urlparse(request.image_url)
         if not parsed_url.scheme or not parsed_url.netloc:
             raise HTTPException(
@@ -373,7 +343,6 @@ async def create_landmarks_detection(request: ImageUrlRequest):
                 detail="Invalid image URL provided"
             )
         
-        # Download image from URL
         try:
             response = requests.get(request.image_url, timeout=10)
             response.raise_for_status()
@@ -383,7 +352,6 @@ async def create_landmarks_detection(request: ImageUrlRequest):
                 detail=f"Failed to download image from URL: {str(e)}"
             )
         
-        # Check if response contains image data
         content_type = response.headers.get('content-type', '')
         if not content_type.startswith('image/'):
             raise HTTPException(
@@ -391,7 +359,6 @@ async def create_landmarks_detection(request: ImageUrlRequest):
                 detail="URL does not point to an image file"
             )
         
-        # Process image
         image = Image.open(io.BytesIO(response.content))
         
         if image.mode != 'RGB':
@@ -401,7 +368,6 @@ async def create_landmarks_detection(request: ImageUrlRequest):
         
         landmarks = extract_landmarks(image_array)
         
-        # Extract filename from URL
         filename = parsed_url.path.split('/')[-1] or "image_from_url"
         
         return LandmarksResponse(
@@ -442,7 +408,6 @@ async def annotate_skin_issues_from_url(request: AnnotationRequest):
     image_url = request.image_url
     issues = request.issues
     try:
-        # Validate URL
         parsed_url = urlparse(image_url)
         if not parsed_url.scheme or not parsed_url.netloc:
             raise HTTPException(
@@ -450,7 +415,6 @@ async def annotate_skin_issues_from_url(request: AnnotationRequest):
                 detail="Invalid image URL provided"
             )
         
-        # Download image
         response = requests.get(image_url, stream=True)
         if response.status_code != 200:
             raise HTTPException(
@@ -458,7 +422,6 @@ async def annotate_skin_issues_from_url(request: AnnotationRequest):
                 detail=f"Failed to download image from URL. Status code: {response.status_code}"
             )
         
-        # Check if response contains image data
         content_type = response.headers.get('content-type', '')
         if not content_type.startswith('image/'):
             raise HTTPException(
@@ -466,7 +429,6 @@ async def annotate_skin_issues_from_url(request: AnnotationRequest):
                 detail="URL does not point to an image file"
             )
         
-        # Process image
         image = Image.open(io.BytesIO(response.content))
         
         if image.mode != 'RGB':
@@ -474,17 +436,27 @@ async def annotate_skin_issues_from_url(request: AnnotationRequest):
         
         image_array = np.array(image)
         
-        # Validate that we have issues to annotate
         if not issues:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="No issues provided for annotation"
             )
+            
+        max_annotation_width = 1024
+        height, width = image_array.shape[:2]
         
-        # Create annotated image
+        if width > max_annotation_width:
+            scale = max_annotation_width / width
+            new_height = int(height * scale)
+            image_array = cv2.resize(image_array, (max_annotation_width, new_height))
+            
+            for issue in issues:
+                for point in issue.dlib_68_facial_landmarks:
+                    point.x = int(point.x * scale)
+                    point.y = int(point.y * scale)
+        
         annotated_image_data = annotate_image_with_issues(image_array, issues)
         
-        # Extract filename from URL
         filename = parsed_url.path.split('/')[-1] or "image_from_url"
         
         return IssueAnnotationResponse(
@@ -527,7 +499,6 @@ async def get_landmarks_info():
         "coordinate_system": "Top-left origin (0,0), x increases right, y increases down"
     }
 
-# legacy endpoint for backward compatibility. dint use this.
 @app.post("/detect-landmarks/", response_model=LandmarksResponse)
 async def detect_landmarks_legacy(file: UploadFile = File(...)):
     """this is legacy endpoint. use /api/v1/landmarks instead, this is deprecated"""

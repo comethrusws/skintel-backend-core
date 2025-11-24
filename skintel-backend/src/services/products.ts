@@ -2,7 +2,7 @@ import { prisma } from '../lib/prisma';
 import OpenAI from 'openai';
 import { maybePresignUrl } from '../lib/s3';
 
-const OPENAI_MODEL = process.env.OPENAI_MODEL || 'gpt-5';
+const OPENAI_MODEL = process.env.OPENAI_MODEL_MINI || 'gpt-5-nano';
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 function buildProductAnalysisPrompt(): string {

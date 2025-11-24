@@ -44,13 +44,13 @@ export const QUESTION_TYPES = {
 export const VALID_VALUES = {
   q_skin_concerns: [
     'acne', 'dark_spots', 'wrinkles', 'fine_lines', 'dryness', 'oiliness',
-    'redness', 'sensitivity', 'dullness', 'aging',
-    'hyperpigmentation', 'blackheads', 'whiteheads', 'scarring','pores_and_texture'
+    'redness', 'sensitivity', 'dullness', 'aging', 'firmness', 'spots', 'melasma', 'uneven_tone',
+    'hyperpigmentation', 'blackheads', 'whiteheads', 'scarring','pores_and_texture', 'no_major_concerns', 'dehydration'
   ],
   q_skin_sensitivity: [
     'not_sensitive', 'mildly_sensitive', 'very_sensitive', 'not_sure'],
   q_skin_type: [
-    'oily', 'dry', 'combination', 'normal', 'dehydrated'
+    'oily', 'dry', 'combination', 'normal', 'dehydrated', 'not_sure'
   ],
   q_goal: [
     'healthy_glow', 'clear_skin', 'hydration', 'anti_aging', 'brightening', 'oil_control',
@@ -58,14 +58,14 @@ export const VALID_VALUES = {
   ],
   q_profile_gender: ['female', 'male', 'nonbinary', 'prefer_not_to_say','female_pregnant'],
   q_profile_ethnicity: [
-    'east_asian', 'black', 'hispanic', 'white', 'middle_eastern', 'native_american', 'south_asian', 'african_descent',
+    'east_asian', 'black', 'hispanic','latino', 'white','caucasian', 'middle_eastern', 'native_american', 'south_asian', 'african_descent',
     'pacific_islander', 'mixed', 'south_east_asian','indigenious_australian' ,'prefer_not_to_say'
   ],
   q_time_spent_outdoors: [ '0_to_1_hr', '1_to_3_hours', 'more_than_3_hours' ],
   q_profile_weather_conditions: ['hot', 'temperate', 'cold', 'minus_10_to_15_celsius', '6_to_29_celsius', '30_celsius_and_above'],
   q_medical_conditions: [
-    'eczema', 'psoriasis', 'rosacea', 'contact_dermatitis', 'allergies', 'medications',
-    'pcos', 'seborrheic_dermatitis', 'none', 'other'
+    'eczema', 'psoriasis', 'rosacea', 'contact_dermatitis', 'allergies', 'medications', 'breakouts','blackheads',
+    'pcos', 'seborrheic_dermatitis', 'none', 'other','spots', 'melasma', 'uneven_tone', 'fragrances','preservatives', 'metals', 'hormonal_treatments'
   ],
   q_hormone_factors: [
     'pregnancy', 'menopause', 'pms', 'puberty', 'hormonal_acne',

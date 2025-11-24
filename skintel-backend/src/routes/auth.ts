@@ -9,6 +9,7 @@ import {
   verifyPassword
 } from '../utils/auth';
 import { authenticateUser, AuthenticatedRequest } from '../middleware/auth';
+import { getAuth } from '@clerk/express';
 import { generateTasksForUser } from '../services/tasks';
 import {
   authSignupRequestSchema,
@@ -21,6 +22,7 @@ import {
 } from '../lib/validation';
 import { prisma } from '../lib/prisma';
 import { Prisma } from '@prisma/client';
+import { verifyClerkSessionToken } from '../lib/clerk';
 
 const router = Router();
 
@@ -88,6 +90,42 @@ const router = Router();
  *         description: Login successful
  *       401:
  *         description: Invalid credentials
+ *       404:
+ *         description: Session not found or expired
+ * 
+ * /v1/auth/sso:
+ *   post:
+ *     summary: SSO login via Clerk
+ *     description: Authenticate user with Clerk SSO (Google, Facebook, Apple)
+ *     tags: [Authentication]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               session_id:
+ *                 type: string
+ *                 description: Anonymous session ID from onboarding
+ *               provider:
+ *                 type: string
+ *                 enum: [clerk_google, clerk_facebook, clerk_apple]
+ *                 description: OAuth provider used with Clerk
+ *               clerk_token:
+ *                 type: string
+ *                 description: Clerk session token obtained after OAuth
+ *             required:
+ *               - session_id
+ *               - provider
+ *               - clerk_token
+ *     responses:
+ *       200:
+ *         description: SSO login successful
+ *       400:
+ *         description: Invalid request data
+ *       401:
+ *         description: Invalid or expired Clerk token
  *       404:
  *         description: Session not found or expired
  * 
@@ -326,7 +364,7 @@ router.post('/sso', async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
-    const { session_id, provider, sso_token } = validationResult.data;
+    const { session_id, provider, clerk_token } = validationResult.data;
 
     const session = await prisma.anonymousSession.findUnique({
       where: { sessionId: session_id },
@@ -337,11 +375,37 @@ router.post('/sso', async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
-    const ssoId = sso_token;
+    const { clerk } = await import('../lib/clerk');
+
+    let clerkUser;
+    try {
+      const clerkSession = await clerk.sessions.getSession(clerk_token);
+      if (!clerkSession || !clerkSession.userId) {
+        res.status(401).json({ error: 'Invalid or expired Clerk token' });
+        return;
+      }
+      clerkUser = await clerk.users.getUser(clerkSession.userId);
+    } catch (clerkError) {
+      console.error('Clerk verification error:', clerkError);
+      res.status(401).json({ error: 'Invalid or expired Clerk token' });
+      return;
+    }
+
+    const primaryEmail = clerkUser.emailAddresses.find(e => e.id === clerkUser.primaryEmailAddressId);
+    const externalAccounts = clerkUser.externalAccounts || [];
+    let detectedProvider = 'clerk';
+
+    if (externalAccounts.length > 0) {
+      const primaryAccount = externalAccounts[0];
+      detectedProvider = `clerk_${primaryAccount.provider}`;
+    }
+
+    const ssoId = clerkUser.id;
+
     let user = await prisma.user.findUnique({
       where: {
         ssoProvider_ssoId: {
-          ssoProvider: provider,
+          ssoProvider: detectedProvider,
           ssoId,
         },
       },
@@ -352,8 +416,12 @@ router.post('/sso', async (req: Request, res: Response): Promise<void> => {
       user = await prisma.user.create({
         data: {
           userId,
-          ssoProvider: provider,
+          ssoProvider: detectedProvider,
           ssoId,
+          email: primaryEmail?.emailAddress || undefined,
+          name: clerkUser.firstName && clerkUser.lastName
+            ? `${clerkUser.firstName} ${clerkUser.lastName}`.trim()
+            : clerkUser.firstName || clerkUser.lastName || undefined,
         },
       });
     }
