@@ -4,7 +4,7 @@ import { maybePresignUrl, uploadImageToS3 } from '../lib/s3';
 import axios from 'axios';
 import { EnhancedAnalysisResult } from '../types';
 
-const OPENAI_MODEL = process.env.OPENAI_MODEL || 'gpt-5';
+const OPENAI_MODEL = process.env.OPENAI_MODEL || 'gpt-5-mini';
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 function getImageUrl(imageId: string): string {
