@@ -36,6 +36,7 @@ export function initCronJobs() {
     });
 
     // Weekly Question of the Day Generation (Sunday at midnight)
+    /*
     cron.schedule('0 0 * * 0', async () => {
         console.log('Running weekly question generation cron job...');
         try {
@@ -44,11 +45,13 @@ export function initCronJobs() {
             console.error('Error in weekly question generation cron job:', error);
         }
     });
+    */
 
     // Question of the Day Notification (11:00 AM)
+    /*
     cron.schedule('0 11 * * *', async () => {
         await NotificationService.sendQuestionOfTheDay();
     });
-
+    */
     console.log('Cron jobs initialized.');
 }
