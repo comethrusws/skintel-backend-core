@@ -115,10 +115,14 @@ const router = Router();
  *               clerk_token:
  *                 type: string
  *                 description: Clerk session token obtained after OAuth
+ *               clerk_session_id:
+ *                 type: string
+ *                 description: Clerk session ID (`sess_...`) returned with the token
  *             required:
  *               - session_id
  *               - provider
  *               - clerk_token
+ *               - clerk_session_id
  *     responses:
  *       200:
  *         description: SSO login successful
@@ -364,7 +368,7 @@ router.post('/sso', async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
-    const { session_id, provider, clerk_token } = validationResult.data;
+    const { session_id, provider, clerk_token, clerk_session_id } = validationResult.data;
 
     const session = await prisma.anonymousSession.findUnique({
       where: { sessionId: session_id },
@@ -375,19 +379,34 @@ router.post('/sso', async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
-    const clerkUser = await verifyClerkSessionToken(clerk_token);
-    if (!clerkUser) {
+    const { clerk } = await import('../lib/clerk');
+
+    let clerkUser;
+    try {
+      const verifiedSession = await clerk.sessions.verifySession(clerk_session_id, clerk_token);
+
+      if (!verifiedSession || verifiedSession.status !== 'active' || !verifiedSession.userId) {
+        res.status(401).json({ error: 'Invalid or expired Clerk token' });
+        return;
+      }
+
+      clerkUser = await clerk.users.getUser(verifiedSession.userId);
+    } catch (clerkError) {
+      console.error('Clerk verification error:', clerkError);
       res.status(401).json({ error: 'Invalid or expired Clerk token' });
       return;
     }
 
-    const {
-      clerkUserId: ssoId,
-      email: clerkEmail,
-      firstName,
-      lastName,
-      provider: detectedProvider
-    } = clerkUser;
+    const primaryEmail = clerkUser.emailAddresses.find(e => e.id === clerkUser.primaryEmailAddressId);
+    const externalAccounts = clerkUser.externalAccounts || [];
+    let detectedProvider = 'clerk';
+
+    if (externalAccounts.length > 0) {
+      const primaryAccount = externalAccounts[0];
+      detectedProvider = `clerk_${primaryAccount.provider}`;
+    }
+
+    const ssoId = clerkUser.id;
 
     let user = await prisma.user.findUnique({
       where: {
@@ -405,10 +424,10 @@ router.post('/sso', async (req: Request, res: Response): Promise<void> => {
           userId,
           ssoProvider: detectedProvider,
           ssoId,
-          email: clerkEmail || undefined,
-          name: firstName && lastName
-            ? `${firstName} ${lastName}`.trim()
-            : firstName || lastName || undefined,
+          email: primaryEmail?.emailAddress || undefined,
+          name: clerkUser.firstName && clerkUser.lastName
+            ? `${clerkUser.firstName} ${clerkUser.lastName}`.trim()
+            : clerkUser.firstName || clerkUser.lastName || undefined,
         },
       });
     }
