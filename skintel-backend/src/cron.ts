@@ -40,6 +40,11 @@ export function initCronJobs() {
         await NotificationService.sendUVAlerts();
     });
 
+    // Ingredient recommendations (4:00 PM)
+    cron.schedule('0 16 * * *', async () => {
+        await NotificationService.sendIngredientRecommendations();
+    });
+
     // Weekly Question of the Day Generation (Sunday at midnight)
     /*
     cron.schedule('0 0 * * 0', async () => {

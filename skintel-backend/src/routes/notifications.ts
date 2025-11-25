@@ -144,14 +144,26 @@ notificationsRouter.get('/preferences', async (req: AuthenticatedRequest, res: R
     try {
         const userId = req.userId!;
 
+        const preferenceSelect = {
+            userId: true,
+            dailyRoutineReminders: true,
+            hydrationAlerts: true,
+            uvIndexAlerts: true,
+            tipOfTheDay: true,
+            ingredientRecommendations: true,
+            notificationSound: true,
+        };
+
         let preferences = await prisma.notificationPreference.findUnique({
             where: { userId },
+            select: preferenceSelect,
         });
 
         if (!preferences) {
             // Create default preferences if not exists
             preferences = await prisma.notificationPreference.create({
                 data: { userId },
+                select: preferenceSelect,
             });
         }
 
@@ -179,20 +191,22 @@ notificationsRouter.get('/preferences', async (req: AuthenticatedRequest, res: R
  *             properties:
  *               dailyRoutineReminders:
  *                 type: boolean
+ *                 description: Enable morning and evening routine reminders
  *               hydrationAlerts:
  *                 type: boolean
+ *                 description: Enable periodic hydration alerts throughout the day
  *               uvIndexAlerts:
  *                 type: boolean
+ *                 description: Enable UV alerts based on your saved location
  *               tipOfTheDay:
  *                 type: boolean
- *               questionsOfTheDay:
- *                 type: boolean
- *               smartInsights:
- *                 type: boolean
+ *                 description: Enable daily skincare tip notifications
  *               ingredientRecommendations:
  *                 type: boolean
+ *                 description: Notifications when we have ingredient-based product recommendations
  *               notificationSound:
  *                 type: boolean
+ *                 description: Control whether push notifications play a sound
  *     responses:
  *       200:
  *         description: Updated preferences
@@ -210,8 +224,6 @@ notificationsRouter.patch('/preferences', async (req: AuthenticatedRequest, res:
             'hydrationAlerts',
             'uvIndexAlerts',
             'tipOfTheDay',
-            'questionsOfTheDay',
-            'smartInsights',
             'ingredientRecommendations',
             'notificationSound',
         ];
@@ -223,6 +235,16 @@ notificationsRouter.patch('/preferences', async (req: AuthenticatedRequest, res:
             }
         });
 
+        const preferenceSelect = {
+            userId: true,
+            dailyRoutineReminders: true,
+            hydrationAlerts: true,
+            uvIndexAlerts: true,
+            tipOfTheDay: true,
+            ingredientRecommendations: true,
+            notificationSound: true,
+        };
+
         const preferences = await prisma.notificationPreference.upsert({
             where: { userId },
             update: filteredUpdates,
@@ -230,6 +252,7 @@ notificationsRouter.patch('/preferences', async (req: AuthenticatedRequest, res:
                 userId,
                 ...filteredUpdates,
             },
+            select: preferenceSelect,
         });
 
         res.json(preferences);
