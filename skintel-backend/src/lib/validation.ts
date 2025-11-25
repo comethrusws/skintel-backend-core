@@ -92,15 +92,10 @@ export const authLoginRequestSchema = z.object({
 });
 
 export const authSSORequestSchema = z.object({
-  session_id: z.string().optional().transform((val) => {
-    if (typeof val !== 'string') {
-      return undefined;
-    }
-    const trimmed = val.trim();
-    return trimmed.length > 0 ? trimmed : undefined;
-  }),
+  session_id: z.string().min(1),
   provider: z.enum(['clerk_google', 'clerk_apple', 'clerk_facebook']),
   clerk_token: z.string().min(1),
+  clerk_session_id: z.string().min(1),
 });
 
 export const refreshTokenRequestSchema = z.object({

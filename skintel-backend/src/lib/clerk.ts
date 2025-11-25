@@ -18,17 +18,15 @@ export interface ClerkUserInfo {
 
 export async function verifyClerkSessionToken(sessionToken: string): Promise<ClerkUserInfo | null> {
     try {
-        const sessionId = extractSessionIdFromToken(sessionToken);
-        if (!sessionId) {
-            return null;
-        }
+        const session = await clerk.sessions.getSession(sessionToken);
 
-        const session = await clerk.sessions.verifySession(sessionId, sessionToken);
         if (!session || !session.userId) {
             return null;
         }
 
-        const user = await clerk.users.getUser(session.userId);
+        const userId = session.userId;
+        const user = await clerk.users.getUser(userId);
+
         if (!user) {
             return null;
         }
@@ -54,29 +52,6 @@ export async function verifyClerkSessionToken(sessionToken: string): Promise<Cle
         console.error('Clerk session verification error:', error);
         return null;
     }
-}
-
-function extractSessionIdFromToken(token: string): string | null {
-    try {
-        const [, payload] = token.split('.');
-        if (!payload) {
-            return null;
-        }
-
-        const normalizedPayload = normalizeBase64Url(payload);
-        const decoded = Buffer.from(normalizedPayload, 'base64').toString('utf8');
-        const claims = JSON.parse(decoded);
-        return claims?.sid || null;
-    } catch (error) {
-        console.error('Failed to extract Clerk session ID from token:', error);
-        return null;
-    }
-}
-
-function normalizeBase64Url(input: string): string {
-    const base64 = input.replace(/-/g, '+').replace(/_/g, '/');
-    const paddingNeeded = base64.length % 4 === 0 ? 0 : 4 - (base64.length % 4);
-    return base64 + '='.repeat(paddingNeeded);
 }
 
 export async function getClerkUserById(clerkUserId: string) {
