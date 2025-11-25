@@ -410,6 +410,30 @@ router.post('/sso', async (req: Request, res: Response): Promise<void> => {
       },
     });
 
+    if (!user && verifiedSession.email) {
+      user = await prisma.user.findUnique({
+        where: {
+          email: verifiedSession.email,
+        },
+      });
+
+      if (user && !user.ssoProvider && !user.ssoId) {
+        user = await prisma.user.update({
+          where: { userId: user.userId },
+          data: {
+            ssoProvider: detectedProvider,
+            ssoId,
+            // Update name if not already set
+            name: user.name || ([verifiedSession.firstName, verifiedSession.lastName]
+              .filter(Boolean)
+              .join(' ')
+              .trim() || undefined),
+          },
+        });
+      }
+    }
+
+    // If still not found, create new user
     if (!user) {
       const userId = generateUserId();
       user = await prisma.user.create({
