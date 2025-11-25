@@ -11,6 +11,12 @@ export const clerk = createClerkClient({
     publishableKey: process.env.CLERK_PUBLISHABLE_KEY,
 });
 
+const normalizeClerkProvider = (provider: string): string => {
+    return provider.startsWith('clerk_oauth_')
+        ? provider.replace('clerk_oauth_', 'clerk_')
+        : provider;
+};
+
 export interface ClerkUserInfo {
     clerkUserId: string;
     sessionId: string;
@@ -44,6 +50,8 @@ export async function verifyClerkSessionToken(sessionToken: string): Promise<Cle
             const primaryAccount = externalAccounts[0];
             provider = `clerk_${primaryAccount.provider}`;
         }
+
+        provider = normalizeClerkProvider(provider);
 
         return {
             clerkUserId: user.id,
