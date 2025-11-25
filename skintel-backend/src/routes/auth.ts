@@ -365,14 +365,17 @@ router.post('/sso', async (req: Request, res: Response): Promise<void> => {
     }
 
     const { session_id, provider, clerk_token } = validationResult.data;
+    const onboardingSessionId = session_id;
 
-    const session = await prisma.anonymousSession.findUnique({
-      where: { sessionId: session_id },
-    });
+    if (onboardingSessionId) {
+      const session = await prisma.anonymousSession.findUnique({
+        where: { sessionId: onboardingSessionId },
+      });
 
-    if (!session || session.expiresAt < new Date()) {
-      res.status(404).json({ error: 'Session not found or expired' });
-      return;
+      if (!session || session.expiresAt < new Date()) {
+        res.status(404).json({ error: 'Session not found or expired' });
+        return;
+      }
     }
 
     const clerkUser = await verifyClerkSessionToken(clerk_token);
@@ -424,7 +427,9 @@ router.post('/sso', async (req: Request, res: Response): Promise<void> => {
       },
     });
 
-    const sessionMerged = await mergeSessionToUser(session_id, user.userId);
+    const sessionMerged = onboardingSessionId
+      ? await mergeSessionToUser(onboardingSessionId, user.userId)
+      : false;
 
     const response: AuthResponse = {
       user_id: user.userId,
