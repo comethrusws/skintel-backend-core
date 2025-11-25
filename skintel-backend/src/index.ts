@@ -5,6 +5,7 @@ import express, { Express, Request, Response } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
+import { clerkMiddleware } from '@clerk/express';
 import { sessionsRouter } from './routes/sessions';
 import { onboardingRouter } from './routes/onboarding';
 import { authRouter } from './routes/auth';
@@ -26,6 +27,7 @@ import { SkinTipService } from './services/skinTip';
 import { QuestionOfTheDayService } from './services/questionOfTheDay';
 import { reportRouter } from './routes/report';
 import { notificationsRouter } from './routes/notifications';
+import { clerk } from './lib/clerk';
 
 dotenv.config();
 
@@ -51,6 +53,8 @@ app.use(express.urlencoded({
   extended: true,
   limit: maxRequestSize
 }));
+
+app.use(clerkMiddleware({ clerkClient: clerk }));
 
 app.use((error: any, req: Request, res: Response, next: Function) => {
   if (error.type === 'entity.too.large') {

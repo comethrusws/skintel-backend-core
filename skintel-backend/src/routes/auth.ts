@@ -9,7 +9,6 @@ import {
   verifyPassword
 } from '../utils/auth';
 import { authenticateUser, AuthenticatedRequest } from '../middleware/auth';
-import { getAuth } from '@clerk/express';
 import { generateTasksForUser } from '../services/tasks';
 import {
   authSignupRequestSchema,
@@ -379,34 +378,28 @@ router.post('/sso', async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
-    const { clerk } = await import('../lib/clerk');
 
-    let clerkUser;
-    try {
-      const verifiedSession = await clerk.sessions.verifySession(clerk_session_id, clerk_token);
+    const verifiedSession = await verifyClerkSessionToken(clerk_token);
 
-      if (!verifiedSession || verifiedSession.status !== 'active' || !verifiedSession.userId) {
-        res.status(401).json({ error: 'Invalid or expired Clerk token' });
-        return;
-      }
-
-      clerkUser = await clerk.users.getUser(verifiedSession.userId);
-    } catch (clerkError) {
-      console.error('Clerk verification error:', clerkError);
+    if (!verifiedSession) {
       res.status(401).json({ error: 'Invalid or expired Clerk token' });
       return;
     }
 
-    const primaryEmail = clerkUser.emailAddresses.find(e => e.id === clerkUser.primaryEmailAddressId);
-    const externalAccounts = clerkUser.externalAccounts || [];
-    let detectedProvider = 'clerk';
-
-    if (externalAccounts.length > 0) {
-      const primaryAccount = externalAccounts[0];
-      detectedProvider = `clerk_${primaryAccount.provider}`;
+    if (verifiedSession.sessionId !== clerk_session_id) {
+      res.status(401).json({ error: 'Mismatched Clerk session' });
+      return;
     }
 
-    const ssoId = clerkUser.id;
+    const detectedProvider = verifiedSession.provider;
+
+    if (provider !== detectedProvider) {
+      console.warn(`Clerk provider mismatch: expected ${provider}, got ${detectedProvider}`);
+      res.status(400).json({ error: 'Provider mismatch' });
+      return;
+    }
+
+    const ssoId = verifiedSession.clerkUserId;
 
     let user = await prisma.user.findUnique({
       where: {
@@ -424,10 +417,11 @@ router.post('/sso', async (req: Request, res: Response): Promise<void> => {
           userId,
           ssoProvider: detectedProvider,
           ssoId,
-          email: primaryEmail?.emailAddress || undefined,
-          name: clerkUser.firstName && clerkUser.lastName
-            ? `${clerkUser.firstName} ${clerkUser.lastName}`.trim()
-            : clerkUser.firstName || clerkUser.lastName || undefined,
+          email: verifiedSession.email || undefined,
+          name: [verifiedSession.firstName, verifiedSession.lastName]
+            .filter(Boolean)
+            .join(' ')
+            .trim() || undefined,
         },
       });
     }
