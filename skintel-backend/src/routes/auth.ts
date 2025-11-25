@@ -375,32 +375,19 @@ router.post('/sso', async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
-    const { clerk } = await import('../lib/clerk');
-
-    let clerkUser;
-    try {
-      const clerkSession = await clerk.sessions.getSession(clerk_token);
-      if (!clerkSession || !clerkSession.userId) {
-        res.status(401).json({ error: 'Invalid or expired Clerk token' });
-        return;
-      }
-      clerkUser = await clerk.users.getUser(clerkSession.userId);
-    } catch (clerkError) {
-      console.error('Clerk verification error:', clerkError);
+    const clerkUser = await verifyClerkSessionToken(clerk_token);
+    if (!clerkUser) {
       res.status(401).json({ error: 'Invalid or expired Clerk token' });
       return;
     }
 
-    const primaryEmail = clerkUser.emailAddresses.find(e => e.id === clerkUser.primaryEmailAddressId);
-    const externalAccounts = clerkUser.externalAccounts || [];
-    let detectedProvider = 'clerk';
-
-    if (externalAccounts.length > 0) {
-      const primaryAccount = externalAccounts[0];
-      detectedProvider = `clerk_${primaryAccount.provider}`;
-    }
-
-    const ssoId = clerkUser.id;
+    const {
+      clerkUserId: ssoId,
+      email: clerkEmail,
+      firstName,
+      lastName,
+      provider: detectedProvider
+    } = clerkUser;
 
     let user = await prisma.user.findUnique({
       where: {
@@ -418,10 +405,10 @@ router.post('/sso', async (req: Request, res: Response): Promise<void> => {
           userId,
           ssoProvider: detectedProvider,
           ssoId,
-          email: primaryEmail?.emailAddress || undefined,
-          name: clerkUser.firstName && clerkUser.lastName
-            ? `${clerkUser.firstName} ${clerkUser.lastName}`.trim()
-            : clerkUser.firstName || clerkUser.lastName || undefined,
+          email: clerkEmail || undefined,
+          name: firstName && lastName
+            ? `${firstName} ${lastName}`.trim()
+            : firstName || lastName || undefined,
         },
       });
     }
