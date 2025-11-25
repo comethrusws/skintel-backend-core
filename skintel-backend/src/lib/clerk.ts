@@ -1,15 +1,19 @@
-import { createClerkClient } from '@clerk/express';
+import { createClerkClient, verifyToken } from '@clerk/express';
 
-if (!process.env.CLERK_SECRET_KEY) {
+const clerkSecretKey = process.env.CLERK_SECRET_KEY;
+
+if (!clerkSecretKey) {
     throw new Error('CLERK_SECRET_KEY is not defined in environment variables');
 }
 
 export const clerk = createClerkClient({
-    secretKey: process.env.CLERK_SECRET_KEY,
+    secretKey: clerkSecretKey,
+    publishableKey: process.env.CLERK_PUBLISHABLE_KEY,
 });
 
 export interface ClerkUserInfo {
     clerkUserId: string;
+    sessionId: string;
     email: string | null;
     firstName: string | null;
     lastName: string | null;
@@ -18,24 +22,24 @@ export interface ClerkUserInfo {
 
 export async function verifyClerkSessionToken(sessionToken: string): Promise<ClerkUserInfo | null> {
     try {
-        const session = await clerk.sessions.getSession(sessionToken);
+        const payload = await verifyToken(sessionToken, {
+            secretKey: clerkSecretKey,
+        });
 
-        if (!session || !session.userId) {
+        if (!payload || typeof payload.sub !== 'string' || typeof payload.sid !== 'string') {
             return null;
         }
 
-        const userId = session.userId;
-        const user = await clerk.users.getUser(userId);
+        const user = await clerk.users.getUser(payload.sub);
 
         if (!user) {
             return null;
         }
 
         const primaryEmail = user.emailAddresses.find(e => e.id === user.primaryEmailAddressId);
-
         const externalAccounts = user.externalAccounts || [];
-        let provider = 'clerk';
 
+        let provider = 'clerk';
         if (externalAccounts.length > 0) {
             const primaryAccount = externalAccounts[0];
             provider = `clerk_${primaryAccount.provider}`;
@@ -43,10 +47,11 @@ export async function verifyClerkSessionToken(sessionToken: string): Promise<Cle
 
         return {
             clerkUserId: user.id,
+            sessionId: payload.sid,
             email: primaryEmail?.emailAddress || null,
             firstName: user.firstName || null,
             lastName: user.lastName || null,
-            provider: provider,
+            provider,
         };
     } catch (error) {
         console.error('Clerk session verification error:', error);
