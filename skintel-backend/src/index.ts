@@ -4,6 +4,7 @@ dotenv.config();
 import express, { Express, Request, Response } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
+import morgan from 'morgan';
 import { sessionsRouter } from './routes/sessions';
 import { onboardingRouter } from './routes/onboarding';
 import { authRouter } from './routes/auth';
@@ -32,10 +33,12 @@ const app: Express = express();
 const port = process.env.PORT || 3000;
 
 const maxRequestSize = process.env.MAX_REQUEST_SIZE || '50mb';
+const morganFormat = process.env.MORGAN_FORMAT || (process.env.NODE_ENV === 'production' ? 'combined' : 'dev');
 console.log(`Server starting with MAX_REQUEST_SIZE: ${maxRequestSize}`);
 
 app.use(helmet());
 app.use(cors());
+app.use(morgan(morganFormat));
 
 app.use(express.json({
   limit: maxRequestSize,
