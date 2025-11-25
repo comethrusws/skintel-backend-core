@@ -35,6 +35,11 @@ export function initCronJobs() {
         await NotificationService.sendTipOfTheDay();
     });
 
+    // UV Alerts (every 2 hours between 9 AM and 5 PM)
+    cron.schedule('0 9-17/2 * * *', async () => {
+        await NotificationService.sendUVAlerts();
+    });
+
     // Weekly Question of the Day Generation (Sunday at midnight)
     /*
     cron.schedule('0 0 * * 0', async () => {

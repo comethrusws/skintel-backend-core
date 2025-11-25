@@ -114,6 +114,11 @@ export const profileUpdateRequestSchema = z.object({
   { message: "At least one field (name or phone_number) must be provided" }
 );
 
+export const profileLocationUpdateSchema = z.object({
+  latitude: z.number().min(-90).max(90),
+  longitude: z.number().min(-180).max(180),
+});
+
 export const versionCheckRequestSchema = z.object({
   current_version: z.string().regex(/^\d+\.\d+\.\d+$/, "Version must be in format x.y.z"),
   platform: z.enum(['ios']),

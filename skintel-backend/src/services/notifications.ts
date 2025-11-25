@@ -1,5 +1,6 @@
 import { firebaseAdmin } from '../lib/firebase';
 import { prisma } from '../lib/prisma';
+import { describeUVRisk, fetchUVIndex } from '../lib/uv';
 
 export class NotificationService {
     /**
@@ -243,6 +244,99 @@ export class NotificationService {
             );
         } catch (error) {
             console.error('Error sending question of the day:', error);
+        }
+    }
+
+    /**
+     * Send UV alerts to users who opted in and shared their location
+     */
+    static async sendUVAlerts() {
+        try {
+            console.log('Sending UV alerts...');
+
+            const users = await prisma.user.findMany({
+                where: {
+                    notificationPreferences: {
+                        uvIndexAlerts: true,
+                    },
+                    latitude: {
+                        not: null,
+                    },
+                    longitude: {
+                        not: null,
+                    },
+                    deviceTokens: {
+                        some: {},
+                    },
+                },
+                select: {
+                    userId: true,
+                    latitude: true,
+                    longitude: true,
+                    deviceTokens: {
+                        select: { token: true },
+                    },
+                },
+            });
+
+            if (users.length === 0) {
+                console.log('No UV alert subscribers with location + device tokens.');
+                return;
+            }
+
+            const cache = new Map<string, ReturnType<typeof fetchUVIndex>>();
+
+            const getUVSummary = (lat: number, lon: number) => {
+                const key = `${lat.toFixed(2)}:${lon.toFixed(2)}`;
+                if (!cache.has(key)) {
+                    cache.set(key, fetchUVIndex(lat, lon));
+                }
+                return cache.get(key)!;
+            };
+
+            for (const user of users) {
+                const latitude = user.latitude!;
+                const longitude = user.longitude!;
+                const tokens = user.deviceTokens.map((dt) => dt.token);
+
+                if (tokens.length === 0) {
+                    continue;
+                }
+
+                let summary;
+                try {
+                    summary = await getUVSummary(latitude, longitude);
+                } catch (error) {
+                    console.error(`Failed to fetch UV summary for ${latitude},${longitude}:`, error);
+                    continue;
+                }
+
+                const uvIndex = summary.uvIndex;
+
+                // Only alert when UV is high (>=5) to avoid spamming users.
+                if (uvIndex < 5) {
+                    continue;
+                }
+
+                const advice = describeUVRisk(uvIndex);
+                const body = `${advice.detail} ${advice.recommendation}`;
+
+                await this.sendMulticastNotification(
+                    tokens,
+                    advice.headline,
+                    body,
+                    {
+                        type: 'uv',
+                        uv_index: uvIndex.toFixed(1),
+                        level: advice.level,
+                        observed_at: summary.observedAt,
+                        latitude: latitude.toFixed(4),
+                        longitude: longitude.toFixed(4),
+                    }
+                );
+            }
+        } catch (error) {
+            console.error('Error sending UV alerts:', error);
         }
     }
 }

@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { locationWeatherRequestSchema } from '../lib/validation';
 import { LocationWeatherResponse } from '../types';
+import { fetchUVIndex } from '../lib/uv';
 
 const router = Router();
 
@@ -168,59 +169,6 @@ router.post('/weather', async (req: Request, res: Response): Promise<void> => {
   }
 });
 
-interface UVIndexAPIResponse {
-  ok: boolean;
-  latitude?: number;
-  longitude?: number;
-  now?: {
-    time: string;
-    uvi: number;
-  };
-  forecast?: Array<{
-    time: string;
-    uvi: number;
-  }>;
-  history?: Array<{
-    time: string;
-    uvi: number;
-  }>;
-  message?: string;
-}
-
-async function fetchUVIndex(lat: number, lon: number): Promise<UVIndexAPIResponse> {
-  const url = `https://currentuvindex.com/api/v1/uvi?latitude=${lat}&longitude=${lon}`;
-  
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 10000);
-  
-  try {
-    const response = await fetch(url, { 
-      signal: controller.signal,
-      headers: {
-        'User-Agent': 'Skintel-Backend/1.0'
-      }
-    });
-    
-    clearTimeout(timeoutId);
-    
-    const data: UVIndexAPIResponse = await response.json();
-    
-    if (!data.ok) {
-      throw new Error(data.message || 'UV API error');
-    }
-    
-    return data;
-  } catch (error) {
-    clearTimeout(timeoutId);
-    
-    if (error instanceof Error && error.name === 'AbortError') {
-      throw new Error('UV API request timeout');
-    }
-    
-    throw error;
-  }
-}
-
 /**
  * @swagger
  * /v1/location/uv:
@@ -285,12 +233,13 @@ router.get('/uv', async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
-    const uvData = await fetchUVIndex(latitude, longitude);
+    const uvSummary = await fetchUVIndex(latitude, longitude);
 
     res.json({
-      uv_index: uvData.now?.uvi || 0,
-      latitude: uvData.latitude,
-      longitude: uvData.longitude,
+      uv_index: uvSummary.uvIndex,
+      latitude: uvSummary.latitude,
+      longitude: uvSummary.longitude,
+      observed_at: uvSummary.observedAt,
     });
   } catch (error) {
     console.error('UV index error:', error);
