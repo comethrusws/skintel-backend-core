@@ -115,10 +115,14 @@ const router = Router();
  *               clerk_token:
  *                 type: string
  *                 description: Clerk session token obtained after OAuth
+ *               clerk_session_id:
+ *                 type: string
+ *                 description: Clerk session ID (`sess_...`) returned with the token
  *             required:
  *               - session_id
  *               - provider
  *               - clerk_token
+ *               - clerk_session_id
  *     responses:
  *       200:
  *         description: SSO login successful
