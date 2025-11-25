@@ -1,6 +1,6 @@
 import { Router, Response } from 'express';
 import { authenticateUser, AuthenticatedRequest } from '../middleware/auth';
-import { profileUpdateRequestSchema, profileQuestionsAnswerRequestSchema } from '../lib/validation';
+import { profileUpdateRequestSchema, profileQuestionsAnswerRequestSchema, profileLocationUpdateSchema } from '../lib/validation';
 import { prisma } from '../lib/prisma';
 import { Prisma } from '@prisma/client';
 import { getTaskProgress } from '../services/tasks';
@@ -468,6 +468,9 @@ router.get('/', authenticateUser, async (req: AuthenticatedRequest, res: Respons
         email: true,
         ssoProvider: true,
         planType: true,
+        latitude: true,
+        longitude: true,
+        locationUpdatedAt: true,
         createdAt: true,
         updatedAt: true
       }
@@ -552,6 +555,13 @@ router.get('/', authenticateUser, async (req: AuthenticatedRequest, res: Respons
       profile_image: profileImage,
       email: user.email,
       sso_provider: user.ssoProvider,
+      location: user.latitude !== null && user.latitude !== undefined && user.longitude !== null && user.longitude !== undefined
+        ? {
+          latitude: user.latitude,
+          longitude: user.longitude,
+          updated_at: user.locationUpdatedAt?.toISOString() ?? null,
+        }
+        : null,
       gender,
       skin_score: skinScore,
       score_change: scoreChange,
@@ -795,6 +805,94 @@ router.put('/', authenticateUser, async (req: AuthenticatedRequest, res: Respons
     res.json(response);
   } catch (error) {
     console.error('Update profile error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+/**
+ * @swagger
+ * /v1/profile/location:
+ *   put:
+ *     summary: Update the user's location for UV alerts
+ *     description: Stores the latest latitude and longitude provided by the client once the user enables UV alerts.
+ *     tags: [Profile]
+ *     security:
+ *       - BearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               latitude:
+ *                 type: number
+ *                 minimum: -90
+ *                 maximum: 90
+ *               longitude:
+ *                 type: number
+ *                 minimum: -180
+ *                 maximum: 180
+ *     responses:
+ *       200:
+ *         description: Location stored successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 user_id:
+ *                   type: string
+ *                 latitude:
+ *                   type: number
+ *                 longitude:
+ *                   type: number
+ *                 updated_at:
+ *                   type: string
+ *                   format: date-time
+ *       400:
+ *         description: Invalid coordinates
+ *       401:
+ *         description: Authentication required
+ */
+router.put('/location', authenticateUser, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const validationResult = profileLocationUpdateSchema.safeParse(req.body);
+
+    if (!validationResult.success) {
+      res.status(400).json({
+        error: 'Invalid coordinates',
+        details: validationResult.error.errors
+      });
+      return;
+    }
+
+    const userId = req.userId!;
+    const { latitude, longitude } = validationResult.data;
+
+    const updatedUser = await prisma.user.update({
+      where: { userId },
+      data: {
+        latitude,
+        longitude,
+        locationUpdatedAt: new Date(),
+      },
+      select: {
+        userId: true,
+        latitude: true,
+        longitude: true,
+        locationUpdatedAt: true,
+      }
+    });
+
+    res.json({
+      user_id: updatedUser.userId,
+      latitude: updatedUser.latitude,
+      longitude: updatedUser.longitude,
+      updated_at: updatedUser.locationUpdatedAt?.toISOString() ?? null,
+    });
+  } catch (error) {
+    console.error('Update profile location error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
