@@ -81,7 +81,6 @@ app.use('/v1/location', locationRouter);
 app.use('/v1/skin-tip', skinTipRouter);
 app.use('/v1/water-intake', waterIntakeRouter);
 app.use('/v1/skin-feel', skinFeelRouter);
-app.use('/v1/skin-feel', skinFeelRouter);
 app.use('/v1/report', reportRouter);
 app.use('/v1/notifications', notificationsRouter);
 
