@@ -28,6 +28,8 @@ import { QuestionOfTheDayService } from './services/questionOfTheDay';
 import { reportRouter } from './routes/report';
 import { notificationsRouter } from './routes/notifications';
 import { clerk } from './lib/clerk';
+import { errorHandler, notFoundHandler } from './middleware/error';
+import { asyncHandler } from './utils/asyncHandler';
 
 dotenv.config();
 
@@ -55,17 +57,6 @@ app.use(express.urlencoded({
 }));
 
 app.use(clerkMiddleware({ clerkClient: clerk }));
-
-app.use((error: any, req: Request, res: Response, next: Function) => {
-  if (error.type === 'entity.too.large') {
-    return res.status(413).json({
-      error: 'Payload too large',
-      message: `Request size exceeds limit of ${maxRequestSize}`,
-      limit: maxRequestSize
-    });
-  }
-  next(error);
-});
 
 app.use('/v1/sessions', sessionsRouter);
 app.use('/v1/onboarding', onboardingRouter);
@@ -103,6 +94,10 @@ app.get('/', (req: Request, res: Response) => {
   res.json({ message: 'Skintel Backend API', version: '1.0.0' });
 });
 
+app.get('/error-test', asyncHandler(async (req: Request, res: Response) => {
+  throw new Error('This is a test error');
+}));
+
 app.get('/health', async (req: Request, res: Response) => {
   try {
     await prisma.$queryRaw`SELECT 1`;
@@ -111,6 +106,9 @@ app.get('/health', async (req: Request, res: Response) => {
     res.status(503).json({ status: 'error', error: 'Database connection failed' });
   }
 });
+
+app.use(notFoundHandler);
+app.use(errorHandler);
 
 process.on('SIGINT', async () => {
   await prisma.$disconnect();
