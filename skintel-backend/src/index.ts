@@ -29,7 +29,6 @@ import { reportRouter } from './routes/report';
 import { notificationsRouter } from './routes/notifications';
 import { clerk } from './lib/clerk';
 import { errorHandler, notFoundHandler } from './middleware/error';
-import { asyncHandler } from './utils/asyncHandler';
 
 dotenv.config();
 
@@ -93,10 +92,6 @@ app.use('/docs', swaggerUi.serve, swaggerUi.setup(specs, {
 app.get('/', (req: Request, res: Response) => {
   res.json({ message: 'Skintel Backend API', version: '1.0.0' });
 });
-
-app.get('/error-test', asyncHandler(async (req: Request, res: Response) => {
-  throw new Error('This is a test error');
-}));
 
 app.get('/health', async (req: Request, res: Response) => {
   try {
