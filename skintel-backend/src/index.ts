@@ -28,6 +28,7 @@ import { QuestionOfTheDayService } from './services/questionOfTheDay';
 import { reportRouter } from './routes/report';
 import { notificationsRouter } from './routes/notifications';
 import { clerk } from './lib/clerk';
+import { errorHandler, notFoundHandler } from './middleware/error';
 
 dotenv.config();
 
@@ -56,17 +57,6 @@ app.use(express.urlencoded({
 
 app.use(clerkMiddleware({ clerkClient: clerk }));
 
-app.use((error: any, req: Request, res: Response, next: Function) => {
-  if (error.type === 'entity.too.large') {
-    return res.status(413).json({
-      error: 'Payload too large',
-      message: `Request size exceeds limit of ${maxRequestSize}`,
-      limit: maxRequestSize
-    });
-  }
-  next(error);
-});
-
 app.use('/v1/sessions', sessionsRouter);
 app.use('/v1/onboarding', onboardingRouter);
 app.use('/v1/auth', authRouter);
@@ -80,7 +70,6 @@ app.use('/v1/tasks', tasksRouter);
 app.use('/v1/location', locationRouter);
 app.use('/v1/skin-tip', skinTipRouter);
 app.use('/v1/water-intake', waterIntakeRouter);
-app.use('/v1/skin-feel', skinFeelRouter);
 app.use('/v1/skin-feel', skinFeelRouter);
 app.use('/v1/report', reportRouter);
 app.use('/v1/notifications', notificationsRouter);
@@ -112,6 +101,9 @@ app.get('/health', async (req: Request, res: Response) => {
     res.status(503).json({ status: 'error', error: 'Database connection failed' });
   }
 });
+
+app.use(notFoundHandler);
+app.use(errorHandler);
 
 process.on('SIGINT', async () => {
   await prisma.$disconnect();
