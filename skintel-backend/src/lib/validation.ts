@@ -163,3 +163,8 @@ export const profileQuestionAnswerSchema = z.object({
 export const profileQuestionsAnswerRequestSchema = z.object({
   answers: z.array(profileQuestionAnswerSchema).min(1),
 });
+
+export const paymentVerifySchema = z.object({
+  receipt_data: z.string().min(1),
+  product_id: z.string().min(1),
+});
