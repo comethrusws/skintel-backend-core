@@ -94,6 +94,11 @@ export class VanalyseService {
             })
         ]);
 
+        const user = await prisma.user.findUnique({
+            where: { userId },
+            select: { planType: true }
+        });
+
         const [currentAnalysis, progressUpdate] = await Promise.all([
             this.analyzeWithLandmarksOptimized(
                 presignedUrls.front,
@@ -110,7 +115,8 @@ export class VanalyseService {
                 initialWeeklyPlan,
                 daysElapsed,
                 userId,
-                answerId
+                answerId,
+                user?.planType || 'MONTHLY'
             )
         ]);
 
@@ -239,7 +245,8 @@ export class VanalyseService {
         weeklyPlan: any[],
         daysElapsed: number,
         userId: string,
-        answerId: string
+        answerId: string,
+        planType: string
     ) {
         const imageContent: any[] = [];
         const availableImages: string[] = [];
@@ -279,7 +286,8 @@ export class VanalyseService {
                                 `Initial score: ${initialScore}\n` +
                                 `Weekly plan: ${JSON.stringify(weeklyPlan)}\n` +
                                 `Days elapsed: ${daysElapsed}\n` +
-                                `Current week plan: ${JSON.stringify(currentWeekPlan)}`
+                                `Current week plan: ${JSON.stringify(currentWeekPlan)}\n` +
+                                `User Plan Type: ${planType}`
                         }
                     ]
                 }

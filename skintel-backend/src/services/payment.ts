@@ -1,11 +1,11 @@
 import axios from 'axios';
 import { prisma } from '../lib/prisma';
 import { PlanType } from '@prisma/client';
+import { TasksService } from './tasks';
 
-const APPLE_VERIFY_RECEIPT_URL_SANDBOX = process.env.APPLE_VERIFY_RECEIPT_URL_SANDBOX ||'https://sandbox.itunes.apple.com/verifyReceipt';
-const APPLE_VERIFY_RECEIPT_URL_PRODUCTION = process.env.APPLE_VERIFY_RECEIPT_URL_PRODUCTION ||'https://buy.itunes.apple.com/verifyReceipt';
+const APPLE_VERIFY_RECEIPT_URL_SANDBOX = process.env.APPLE_VERIFY_RECEIPT_URL_SANDBOX || 'https://sandbox.itunes.apple.com/verifyReceipt';
+const APPLE_VERIFY_RECEIPT_URL_PRODUCTION = process.env.APPLE_VERIFY_RECEIPT_URL_PRODUCTION || 'https://buy.itunes.apple.com/verifyReceipt';
 
-// You should store this securely, e.g., in environment variables
 const APPLE_SHARED_SECRET = process.env.APPLE_SHARED_SECRET;
 
 interface IAPVerificationResult {
@@ -114,6 +114,8 @@ export class PaymentService {
                 email: true,
             }
         });
+
+        await TasksService.ensureTasksForPlanType(userId, planType);
 
         return user;
     }

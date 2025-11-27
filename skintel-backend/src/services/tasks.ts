@@ -628,6 +628,32 @@ export class TasksService {
 
     return history;
   }
+
+  static async ensureTasksForPlanType(userId: string, planType: 'WEEKLY' | 'MONTHLY'): Promise<void> {
+    // This method ensures that the user has the correct tasks generated for their plan type.
+    // Since we generate a 4-week plan by default during onboarding, we mostly need to ensure
+    // that the tasks are active and potentially handle any future logic where we might
+    // gate access to future weeks for weekly subscribers (though currently we allow full access).
+
+    // Check if tasks exist
+    const existingTasksCount = await prisma.task.count({
+      where: { userId, isActive: true }
+    });
+
+    if (existingTasksCount === 0) {
+      // If no tasks, try to generate from existing plan
+      try {
+        await this.generateTasksFromPlan(userId);
+      } catch (error) {
+        console.log(`Could not generate tasks for user ${userId} (likely no plan yet):`, error);
+        // This is fine, they might be paying before analysis is complete
+      }
+    }
+
+    // Future logic: If planType is WEEKLY, we could deactivate weeks 2-4 if we wanted to be strict.
+    // For now, we follow the "Master Plan" strategy where paying unlocks the full roadmap.
+    console.log(`Ensured tasks for user ${userId} with plan ${planType}`);
+  }
 }
 
 export const generateTasksForUser = TasksService.generateTasksForUser;
