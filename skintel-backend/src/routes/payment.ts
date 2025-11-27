@@ -67,7 +67,6 @@ router.post('/verify-ios', authenticateUser, asyncHandler(async (req: Authentica
     const { receipt_data, product_id } = validationResult.data;
     const userId = req.userId!;
 
-    // Verify receipt with Apple
     const verificationResult = await PaymentService.verifyAppleReceipt(receipt_data);
 
     if (!verificationResult.isValid) {
@@ -78,14 +77,6 @@ router.post('/verify-ios', authenticateUser, asyncHandler(async (req: Authentica
         return;
     }
 
-    // Check if the verified product ID matches the requested one (optional but recommended)
-    // Note: verificationResult.productId might be different if the user upgraded/downgraded in the same receipt group,
-    // but usually we care that they have *a* valid subscription.
-    // For strictness, we can check:
-    // if (verificationResult.productId !== product_id) { ... }
-
-    // Determine plan type based on product ID
-    // This mapping should be configured properly. For now, we infer from the string or passed ID.
     let planType: 'WEEKLY' | 'MONTHLY';
 
     if (product_id.toLowerCase().includes('weekly')) {
@@ -93,8 +84,6 @@ router.post('/verify-ios', authenticateUser, asyncHandler(async (req: Authentica
     } else if (product_id.toLowerCase().includes('monthly')) {
         planType = 'MONTHLY';
     } else {
-        // Default or error? Let's assume monthly if ambiguous for now, or error.
-        // Better to error if unknown.
         res.status(400).json({ error: 'Unknown product ID for plan mapping' });
         return;
     }
