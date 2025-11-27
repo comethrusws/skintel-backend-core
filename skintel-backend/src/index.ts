@@ -28,6 +28,7 @@ import { QuestionOfTheDayService } from './services/questionOfTheDay';
 import { reportRouter } from './routes/report';
 import { notificationsRouter } from './routes/notifications';
 import { clerk } from './lib/clerk';
+import { paymentRouter } from './routes/payment';
 import { errorHandler, notFoundHandler } from './middleware/error';
 
 dotenv.config();
@@ -73,6 +74,7 @@ app.use('/v1/water-intake', waterIntakeRouter);
 app.use('/v1/skin-feel', skinFeelRouter);
 app.use('/v1/report', reportRouter);
 app.use('/v1/notifications', notificationsRouter);
+app.use('/v1/payment', paymentRouter);
 
 // Swagger documentation
 app.use('/docs', swaggerUi.serve, swaggerUi.setup(specs, {

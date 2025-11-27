@@ -1,16 +1,8 @@
 import { Router, Response } from 'express';
 import { authenticateUser, AuthenticatedRequest } from '../middleware/auth';
-import { prisma } from '../lib/prisma';
-import { Prisma } from '@prisma/client';
 import { z } from 'zod';
-import {
-  generateTasksForUser,
-  getTodaysTasks,
-  completeTask,
-  uncompleteTask,
-  getTaskProgress,
-  adaptTasksForUser
-} from '../services/tasks';
+import { asyncHandler } from '../utils/asyncHandler';
+import { TasksService } from '../services/tasks';
 
 const router = Router();
 
@@ -35,70 +27,11 @@ const taskCompletionSchema = z.object({
  *       404:
  *         description: No active plan found
  */
-router.get('/today', authenticateUser, async (req: AuthenticatedRequest, res: Response) => {
-  try {
-    const userId = req.userId!;
-    let todaysTasks = await getTodaysTasks(userId);
-
-    if (todaysTasks.tasks.length === 0) {
-      const activeTasksCount = await prisma.task.count({
-        where: { userId, isActive: true }
-      });
-
-      if (activeTasksCount === 0) {
-
-        const latestAnalysis = await prisma.facialLandmarks.findFirst({
-          where: {
-            userId,
-            status: 'COMPLETED',
-            weeklyPlan: { not: Prisma.DbNull }
-          },
-          orderBy: { createdAt: 'desc' }
-        });
-
-        if (latestAnalysis && latestAnalysis.weeklyPlan) {
-          const userProducts = await prisma.product.findMany({
-            where: { userId },
-            select: {
-              id: true,
-              productData: true
-            }
-          });
-
-          const formattedProducts = userProducts.map(p => {
-            const data = p.productData as any;
-            return {
-              id: p.id,
-              name: data?.product_name || 'Unknown Product',
-              category: data?.category || 'unknown',
-              ingredients: data?.ingredients || []
-            };
-          });
-
-          const weeklyPlan = typeof latestAnalysis.weeklyPlan === 'string'
-            ? JSON.parse(latestAnalysis.weeklyPlan)
-            : latestAnalysis.weeklyPlan;
-
-          await generateTasksForUser({
-            userId,
-            weeklyPlan,
-            userProducts: formattedProducts
-          });
-
-          todaysTasks = await getTodaysTasks(userId);
-        }
-      }
-    }
-
-    res.json(todaysTasks);
-  } catch (error) {
-    console.error('Get today tasks error:', error);
-    if (error instanceof Error && error.message === 'No active plan found') {
-      return res.status(404).json({ error: 'No active skincare plan found' });
-    }
-    res.status(500).json({ error: 'Failed to retrieve tasks' });
-  }
-});
+router.get('/today', authenticateUser, asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+  const userId = req.userId!;
+  const todaysTasks = await TasksService.getTodaysTasksWithFallback(userId);
+  res.json(todaysTasks);
+}));
 
 /**
  * @swagger
@@ -125,69 +58,17 @@ router.get('/today', authenticateUser, async (req: AuthenticatedRequest, res: Re
  *       401:
  *         description: Authentication required
  */
-router.get('/week/:week', authenticateUser, async (req: AuthenticatedRequest, res: Response) => {
-  try {
-    const week = parseInt(req.params.week);
-    if (isNaN(week) || week < 1 || week > 4) {
-      return res.status(400).json({ error: 'Week must be between 1 and 4' });
-    }
-
-    const userId = req.userId!;
-
-    const tasks = await prisma.task.findMany({
-      where: {
-        userId,
-        week,
-        isActive: true
-      },
-      orderBy: [
-        { priority: 'asc' },
-        { timeOfDay: 'asc' }
-      ]
-    });
-
-    const userProducts = await prisma.product.findMany({
-      where: { userId },
-      select: {
-        id: true,
-        productData: true
-      }
-    });
-
-    const formattedTasks = tasks.map(task => {
-      const taskUserProducts = task.userProducts ?
-        userProducts.filter(p => (task.userProducts as string[]).includes(p.id))
-          .map(p => {
-            const data = p.productData as any;
-            return {
-              id: p.id,
-              name: data?.product_name || 'Unknown Product',
-              category: data?.category || 'unknown'
-            };
-          }) : [];
-
-      return {
-        id: task.id,
-        title: task.title,
-        description: task.description,
-        timeOfDay: task.timeOfDay,
-        category: task.category,
-        priority: task.priority,
-        recommendedProducts: task.recommendedProducts as string[] || [],
-        userProducts: taskUserProducts
-      };
-    });
-
-    res.json({
-      week,
-      tasks: formattedTasks,
-      totalTasks: formattedTasks.length
-    });
-  } catch (error) {
-    console.error('Get week tasks error:', error);
-    res.status(500).json({ error: 'Failed to retrieve week tasks' });
+router.get('/week/:week', authenticateUser, asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+  const week = parseInt(req.params.week);
+  if (isNaN(week) || week < 1 || week > 4) {
+    res.status(400).json({ error: 'Week must be between 1 and 4' });
+    return;
   }
-});
+
+  const userId = req.userId!;
+  const response = await TasksService.getWeekTasks(userId, week);
+  res.json(response);
+}));
 
 /**
  * @swagger
@@ -224,41 +105,35 @@ router.get('/week/:week', authenticateUser, async (req: AuthenticatedRequest, re
  *       404:
  *         description: Task not found
  */
-router.post('/:taskId/complete', authenticateUser, async (req: AuthenticatedRequest, res: Response) => {
-  try {
-    const { taskId } = req.params;
-    const userId = req.userId!;
+router.post('/:taskId/complete', authenticateUser, asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+  const { taskId } = req.params;
+  const userId = req.userId!;
 
-    const validationResult = taskCompletionSchema.safeParse(req.body);
-    if (!validationResult.success) {
-      return res.status(400).json({
-        error: 'Invalid request data',
-        details: validationResult.error.errors
-      });
-    }
-
-    const { completedAt } = validationResult.data;
-
-    const success = await completeTask(userId, taskId, completedAt);
-
-    if (!success) {
-      return res.status(400).json({ error: 'Task already completed for this date' });
-    }
-
-    res.json({
-      success: true,
-      message: 'Task completed successfully',
-      taskId,
-      completedAt: completedAt || new Date().toISOString()
+  const validationResult = taskCompletionSchema.safeParse(req.body);
+  if (!validationResult.success) {
+    res.status(400).json({
+      error: 'Invalid request data',
+      details: validationResult.error.errors
     });
-  } catch (error) {
-    console.error('Complete task error:', error);
-    if (error instanceof Error && error.message === 'Task not found') {
-      return res.status(404).json({ error: 'Task not found' });
-    }
-    res.status(500).json({ error: 'Failed to complete task' });
+    return;
   }
-});
+
+  const { completedAt } = validationResult.data;
+
+  const success = await TasksService.completeTask(userId, taskId, completedAt);
+
+  if (!success) {
+    res.status(400).json({ error: 'Task already completed for this date' });
+    return;
+  }
+
+  res.json({
+    success: true,
+    message: 'Task completed successfully',
+    taskId,
+    completedAt: completedAt || new Date().toISOString()
+  });
+}));
 
 /**
  * @swagger
@@ -283,28 +158,24 @@ router.post('/:taskId/complete', authenticateUser, async (req: AuthenticatedRequ
  *       404:
  *         description: Task completion not found
  */
-router.delete('/:taskId/complete', authenticateUser, async (req: AuthenticatedRequest, res: Response) => {
-  try {
-    const { taskId } = req.params;
-    const userId = req.userId!;
-    const { date } = req.query;
+router.delete('/:taskId/complete', authenticateUser, asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+  const { taskId } = req.params;
+  const userId = req.userId!;
+  const { date } = req.query;
 
-    const success = await uncompleteTask(userId, taskId, date as string);
+  const success = await TasksService.uncompleteTask(userId, taskId, date as string);
 
-    if (!success) {
-      return res.status(404).json({ error: 'Task completion not found for this date' });
-    }
-
-    res.json({
-      success: true,
-      message: 'Task completion removed successfully',
-      taskId
-    });
-  } catch (error) {
-    console.error('Uncomplete task error:', error);
-    res.status(500).json({ error: 'Failed to uncomplete task' });
+  if (!success) {
+    res.status(404).json({ error: 'Task completion not found for this date' });
+    return;
   }
-});
+
+  res.json({
+    success: true,
+    message: 'Task completion removed successfully',
+    taskId
+  });
+}));
 
 /**
  * @swagger
@@ -323,19 +194,11 @@ router.delete('/:taskId/complete', authenticateUser, async (req: AuthenticatedRe
  *       404:
  *         description: No plan found
  */
-router.get('/progress', authenticateUser, async (req: AuthenticatedRequest, res: Response) => {
-  try {
-    const userId = req.userId!;
-    const progress = await getTaskProgress(userId);
-    res.json(progress);
-  } catch (error) {
-    console.error('Get task progress error:', error);
-    if (error instanceof Error && error.message === 'No plan found') {
-      return res.status(404).json({ error: 'No skincare plan found' });
-    }
-    res.status(500).json({ error: 'Failed to retrieve progress' });
-  }
-});
+router.get('/progress', authenticateUser, asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+  const userId = req.userId!;
+  const progress = await TasksService.getTaskProgress(userId);
+  res.json(progress);
+}));
 
 /**
  * @swagger
@@ -354,61 +217,15 @@ router.get('/progress', authenticateUser, async (req: AuthenticatedRequest, res:
  *       401:
  *         description: Authentication required
  */
-router.post('/generate', authenticateUser, async (req: AuthenticatedRequest, res: Response) => {
-  try {
-    const userId = req.userId!;
+router.post('/generate', authenticateUser, asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+  const userId = req.userId!;
+  await TasksService.generateTasksFromPlan(userId);
 
-    // Get user's latest weekly plan
-    const latestAnalysis = await prisma.facialLandmarks.findFirst({
-      where: {
-        userId,
-        status: 'COMPLETED',
-        weeklyPlan: { not: Prisma.DbNull }
-      },
-      orderBy: { createdAt: 'desc' }
-    });
-
-    if (!latestAnalysis || !latestAnalysis.weeklyPlan) {
-      return res.status(400).json({ error: 'No weekly plan found. Complete analysis first.' });
-    }
-
-    const userProducts = await prisma.product.findMany({
-      where: { userId },
-      select: {
-        id: true,
-        productData: true
-      }
-    });
-
-    const formattedProducts = userProducts.map(p => {
-      const data = p.productData as any;
-      return {
-        id: p.id,
-        name: data?.product_name || 'Unknown Product',
-        category: data?.category || 'unknown',
-        ingredients: data?.ingredients || []
-      };
-    });
-
-    const weeklyPlan = typeof latestAnalysis.weeklyPlan === 'string'
-      ? JSON.parse(latestAnalysis.weeklyPlan)
-      : latestAnalysis.weeklyPlan;
-
-    await generateTasksForUser({
-      userId,
-      weeklyPlan,
-      userProducts: formattedProducts
-    });
-
-    res.json({
-      success: true,
-      message: 'Tasks generated successfully'
-    });
-  } catch (error) {
-    console.error('Generate tasks error:', error);
-    res.status(500).json({ error: 'Failed to generate tasks' });
-  }
-});
+  res.json({
+    success: true,
+    message: 'Tasks generated successfully'
+  });
+}));
 
 /**
  * @swagger
@@ -425,21 +242,16 @@ router.post('/generate', authenticateUser, async (req: AuthenticatedRequest, res
  *       401:
  *         description: Authentication required
  */
-router.post('/adapt', authenticateUser, async (req: AuthenticatedRequest, res: Response) => {
-  try {
-    const userId = req.userId!;
-    const adaptations = await adaptTasksForUser(userId);
+router.post('/adapt', authenticateUser, asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+  const userId = req.userId!;
+  const adaptations = await TasksService.adaptTasksForUser(userId);
 
-    res.json({
-      success: true,
-      adaptations,
-      message: `${adaptations.length} tasks adapted based on completion patterns`
-    });
-  } catch (error) {
-    console.error('Adapt tasks error:', error);
-    res.status(500).json({ error: 'Failed to adapt tasks' });
-  }
-});
+  res.json({
+    success: true,
+    adaptations,
+    message: `${adaptations.length} tasks adapted based on completion patterns`
+  });
+}));
 
 /**
  * @swagger
@@ -456,23 +268,10 @@ router.post('/adapt', authenticateUser, async (req: AuthenticatedRequest, res: R
  *       401:
  *         description: Authentication required
  */
-router.get('/history', authenticateUser, async (req: AuthenticatedRequest, res: Response) => {
-  try {
-    const userId = req.userId!;
-
-    const history = await prisma.taskCompletion.findMany({
-      where: { userId },
-      orderBy: { completedAt: 'desc' },
-      include: {
-        task: true
-      }
-    });
-
-    res.json(history);
-  } catch (error) {
-    console.error('Get task history error:', error);
-    res.status(500).json({ error: 'Failed to retrieve task history' });
-  }
-});
+router.get('/history', authenticateUser, asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+  const userId = req.userId!;
+  const history = await TasksService.getTaskHistory(userId);
+  res.json(history);
+}));
 
 export { router as tasksRouter };
