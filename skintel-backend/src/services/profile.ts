@@ -137,27 +137,47 @@ export class ProfileService {
             orderBy: { createdAt: 'desc' }
         });
 
+        const user = await prisma.user.findUnique({
+            where: { userId },
+            select: { planType: true }
+        });
+
         return {
             user_id: userId,
-            analysis: facialLandmarks.map(landmark => ({
-                answer_id: landmark.answerId,
-                question_id: landmark.answer.questionId,
-                screen_id: landmark.answer.screenId,
-                analysis: landmark.analysis ?
-                    (typeof landmark.analysis === 'string' ? JSON.parse(landmark.analysis) : landmark.analysis)
-                    : null,
-                score: landmark.score,
-                weekly_plan: landmark.weeklyPlan ?
+            analysis: facialLandmarks.map(landmark => {
+                let weeklyPlan = landmark.weeklyPlan ?
                     (typeof landmark.weeklyPlan === 'string' ? JSON.parse(landmark.weeklyPlan) : landmark.weeklyPlan)
-                    : null,
-                analysis_type: landmark.analysisType,
-                plan_start_date: landmark.planStartDate?.toISOString(),
-                plan_end_date: landmark.planEndDate?.toISOString(),
-                status: landmark.status,
-                processed_at: landmark.processedAt?.toISOString(),
-                created_at: landmark.createdAt.toISOString(),
-                error: landmark.error
-            }))
+                    : null;
+
+                if (user?.planType === 'WEEKLY' && Array.isArray(weeklyPlan)) {
+                    weeklyPlan = weeklyPlan.map((week: any, index: number) => {
+                        if (index === 0) return week; // Week 1 is always visible
+                        return {
+                            ...week,
+                            preview: "Upgrade to Monthly to unlock this week's plan",
+                            locked: true
+                        };
+                    });
+                }
+
+                return {
+                    answer_id: landmark.answerId,
+                    question_id: landmark.answer.questionId,
+                    screen_id: landmark.answer.screenId,
+                    analysis: landmark.analysis ?
+                        (typeof landmark.analysis === 'string' ? JSON.parse(landmark.analysis) : landmark.analysis)
+                        : null,
+                    score: landmark.score,
+                    weekly_plan: weeklyPlan,
+                    analysis_type: landmark.analysisType,
+                    plan_start_date: landmark.planStartDate?.toISOString(),
+                    plan_end_date: landmark.planEndDate?.toISOString(),
+                    status: landmark.status,
+                    processed_at: landmark.processedAt?.toISOString(),
+                    created_at: landmark.createdAt.toISOString(),
+                    error: landmark.error
+                };
+            })
         };
     }
 
