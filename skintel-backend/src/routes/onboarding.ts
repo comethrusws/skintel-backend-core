@@ -201,8 +201,24 @@ router.put('/', idempotencyMiddleware, authenticateSession, async (req: Authenti
 router.get('/', authenticateSessionOptional, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
     const querySessionId = req.query.session_id as string;
-
     const sessionId = req.sessionId || querySessionId;
+
+    if (req.userId) {
+      const answers = await prisma.onboardingAnswer.findMany({
+        where: { userId: req.userId },
+        orderBy: { savedAt: 'asc' }
+      });
+
+      const response: OnboardingStateResponse = {
+        session_id: req.userId,
+        answers: answers.map((answer: any) => ({
+          question_id: answer.questionId,
+          value: answer.value as any,
+        })),
+      };
+      res.json(response);
+      return;
+    }
 
     if (!sessionId) {
       res.status(400).json({ error: 'Session ID required (either via query param or authentication token)' });

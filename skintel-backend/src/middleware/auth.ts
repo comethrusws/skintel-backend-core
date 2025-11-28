@@ -45,6 +45,18 @@ export const authenticateSession = async (req: AuthenticatedRequest, res: Respon
  */
 export const authenticateSessionOptional = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
   try {
+    const authHeader = req.headers.authorization;
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      const token = authHeader.slice(7);
+      const decoded = verifyAccessToken(token);
+
+      if (decoded) {
+        req.userId = decoded.userId;
+        next();
+        return;
+      }
+    }
+
     const sessionToken = req.headers['x-session-token'] as string;
 
     if (!sessionToken) {
