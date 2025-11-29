@@ -1,8 +1,10 @@
 import { Router, Response } from 'express';
 import { authenticateUser, AuthenticatedRequest } from '../middleware/auth';
-import { paymentVerifySchema } from '../lib/validation';
+import { paymentVerifySchema, cancelReasonSchema } from '../lib/validation';
 import { asyncHandler } from '../utils/asyncHandler';
 import { PaymentService } from '../services/payment';
+import { prisma } from '../lib/prisma';
+import { sendSlackNotification } from '../services/slack';
 
 const router = Router();
 
@@ -12,7 +14,7 @@ const router = Router();
  *   post:
  *     summary: Verify iOS In-App Purchase receipt
  *     description: Verifies the receipt with Apple and updates the user's plan if valid.
- *     tags: [Payment]
+ *     tags: [Subscription]
  *     security:
  *       - BearerAuth: []
  *     requestBody:
@@ -89,7 +91,12 @@ router.post('/verify-ios', authenticateUser, asyncHandler(async (req: Authentica
     }
 
     // Update user plan
-    const updatedUser = await PaymentService.updateUserPlan(userId, planType);
+    const updatedUser = await PaymentService.updateUserPlan(
+        userId,
+        planType,
+        verificationResult.originalTransactionId,
+        verificationResult.expiresDate
+    );
 
     res.json({
         success: true,
@@ -97,6 +104,161 @@ router.post('/verify-ios', authenticateUser, asyncHandler(async (req: Authentica
         expires_date: verificationResult.expiresDate,
         environment: verificationResult.environment
     });
+}));
+
+/**
+ * @swagger
+ * /v1/payment/cancel-reason:
+ *   post:
+ *     summary: Submit cancellation reason
+ *     description: Submit a reason for cancelling the subscription. Sends a notification to Slack.
+ *     tags: [Subscription]
+ *     security:
+ *       - BearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               reason:
+ *                 type: string
+ *               otherDetails:
+ *                 type: string
+ *             required:
+ *               - reason
+ *     responses:
+ *       200:
+ *         description: Reason submitted successfully
+ *       400:
+ *         description: Invalid request data
+ *       401:
+ *         description: Authentication required
+ */
+router.post('/cancel-reason', authenticateUser, asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+    const validationResult = cancelReasonSchema.safeParse(req.body);
+
+    if (!validationResult.success) {
+        res.status(400).json({
+            error: 'Invalid request data',
+            details: validationResult.error.errors
+        });
+        return;
+    }
+
+    const { reason, otherDetails } = validationResult.data;
+    const userId = req.userId!;
+
+    await sendSlackNotification({
+        text: `⚠️ Subscription Cancelled\nUser ID: ${userId}\nReason: ${reason}\nDetails: ${otherDetails || 'N/A'}`
+    });
+
+    res.json({ success: true });
+}));
+
+/**
+ * @swagger
+ * /v1/payment/plans:
+ *   get:
+ *     summary: Get available payment plans
+ *     description: Retrieve a list of available subscription plans (Product IDs).
+ *     tags: [Subscription]
+ *     security:
+ *       - BearerAuth: []
+ *     responses:
+ *       200:
+ *         description: List of plans retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 plans:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       id:
+ *                         type: string
+ *                       name:
+ *                         type: string
+ *                       type:
+ *                         type: string
+ *                         enum: [WEEKLY, MONTHLY]
+ *       401:
+ *         description: Authentication required
+ */
+router.get('/plans', authenticateUser, (req: AuthenticatedRequest, res: Response) => {
+    const plans = [
+        { id: 'com.skintel.weekly', name: 'Weekly Plan', type: 'WEEKLY' },
+        { id: 'com.skintel.monthly', name: 'Monthly Plan', type: 'MONTHLY' }
+    ];
+    res.json({ plans });
+});
+
+/**
+ * @swagger
+ * /v1/payment/status:
+ *   get:
+ *     summary: Get current subscription status
+ *     description: Fetches the latest subscription status directly from Apple.
+ *     tags: [Subscription]
+ *     security:
+ *       - BearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Subscription status retrieved
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 isActive:
+ *                   type: boolean
+ *                 planType:
+ *                   type: string
+ *                   enum: [WEEKLY, MONTHLY]
+ *                 expiresDate:
+ *                   type: string
+ *       401:
+ *         description: Authentication required
+ */
+router.get('/status', authenticateUser, asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+    const userId = req.userId!;
+
+    const user = await prisma.user.findUnique({
+        where: { userId },
+        select: { originalTransactionId: true, planType: true }
+    });
+
+    if (!user || !user.originalTransactionId) {
+        return res.json({
+            isActive: false,
+            message: 'No subscription history found'
+        });
+    }
+
+    const status = await PaymentService.getSubscriptionStatus(user.originalTransactionId);
+
+    if (status.isActive && status.planType && status.planType !== user.planType) {
+        // sync DB if plan type changed (upg or downg)
+        await PaymentService.updateUserPlan(
+            userId,
+            status.planType,
+            user.originalTransactionId,
+            status.expiresDate
+        );
+    } else if (status.isActive && status.expiresDate) {
+        await PaymentService.updateUserPlan(
+            userId,
+            user.planType,
+            user.originalTransactionId,
+            status.expiresDate
+        );
+    }
+
+    res.json(status);
 }));
 
 export { router as paymentRouter };

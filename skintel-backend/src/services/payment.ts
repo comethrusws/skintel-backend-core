@@ -2,11 +2,19 @@ import axios from 'axios';
 import { prisma } from '../lib/prisma';
 import { PlanType } from '@prisma/client';
 import { TasksService } from './tasks';
+import jwt from 'jsonwebtoken';
 
 const APPLE_VERIFY_RECEIPT_URL_SANDBOX = process.env.APPLE_VERIFY_RECEIPT_URL_SANDBOX || 'https://sandbox.itunes.apple.com/verifyReceipt';
 const APPLE_VERIFY_RECEIPT_URL_PRODUCTION = process.env.APPLE_VERIFY_RECEIPT_URL_PRODUCTION || 'https://buy.itunes.apple.com/verifyReceipt';
 
 const APPLE_SHARED_SECRET = process.env.APPLE_SHARED_SECRET;
+
+// App Store Server API Configuration
+const ISSUER_ID = process.env.APPLE_ISSUER_ID;
+const KEY_ID = process.env.APPLE_KEY_ID;
+const BUNDLE_ID = process.env.APPLE_BUNDLE_ID;
+const APPLE_API_URL_PRODUCTION = process.env.APPLE_API_URL_PRODUCTION;
+const APPLE_API_URL_SANDBOX = process.env.APPLE_API_URL_SANDBOX;
 
 interface IAPVerificationResult {
     isValid: boolean;
@@ -102,21 +110,125 @@ export class PaymentService {
         return response.data;
     }
 
-    static async updateUserPlan(userId: string, planType: 'WEEKLY' | 'MONTHLY') {
+    static async updateUserPlan(userId: string, planType: 'WEEKLY' | 'MONTHLY', originalTransactionId?: string, expiresDate?: string) {
         const user = await prisma.user.update({
             where: { userId },
             data: {
                 planType: planType === 'WEEKLY' ? PlanType.WEEKLY : PlanType.MONTHLY,
+                ...(originalTransactionId ? { originalTransactionId } : {}),
+                ...(expiresDate ? { subscriptionExpiresAt: new Date(expiresDate) } : {})
             },
             select: {
                 userId: true,
                 planType: true,
                 email: true,
+                subscriptionExpiresAt: true
             }
         });
 
         await TasksService.ensureTasksForPlanType(userId, planType);
 
         return user;
+    }
+
+    /**
+     * Generates a JWT for App Store Server API authentication.
+     */
+    private static generateAppStoreJWT(): string {
+        if (!APPLE_SHARED_SECRET) {
+            throw new Error('APPLE_SHARED_SECRET (Private Key) is missing');
+        }
+
+        const payload = {
+            iss: ISSUER_ID,
+            iat: Math.floor(Date.now() / 1000),
+            exp: Math.floor(Date.now() / 1000) + 3600, // 1 hour expiration
+            aud: 'appstoreconnect-v1',
+            bid: BUNDLE_ID
+        };
+
+        const headers = {
+            alg: 'ES256',
+            kid: KEY_ID,
+            typ: 'JWT'
+        };
+
+        return jwt.sign(payload, APPLE_SHARED_SECRET, { header: headers });
+    }
+
+    /**
+     * Fetches subscription status from App Store Server API.
+     */
+    static async getSubscriptionStatus(originalTransactionId: string): Promise<{ isActive: boolean; expiresDate?: string; planType?: 'WEEKLY' | 'MONTHLY' }> {
+        try {
+            const token = this.generateAppStoreJWT();
+
+            let url = `${APPLE_API_URL_PRODUCTION}/${originalTransactionId}`;
+            let response;
+
+            try {
+                response = await axios.get(url, {
+                    headers: { Authorization: `Bearer ${token}` }
+                });
+            } catch (error: any) {
+                if (error.response?.status === 404) {
+                    console.log('Transaction not found in Production, trying Sandbox...');
+                    url = `${APPLE_API_URL_SANDBOX}/${originalTransactionId}`;
+                    response = await axios.get(url, {
+                        headers: { Authorization: `Bearer ${token}` }
+                    });
+                } else {
+                    throw error;
+                }
+            }
+
+            const data = response.data;
+
+            if (!data || !data.data || data.data.length === 0) {
+                return { isActive: false };
+            }
+
+            const lastTransaction = data.data[0].lastTransactions.find((t: any) => t.originalTransactionId === originalTransactionId);
+
+            if (!lastTransaction) {
+                return { isActive: false };
+            }
+
+           const status = lastTransaction.status;
+           const signedTransactionInfo = lastTransaction.signedTransactionInfo;
+
+           let activeSubscription = null;
+
+           for (const group of data.data) {
+                for (const transaction of group.lastTransactions) {
+                    if (transaction.status === 1 || transaction.status === 4) { // Active or Grace Period
+                        activeSubscription = transaction;
+                        break;
+                    }
+                }
+            }
+
+            if (activeSubscription) {
+                const decoded: any = jwt.decode(activeSubscription.signedTransactionInfo);
+
+                let planType: 'WEEKLY' | 'MONTHLY' | undefined;
+                if (decoded && decoded.productId) {
+                    if (decoded.productId.toLowerCase().includes('weekly')) planType = 'WEEKLY';
+                    if (decoded.productId.toLowerCase().includes('monthly')) planType = 'MONTHLY';
+                }
+
+                return {
+                    isActive: true,
+                    expiresDate: decoded ? new Date(decoded.expiresDate).toISOString() : undefined,
+                    planType
+                };
+            }
+
+            return { isActive: false };
+
+        } catch (error) {
+            console.error('Get Subscription Status Error:', error);
+            return { isActive: false };
+        }
     }
 }

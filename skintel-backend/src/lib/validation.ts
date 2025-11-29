@@ -168,3 +168,8 @@ export const paymentVerifySchema = z.object({
   receipt_data: z.string().min(1),
   product_id: z.string().min(1),
 });
+
+export const cancelReasonSchema = z.object({
+  reason: z.string().min(1),
+  otherDetails: z.string().optional(),
+});
