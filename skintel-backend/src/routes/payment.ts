@@ -12,7 +12,7 @@ const router = Router();
  *   post:
  *     summary: Verify iOS In-App Purchase receipt
  *     description: Verifies the receipt with Apple and updates the user's plan if valid.
- *     tags: [Payment]
+ *     tags: [Subscription]
  *     security:
  *       - BearerAuth: []
  *     requestBody:

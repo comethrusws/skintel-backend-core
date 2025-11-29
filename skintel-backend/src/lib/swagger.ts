@@ -23,6 +23,7 @@ const options = {
       { name: 'Version', description: 'App version check' },
       { name: 'Tasks', description: 'Skincare task management' },
       { name: 'Report', description: 'Email/Report Issues' },
+      { name: 'Subscription', description: 'Subscription APIs' },
     ],
     servers: [
       {
