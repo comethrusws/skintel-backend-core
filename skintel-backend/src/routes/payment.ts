@@ -1,8 +1,9 @@
 import { Router, Response } from 'express';
 import { authenticateUser, AuthenticatedRequest } from '../middleware/auth';
-import { paymentVerifySchema } from '../lib/validation';
+import { paymentVerifySchema, cancelReasonSchema } from '../lib/validation';
 import { asyncHandler } from '../utils/asyncHandler';
 import { PaymentService } from '../services/payment';
+import { sendSlackNotification } from '../services/slack';
 
 const router = Router();
 
@@ -98,5 +99,97 @@ router.post('/verify-ios', authenticateUser, asyncHandler(async (req: Authentica
         environment: verificationResult.environment
     });
 }));
+
+/**
+ * @swagger
+ * /v1/payment/cancel-reason:
+ *   post:
+ *     summary: Submit cancellation reason
+ *     description: Submit a reason for cancelling the subscription. Sends a notification to Slack.
+ *     tags: [Subscription]
+ *     security:
+ *       - BearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               reason:
+ *                 type: string
+ *               otherDetails:
+ *                 type: string
+ *             required:
+ *               - reason
+ *     responses:
+ *       200:
+ *         description: Reason submitted successfully
+ *       400:
+ *         description: Invalid request data
+ *       401:
+ *         description: Authentication required
+ */
+router.post('/cancel-reason', authenticateUser, asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+    const validationResult = cancelReasonSchema.safeParse(req.body);
+
+    if (!validationResult.success) {
+        res.status(400).json({
+            error: 'Invalid request data',
+            details: validationResult.error.errors
+        });
+        return;
+    }
+
+    const { reason, otherDetails } = validationResult.data;
+    const userId = req.userId!;
+
+    // Send to Slack
+    await sendSlackNotification({
+        text: `⚠️ Subscription Cancelled\nUser ID: ${userId}\nReason: ${reason}\nDetails: ${otherDetails || 'N/A'}`
+    });
+
+    res.json({ success: true });
+}));
+
+/**
+ * @swagger
+ * /v1/payment/plans:
+ *   get:
+ *     summary: Get available payment plans
+ *     description: Retrieve a list of available subscription plans (Product IDs).
+ *     tags: [Subscription]
+ *     security:
+ *       - BearerAuth: []
+ *     responses:
+ *       200:
+ *         description: List of plans retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 plans:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       id:
+ *                         type: string
+ *                       name:
+ *                         type: string
+ *                       type:
+ *                         type: string
+ *                         enum: [WEEKLY, MONTHLY]
+ *       401:
+ *         description: Authentication required
+ */
+router.get('/plans', authenticateUser, (req: AuthenticatedRequest, res: Response) => {
+    const plans = [
+        { id: 'com.skintel.weekly', name: 'Weekly Plan', type: 'WEEKLY' },
+        { id: 'com.skintel.monthly', name: 'Monthly Plan', type: 'MONTHLY' }
+    ];
+    res.json({ plans });
+});
 
 export { router as paymentRouter };
