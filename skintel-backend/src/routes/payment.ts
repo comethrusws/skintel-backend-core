@@ -144,7 +144,6 @@ router.post('/cancel-reason', authenticateUser, asyncHandler(async (req: Authent
     const { reason, otherDetails } = validationResult.data;
     const userId = req.userId!;
 
-    // Send to Slack
     await sendSlackNotification({
         text: `⚠️ Subscription Cancelled\nUser ID: ${userId}\nReason: ${reason}\nDetails: ${otherDetails || 'N/A'}`
     });
