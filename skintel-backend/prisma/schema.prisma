@@ -43,6 +43,8 @@ model User {
   longitude               Float?                  @map("longitude")
   locationUpdatedAt       DateTime?               @map("location_updated_at")
   planType                PlanType                @default(MONTHLY) @map("plan_type")
+  originalTransactionId   String?                 @map("original_transaction_id")
+  subscriptionExpiresAt   DateTime?               @map("subscription_expires_at")
   createdAt               DateTime                @default(now()) @map("created_at")
   updatedAt               DateTime                @updatedAt @map("updated_at")
   refreshTokens           RefreshToken[]
