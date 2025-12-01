@@ -58,6 +58,7 @@ model User {
   skinFeels               SkinFeel[]
   notificationPreferences NotificationPreference?
   deviceTokens            DeviceToken[]
+  waterIntakeLogs         WaterIntakeLog[]
 
   @@unique([ssoProvider, ssoId])
   @@map("users")
@@ -175,6 +176,20 @@ model FacialLandmarks {
   user   User?            @relation(fields: [userId], references: [userId], onDelete: Cascade)
 
   @@map("facial_landmarks")
+}
+
+model WaterIntakeLog {
+  id        String   @id @default(cuid())
+  userId    String   @map("user_id")
+  date      DateTime @map("date")
+  amountMl  Int      @map("amount_ml")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [userId], onDelete: Cascade)
+
+  @@unique([userId, date])
+  @@map("water_intake_logs")
 }
 
 model Product {
