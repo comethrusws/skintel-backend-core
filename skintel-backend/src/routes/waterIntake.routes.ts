@@ -112,8 +112,8 @@ router.put('/', authenticateUser, async (req: AuthenticatedRequest, res: Respons
     }
 
     const numericAmount = Number(amount);
-    if (!Number.isFinite(numericAmount) || numericAmount <= 0) {
-      return res.status(400).json({ error: 'amount must be a positive number' });
+    if (!Number.isFinite(numericAmount)) {
+      return res.status(400).json({ error: 'amount must be a valid number' });
     }
 
     if (unit && !['ml', 'l', 'L'].includes(unit)) {

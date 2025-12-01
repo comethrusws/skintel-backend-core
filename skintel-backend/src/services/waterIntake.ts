@@ -108,8 +108,8 @@ export class WaterIntakeService {
   static async upsertDailyIntake(userId: string, params: { date?: string; amount: number; unit?: string }): Promise<DailyWaterIntakeSummary> {
     const { amount, unit = 'ml', date } = params;
 
-    if (!Number.isFinite(amount) || amount <= 0) {
-      throw new Error('Amount must be a positive number');
+    if (!Number.isFinite(amount)) {
+      throw new Error('Amount must be a valid number');
     }
 
     const normalizedDate = this.normalizeDate(date);
@@ -122,7 +122,7 @@ export class WaterIntakeService {
 
     const recommendation = await this.getWaterIntakeSuggestion(userId);
 
-    await prisma.waterIntakeLog.upsert({
+    const log = await prisma.waterIntakeLog.upsert({
       where: {
         userId_date: {
           userId,
@@ -135,18 +135,23 @@ export class WaterIntakeService {
         amountMl,
       },
       update: {
-        amountMl,
+        amountMl: {
+          increment: amountMl,
+        },
       },
     });
 
-    const progress = amountMl && recommendation.amount
-      ? Math.min(1, amountMl / recommendation.amount)
+    // Use the updated amount from the log for the return value
+    const finalAmount = log.amountMl;
+
+    const progress = finalAmount && recommendation.amount
+      ? Math.min(1, finalAmount / recommendation.amount)
       : null;
 
     // Return normalized summary
     return {
       date: normalizedDate.toISOString().slice(0, 10),
-      actualAmount: amountMl,
+      actualAmount: finalAmount,
       actualUnit: 'ml',
       recommended: recommendation,
       progress,
