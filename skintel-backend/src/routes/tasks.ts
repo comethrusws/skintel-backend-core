@@ -12,6 +12,46 @@ const taskCompletionSchema = z.object({
 
 /**
  * @swagger
+ * /v1/tasks/all:
+ *   get:
+ *     summary: Get all tasks
+ *     description: Retrieve all tasks for the current user across all weeks (both active and inactive)
+ *     tags: [Tasks]
+ *     security:
+ *       - BearerAuth: []
+ *     responses:
+ *       200:
+ *         description: All tasks retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 tasks:
+ *                   type: array
+ *                   description: All tasks in a flat array (includes both active and inactive tasks)
+ *                 tasksByWeek:
+ *                   type: object
+ *                   description: Tasks grouped by week (1-4)
+ *                 totalTasks:
+ *                   type: integer
+ *                   description: Total number of tasks (active and inactive)
+ *                 weeks:
+ *                   type: array
+ *                   items:
+ *                     type: integer
+ *                   description: Array of weeks that have tasks
+ *       401:
+ *         description: Authentication required
+ */
+router.get('/all', authenticateUser, asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+  const userId = req.userId!;
+  const allTasks = await TasksService.getAllTasks(userId);
+  res.json(allTasks);
+}));
+
+/**
+ * @swagger
  * /v1/tasks/today:
  *   get:
  *     summary: Get today's tasks

@@ -35,7 +35,7 @@ Example output:
       "title": "Salicylic Acid Treatment",
       "description": "Apply salicylic acid treatment to clean skin, start 3x per week",
       "timeOfDay": "evening",
-      "category": "treatment", 
+      "category": "treatment",
       "priority": "important",
       "recommendedProducts": ["salicylic acid", "BHA treatment"]
     }
@@ -362,6 +362,69 @@ export class TasksService {
       week,
       tasks: formattedTasks,
       totalTasks: formattedTasks.length
+    };
+  }
+
+  static async getAllTasks(userId: string): Promise<any> {
+    const tasks = await prisma.task.findMany({
+      where: {
+        userId
+      },
+      orderBy: [
+        { week: 'asc' },
+        { priority: 'asc' },
+        { timeOfDay: 'asc' }
+      ]
+    });
+
+    const userProducts = await prisma.product.findMany({
+      where: { userId },
+      select: {
+        id: true,
+        productData: true
+      }
+    });
+
+    const formattedTasks = tasks.map(task => {
+      const taskUserProducts = task.userProducts ?
+        userProducts.filter(p => (task.userProducts as string[]).includes(p.id))
+          .map(p => {
+            const data = p.productData as any;
+            return {
+              id: p.id,
+              name: data?.product_name || 'Unknown Product',
+              category: data?.category || 'unknown'
+            };
+          }) : [];
+
+      return {
+        id: task.id,
+        week: task.week,
+        title: task.title,
+        description: task.description,
+        timeOfDay: task.timeOfDay,
+        category: task.category,
+        priority: task.priority,
+        isActive: task.isActive,
+        recommendedProducts: task.recommendedProducts as string[] || [],
+        userProducts: taskUserProducts
+      };
+    });
+
+    // Group tasks by week for better organization
+    const tasksByWeek: Record<number, typeof formattedTasks> = {};
+    formattedTasks.forEach(task => {
+      if (!tasksByWeek[task.week]) {
+        tasksByWeek[task.week] = [];
+      }
+      tasksByWeek[task.week].push(task);
+    });
+
+    return {
+      tasks: formattedTasks,
+      tasksByWeek,
+      totalTasks: formattedTasks.length,
+      weeks: Object.keys(tasksByWeek).map(Number).sort((a, b) => a - b)
     };
   }
 
