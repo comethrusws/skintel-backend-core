@@ -140,8 +140,9 @@ export class WaterIntakeService {
 
   private static normalizeDate(date?: string | Date): Date {
     const d = date ? new Date(date) : new Date();
-    // Normalize to UTC midnight for uniqueness
-    const utc = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
+    // Normalize to UTC midnight using local date components
+    // This ensures the same calendar date is used regardless of timezone
+    const utc = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
     return utc;
   }
 
