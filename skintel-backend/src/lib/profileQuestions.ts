@@ -72,3 +72,23 @@ export function validateProfileQuestionValue(questionId: string, value: any): bo
 
     return false;
 }
+
+/**
+ * Convert underscore-separated option to readable format
+ */
+export function formatOptionLabel(option: string): string {
+    return option
+        .split('_')
+        .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+        .join(' ');
+}
+
+/**
+ * Map options array to include both value and label
+ */
+export function mapOptionsWithLabels(options: string[]): Array<{ value: string; label: string }> {
+    return options.map(option => ({
+        value: option,
+        label: formatOptionLabel(option)
+    }));
+}

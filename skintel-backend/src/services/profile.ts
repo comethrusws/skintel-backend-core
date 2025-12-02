@@ -2,7 +2,7 @@ import { prisma } from '../lib/prisma';
 import { Prisma } from '@prisma/client';
 import { getTaskProgress } from './tasks';
 import { maybePresignUrl } from '../lib/s3';
-import { PROFILE_QUESTIONS, PROFILE_SCREEN_ID, getProfileQuestion, validateProfileQuestionValue } from '../lib/profileQuestions';
+import { PROFILE_QUESTIONS, PROFILE_SCREEN_ID, getProfileQuestion, validateProfileQuestionValue, mapOptionsWithLabels } from '../lib/profileQuestions';
 
 export class ProfileService {
     static async getProfile(userId: string) {
@@ -553,7 +553,7 @@ export class ProfileService {
             };
 
             if (question.type === 'single' && question.options) {
-                questionResponse.options = question.options;
+                questionResponse.options = mapOptionsWithLabels(question.options);
             } else if (question.type === 'slider') {
                 questionResponse.min_value = question.min_value;
                 questionResponse.max_value = question.max_value;
