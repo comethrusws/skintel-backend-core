@@ -53,7 +53,7 @@ function buildPrompt(): string {
     '    {"week": 3, "preview": "Introduce retinol treatment and sun protection", "improvement_expected": "50%", "weekly_improvement_score": 82},\n' +
     '    {"week": 4, "preview": "Maintain routine and assess overall progress", "improvement_expected": "70%", "weekly_improvement_score": 85}\n' +
     '  ],\n' +
-    '  "estimated_weekly_scores": [75, 78, 82, 85],\n' +
+    '  "estimated_weekly_scores": {"week_1": 75, "week_2": 78, "week_3": 82, "week_4": 85},\n' +
     '  "images_analyzed": ["front", "left", "right"]\n' +
     '}'
   );
@@ -91,7 +91,7 @@ function buildProgressPrompt(): string {
     '  "areas_needing_attention": ["forehead texture", "jawline breakouts"],\n' +
     '  "updated_recommendations": ["increase retinol frequency", "add exfoliation"],\n' +
     '  "next_week_focus": "Focus on consistency with evening routine and add gentle exfoliation twice weekly",\n' +
-    '  "updated_weekly_scores": [85, 88, 90, 92],\n' +
+    '  "updated_weekly_scores": {"week_1": 85, "week_2": 88, "week_3": 90, "week_4": 92},\n' +
     '  "remaining_issues": [\n' +
     '    {"type": "dark_circles", "region": "under_eye_left", "severity": "mild", "visible_in": ["front"], "dlib_68_facial_landmarks": [\n' +
     '      {"x": 30, "y": 40},\n' +

@@ -204,8 +204,8 @@ export interface EnhancedAnalysisResult {
   images_analyzed: string[];
   score: number;
   estimated_improvement_score?: number;
-  estimated_weekly_scores?: number[];
-  updated_weekly_scores?: number[];
+  estimated_weekly_scores?: { week_1: number; week_2: number; week_3: number; week_4: number };
+  updated_weekly_scores?: { week_1: number; week_2: number; week_3: number; week_4: number };
   care_plan_4_weeks: WeeklyPlanItem[];
 }
 
