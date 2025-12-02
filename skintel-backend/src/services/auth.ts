@@ -135,8 +135,7 @@ export class AuthService {
         const detectedProvider = verifiedSession.provider;
 
         if (provider !== detectedProvider) {
-            console.warn(`Clerk provider mismatch: expected ${provider}, got ${detectedProvider}`);
-            throw new Error('Provider mismatch');
+            console.warn(`Clerk provider mismatch: client sent ${provider}, but Clerk verified as ${detectedProvider}. Using detected provider.`);
         }
 
         const ssoId = verifiedSession.clerkUserId;
@@ -158,6 +157,19 @@ export class AuthService {
             });
 
             if (user && !user.ssoProvider && !user.ssoId) {
+                user = await prisma.user.update({
+                    where: { userId: user.userId },
+                    data: {
+                        ssoProvider: detectedProvider,
+                        ssoId,
+                        name: user.name || ([verifiedSession.firstName, verifiedSession.lastName]
+                            .filter(Boolean)
+                            .join(' ')
+                            .trim() || undefined),
+                    },
+                });
+            } else if (user && user.ssoProvider && user.ssoProvider !== detectedProvider) {
+                console.log(`User ${user.userId} switching from ${user.ssoProvider} to ${detectedProvider}`);
                 user = await prisma.user.update({
                     where: { userId: user.userId },
                     data: {
