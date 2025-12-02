@@ -17,16 +17,16 @@ jobs:
           mv /tmp/skintel-backend-core.tar.gz .
           
           # Create SSH key file
-          echo "${{ secrets.SSH_KEY }}" > /tmp/ssh_key
+          echo "${{ secrets.SSH_KEY_PROD }}" > /tmp/ssh_key
           chmod 600 /tmp/ssh_key
           
           # Upload to server
           scp -i /tmp/ssh_key -o StrictHostKeyChecking=no \
-            skintel-backend-core.tar.gz ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:/home/admin/
+            skintel-backend-core.tar.gz ${{ secrets.SSH_USER_PROD }}@${{ secrets.SSH_HOST_PROD }}:/home/admin/
           
           # Deploy on server
           ssh -i /tmp/ssh_key -o StrictHostKeyChecking=no \
-            ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} << 'EOF'
+            ${{ secrets.SSH_USER_PROD }}@${{ secrets.SSH_HOST_PROD }} << 'EOF'
             cd /home/admin
             rm -rf skintel-backend-core
             mkdir -p skintel-backend-core
