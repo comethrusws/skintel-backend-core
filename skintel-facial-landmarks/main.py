@@ -25,31 +25,53 @@ LANDMARK_INDICES = {
     'right_eye': [33, 7, 163, 144, 145, 153, 154, 155, 133, 173, 157, 158, 159, 160, 161, 246],
     'left_eyebrow': [276, 283, 282, 295, 285, 300, 293, 334, 296, 336],
     'right_eyebrow': [46, 53, 52, 65, 55, 70, 63, 105, 66, 107],
-    'nose': [1, 2, 98, 327, 195, 5, 4, 275, 440, 220, 45, 274, 237, 44, 19], # Simplified nose
+    'nose': [1, 2, 98, 327, 195, 5, 4, 275, 440, 220, 45, 274, 237, 44, 19],
     'face_oval': [10, 338, 297, 332, 284, 251, 389, 356, 454, 323, 361, 288, 397, 365, 379, 378, 400, 377, 152, 148, 176, 149, 150, 136, 172, 58, 132, 93, 234, 127, 162, 21, 54, 103, 67, 109],
-    'forehead': [10, 338, 297, 332, 284, 251, 389, 356, 454, 323, 361, 288, 397, 365, 379, 378, 400, 377, 152, 148, 176, 149, 150, 136, 172, 58, 132, 93, 234, 127, 162, 21, 54, 103, 67, 109], # Fallback to face oval or specific forehead points if needed
-    'left_under_eye': [382, 362, 263, 466, 388, 387, 386, 385, 384, 398], # Approximate under eye area
-    'right_under_eye': [33, 246, 161, 160, 159, 158, 157, 173, 133, 155]  # Approximate under eye area
+    'forehead': [10, 338, 297, 332, 284, 251, 389, 356, 454, 323, 67, 109, 10],
+    # Smaller, more precise under-eye regions (just the crescent under the eye)
+    'left_under_eye': [359, 255, 339, 254, 253, 252, 256, 341, 463, 414, 286, 258],
+    'right_under_eye': [130, 25, 110, 24, 23, 22, 26, 112, 243, 190, 56, 28],
+    # Smaller cheek areas - just the prominent cheek zone
+    'left_cheek': [266, 426, 436, 416, 376, 352, 280, 330],
+    'right_cheek': [36, 206, 216, 192, 147, 123, 50, 101],
+    # T-zone smaller region
+    't_zone': [10, 151, 9, 8, 168, 6, 197, 195, 5, 4, 1, 19, 94, 2]
 }
 
 def get_region_landmarks(region_name: str) -> List[int]:
     region_name = region_name.lower()
-    if 'lip' in region_name or 'mouth' in region_name:
+    
+    # Prioritize under-eye detection for dark circles
+    if 'under' in region_name and 'eye' in region_name:
+        if 'left' in region_name:
+            return LANDMARK_INDICES['left_under_eye']
+        elif 'right' in region_name:
+            return LANDMARK_INDICES['right_under_eye']
+        else:
+            return LANDMARK_INDICES['left_under_eye'] + LANDMARK_INDICES['right_under_eye']
+    elif 'lip' in region_name or 'mouth' in region_name:
         return LANDMARK_INDICES['lips']
-    elif 'left_eye' in region_name: # Specific eye
+    elif 'left_eye' in region_name:
         return LANDMARK_INDICES['left_eye']
     elif 'right_eye' in region_name:
         return LANDMARK_INDICES['right_eye']
-    elif 'eye' in region_name: 
-        return LANDMARK_INDICES['left_eye'] + LANDMARK_INDICES['right_eye'] 
+    elif 'eye' in region_name:
+        return LANDMARK_INDICES['left_eye'] + LANDMARK_INDICES['right_eye']
     elif 'eyebrow' in region_name:
         return LANDMARK_INDICES['left_eyebrow'] + LANDMARK_INDICES['right_eyebrow']
     elif 'nose' in region_name:
         return LANDMARK_INDICES['nose']
     elif 'forehead' in region_name:
-         return [10, 338, 297, 332, 284, 251, 389, 356, 454, 323, 361, 288, 397, 365, 379, 378, 400, 377] 
+        return LANDMARK_INDICES['forehead']
+    elif 't_zone' in region_name or 't-zone' in region_name:
+        return LANDMARK_INDICES['t_zone']
     elif 'cheek' in region_name:
-        return LANDMARK_INDICES['face_oval']
+        if 'left' in region_name:
+            return LANDMARK_INDICES['left_cheek']
+        elif 'right' in region_name:
+            return LANDMARK_INDICES['right_cheek']
+        else:
+            return LANDMARK_INDICES['left_cheek'] + LANDMARK_INDICES['right_cheek']
     else:
         return LANDMARK_INDICES['face_oval']
 
@@ -235,13 +257,30 @@ def annotate_image_with_issues(image_array: np.ndarray, issues: List[SkinIssue])
         for idx, issue in enumerate(issues, start=1):
             color = severity_colors.get(issue.severity.lower(), (255, 255, 255))
             
-            indices = get_region_landmarks(issue.region)
-            
-            if issue.type.lower() in ['dark_circles', 'dark circles', 'eye_bags', 'puffy_eyes']:
+            # Special handling for dark circles and under-eye issues
+            if issue.type.lower() in ['dark_circles', 'dark circles', 'eye_bags', 'puffy_eyes', 'under_eye_circles']:
                 if 'left' in issue.region.lower():
                     indices = LANDMARK_INDICES['left_under_eye']
                 elif 'right' in issue.region.lower():
                     indices = LANDMARK_INDICES['right_under_eye']
+                else:
+                    # If no specific side mentioned, mark both
+                    indices = LANDMARK_INDICES['left_under_eye'] + LANDMARK_INDICES['right_under_eye']
+            # Special handling for uneven skin tone - use broader regions
+            elif issue.type.lower() in ['uneven_skin_tone', 'uneven skin tone', 'hyperpigmentation', 'post_inflammatory_hyperpigmentation']:
+                if 'cheek' in issue.region.lower():
+                    if 'left' in issue.region.lower():
+                        indices = LANDMARK_INDICES['left_cheek']
+                    elif 'right' in issue.region.lower():
+                        indices = LANDMARK_INDICES['right_cheek']
+                    else:
+                        indices = get_region_landmarks(issue.region)
+                elif 't' in issue.region.lower() and 'zone' in issue.region.lower():
+                    indices = LANDMARK_INDICES['t_zone']
+                else:
+                    indices = get_region_landmarks(issue.region)
+            else:
+                indices = get_region_landmarks(issue.region)
             
             points = []
             for index in indices:

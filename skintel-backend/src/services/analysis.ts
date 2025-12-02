@@ -19,25 +19,31 @@ function buildPrompt(): string {
     'You will receive 1-3 face images (front, left profile, right profile) and facial landmarks data from the front image.\n' +
     'Your task:\n' +
     '1. Analyze skin across all provided images\n' +
-    '2. Clearly mention the affected regions (e.g., "mild acne on the right cheek", "dark spots on left temple")\n' +
-    '3. Give severity-based explanations (mild = easy care, severe = consider dermatologist)\n' +
-    '4. Use information from all angles to provide comprehensive analysis\n' +
-    '5. Provide an overall skin health score out of 100\n' +
-    '6. Create a 4-week improvement plan with weekly previews and expected improvement percentages\n' +
-    '7. Return the facial issues in 68 face landmark data format in JSON\n' +
+    '2. Identify SPECIFIC, LOCALIZED skin issues - not large general areas\n' +
+    '3. For dark circles: use left_under_eye or right_under_eye (small crescent under the eye)\n' +
+    '4. For pigmentation/acne: specify exact location (left_cheek, right_cheek, forehead, nose, etc.)\n' +
+    '5. Keep marked regions SMALL and PRECISE - only mark the visible problem area\n' +
+    '6. Provide an overall skin health score out of 100\n' +
+    '7. Create a 4-week improvement plan with weekly previews and expected improvement percentages\n' +
+    '8. Return the facial issues in 68 face landmark data format in JSON\n' +
     '\n' +
     'Example JSON output (clearly highlight the issues visible in the images) and respond strictly in the following json format! DO NOT ADD ANYTHING ELSE:\n' +
     '{\n' +
     '  "issues": [\n' +
-    '    {"type": "dark_circles", "region": "under_eye_left", "severity": "moderate", "visible_in": ["front"], "dlib_68_facial_landmarks": [\n' +
+    '    {"type": "dark_circles", "region": "left_under_eye", "severity": "moderate", "visible_in": ["front"], "dlib_68_facial_landmarks": [\n' +
     '      {"x": 30, "y": 40},\n' +
     '      {"x": 32, "y": 42}\n' +
     '    ]},\n' +
-    '    {"type": "acne", "region": "cheek_right", "severity": "mild", "visible_in": ["front", "right"], "dlib_68_facial_landmarks": [\n' +
+    '    {"type": "uneven_skin_tone", "region": "left_cheek", "severity": "mild", "visible_in": ["front", "left"], "dlib_68_facial_landmarks": [\n' +
     '      {"x": 50, "y": 60},\n' +
     '      {"x": 52, "y": 62}\n' +
+    '    ]},\n' +
+    '    {"type": "acne", "region": "right_cheek", "severity": "mild", "visible_in": ["front", "right"], "dlib_68_facial_landmarks": [\n' +
+    '      {"x": 55, "y": 65},\n' +
+    '      {"x": 57, "y": 67}\n' +
     '    ]}\n' +
     '  ],\n' +
+    '  "important_notes": "1. Use SMALL, PRECISE regions. 2. For dark circles: left_under_eye or right_under_eye (NOT eye). 3. For pigmentation: specify exact small area like left_cheek, right_cheek. 4. Avoid marking large areas - be specific and localized. 5. Only mark the visible problem area, not the entire face region."\n' +
     '  "overall_assessment": "Combination skin with mild acne and moderate dark circles",\n' +
     '  "score": 72,\n' +
     '  "estimated_improvement_score": 85,\n' +
@@ -47,6 +53,7 @@ function buildPrompt(): string {
     '    {"week": 3, "preview": "Introduce retinol treatment and sun protection", "improvement_expected": "50%", "weekly_improvement_score": 82},\n' +
     '    {"week": 4, "preview": "Maintain routine and assess overall progress", "improvement_expected": "70%", "weekly_improvement_score": 85}\n' +
     '  ],\n' +
+    '  "estimated_weekly_scores": [75, 78, 82, 85],\n' +
     '  "images_analyzed": ["front", "left", "right"]\n' +
     '}'
   );
@@ -71,6 +78,7 @@ function buildProgressPrompt(): string {
     '{\n' +
     '  "overall_progress_score": 85,\n' +
     '  "score_change": 13,\n' +
+    '  "estimated_improvement_score": 92,\n' +
     '  "issues_improved": [\n' +
     '    {"issue_type": "dark_circles", "initial_severity": "moderate", "current_severity": "mild", "improvement_percentage": 40}\n' +
     '  ],\n' +
@@ -83,6 +91,7 @@ function buildProgressPrompt(): string {
     '  "areas_needing_attention": ["forehead texture", "jawline breakouts"],\n' +
     '  "updated_recommendations": ["increase retinol frequency", "add exfoliation"],\n' +
     '  "next_week_focus": "Focus on consistency with evening routine and add gentle exfoliation twice weekly",\n' +
+    '  "updated_weekly_scores": [85, 88, 90, 92],\n' +
     '  "remaining_issues": [\n' +
     '    {"type": "dark_circles", "region": "under_eye_left", "severity": "mild", "visible_in": ["front"], "dlib_68_facial_landmarks": [\n' +
     '      {"x": 30, "y": 40},\n' +
