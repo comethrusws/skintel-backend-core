@@ -37,20 +37,19 @@ jobs:
             # Create .env file with properly quoted secrets
             cat > .env << 'ENVEOF'
           NODE_ENV="${{ secrets.NODE_ENV }}"
-          API_BASE_URL="${{ secrets.API_BASE_URL }}"
-          API_BASE_URL_PROD="${{ secrets.API_BASE_URL_PROD }}"
+          API_BASE_URL="${{ secrets.API_BASE_URL_PROD }}"
           MAX_REQUEST_SIZE="${{ secrets.MAX_REQUEST_SIZE }}"
           PORT="${{ secrets.PORT }}"
           JWT_SECRET="${{ secrets.JWT_SECRET }}"
           OPENAI_API_KEY="${{ secrets.OPENAI_API_KEY }}"
-          AWS_ACCESS_KEY_ID_PROD="${{ secrets.AWS_ACCESS_KEY_ID_PROD }}"
-          AWS_SECRET_ACCESS_KEY_PROD="${{ secrets.AWS_SECRET_ACCESS_KEY_PROD }}"
-          AWS_REGION_PROD="${{ secrets.AWS_REGION_PROD }}"
+          AWS_ACCESS_KEY_ID="${{ secrets.AWS_ACCESS_KEY_ID_PROD }}"
+          AWS_SECRET_ACCESS_KEY="${{ secrets.AWS_SECRET_ACCESS_KEY_PROD }}"
+          AWS_REGION="${{ secrets.AWS_REGION_PROD }}"
           IOS_BUNDLE_ID="${{ secrets.IOS_BUNDLE_ID }}"
           APPLE_SHARED_SECRET="${{ secrets.APPLE_SHARED_SECRET }}"
-          S3_BUCKET_NAME_PROD="${{ secrets.S3_BUCKET_NAME_PROD }}"
-          S3_PUBLIC_BASE_URL_PROD="${{ secrets.S3_PUBLIC_BASE_URL_PROD }}"
-          S3_OBJECT_ACL_PROD="${{ secrets.S3_OBJECT_ACL_PROD }}"
+          S3_BUCKET_NAME="${{ secrets.S3_BUCKET_NAME_PROD }}"
+          S3_PUBLIC_BASE_URL="${{ secrets.S3_PUBLIC_BASE_URL_PROD }}"
+          S3_OBJECT_ACL="${{ secrets.S3_OBJECT_ACL_PROD }}"
           APPLE_ISSUER_ID="${{ secrets.APPLE_ISSUER_ID }}"
           APPLE_KEY_ID="${{ secrets.APPLE_KEY_ID }}"
           APPLE_BUNDLE_ID="${{ secrets.APPLE_BUNDLE_ID }}"
@@ -62,7 +61,7 @@ jobs:
           CLERK_PUBLISHABLE_KEY="${{ secrets.CLERK_PUBLISHABLE_KEY }}"
           FIREBASE_SERVICE_ACCOUNT='${{ secrets.FIREBASE_SERVICE_ACCOUNT }}'
           SENTRY_DSN="${{ secrets.SENTRY_DSN }}"
-          DATABASE_URL_PROD="${{ secrets.DATABASE_URL_PROD }}"
+          DATABASE_URL="${{ secrets.DATABASE_URL_PROD }}"
           ENVEOF
             
             # Stop existing services and start new ones

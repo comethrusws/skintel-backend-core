@@ -10,24 +10,16 @@ services:
       - PORT=${PORT:-3000}
       - JWT_SECRET=${JWT_SECRET}
       - API_BASE_URL=${API_BASE_URL}
-      - API_BASE_URL_PROD=${API_BASE_URL_PROD}
       - MAX_REQUEST_SIZE=${MAX_REQUEST_SIZE}
-      - DATABASE_URL=postgresql://postgres:password@skintel-database:5432/skintel_db
-      - DATABASE_URL_PROD=${DATABASE_URL_PROD}
+      - DATABASE_URL=${DATABASE_URL}
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - LANDMARK_URL=http://skintel-facial-landmarks:8000
       - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
       - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
       - AWS_REGION=${AWS_REGION}
-      - AWS_ACCESS_KEY_ID_PROD=${AWS_ACCESS_KEY_ID_PROD}
-      - AWS_SECRET_ACCESS_KEY_PROD=${AWS_SECRET_ACCESS_KEY_PROD}
-      - AWS_REGION_PROD=${AWS_REGION_PROD}
       - S3_BUCKET_NAME=${S3_BUCKET_NAME}
       - S3_PUBLIC_BASE_URL=${S3_PUBLIC_BASE_URL}
       - S3_OBJECT_ACL=${S3_OBJECT_ACL}
-      - S3_BUCKET_NAME_PROD=${S3_BUCKET_NAME_PROD}
-      - S3_PUBLIC_BASE_URL_PROD=${S3_PUBLIC_BASE_URL_PROD}
-      - S3_OBJECT_ACL_PROD=${S3_OBJECT_ACL_PROD}
       - OPENWEATHER_API_KEY=${OPENWEATHER_API_KEY}
       - SLACK_WEBHOOK_URL=${SLACK_WEBHOOK_URL}
       - CLERK_SECRET_KEY=${CLERK_SECRET_KEY}
@@ -54,7 +46,6 @@ services:
     environment:
       - NODE_ENV=${NODE_ENV:-production}
       - DATABASE_URL=postgresql://postgres:password@skintel-database:5432/skintel_db
-      - DATABASE_URL_PROD=${DATABASE_URL_PROD}
     depends_on:
       skintel-database:
         condition: service_healthy
