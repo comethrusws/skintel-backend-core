@@ -8,27 +8,51 @@ const router = Router();
  * @swagger
  * /v1/water-intake:
  *   get:
- *     summary: Get personalized water intake suggestion
+ *     summary: Get water intake information
+ *     description: Returns today's water intake data including recommendation, actual intake logged by the user, and progress.
  *     tags: [Dashboard]
  *     security:
  *       - BearerAuth: []
  *     responses:
  *       200:
- *         description: Water intake suggestion
+ *         description: Water intake information
  *         content:
  *           application/json:
  *             schema:
  *               type: object
  *               properties:
- *                 amount:
+ *                 date:
+ *                   type: string
+ *                   format: date
+ *                   example: "2025-12-02"
+ *                 recommended:
+ *                   type: object
+ *                   properties:
+ *                     amount:
+ *                       type: number
+ *                       example: 2500
+ *                     unit:
+ *                       type: string
+ *                       example: "ml"
+ *                     reason:
+ *                       type: string
+ *                       example: "To maintain hydration for dry skin."
+ *                 actual:
+ *                   type: object
+ *                   nullable: true
+ *                   description: Actual water intake logged by the user for today. Null if no intake has been logged.
+ *                   properties:
+ *                     amount:
+ *                       type: number
+ *                       example: 1800
+ *                     unit:
+ *                       type: string
+ *                       example: "ml"
+ *                 progress:
  *                   type: number
- *                   example: 2500
- *                 unit:
- *                   type: string
- *                   example: "ml"
- *                 reason:
- *                   type: string
- *                   example: "To maintain hydration for dry skin."
+ *                   nullable: true
+ *                   description: Progress towards recommended intake (0-1). Null if no intake has been logged.
+ *                   example: 0.72
  *   put:
  *     summary: Update daily water intake for a user
  *     description: Record how much water the user actually drank on a given day and compare it against the recommended intake.

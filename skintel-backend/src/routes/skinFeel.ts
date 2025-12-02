@@ -178,10 +178,12 @@ router.post('/', authenticateUser, async (req: AuthenticatedRequest, res: Respon
     let isUpdate = false;
 
     if (existingEntry) {
-      // Update existing entry
       skinFeel = await prisma.skinFeel.update({
         where: { id: existingEntry.id },
-        data: { value: value as any }
+        data: {
+          value: value as any,
+          createdAt: new Date()
+        }
       });
       isUpdate = true;
     } else {
