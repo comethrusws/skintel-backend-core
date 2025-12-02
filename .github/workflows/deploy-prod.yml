@@ -1,9 +1,6 @@
-name: Deploy to AWS (EC2 via SCP + Docker Compose)
+name: Production Deploy to AWS
 
 on:
-  push:
-    branches:
-      - main
   workflow_dispatch:
 
 jobs:
