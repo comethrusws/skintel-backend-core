@@ -80,17 +80,17 @@ export function formatOptionLabel(option: string): string {
     return option
         .split('_')
         .map(word => {
-            // Keep numbers as is, capitalize first letter of text
             if (/^\d+$/.test(word)) return word;
-            // Keep units lowercase (hrs, hr, celsius, etc)
-            if (['hrs', 'hr', 'hours', 'celsius', 'and', 'to'].includes(word.toLowerCase())) {
+            if (['hrs', 'hr', 'hours', 'celsius', 'and', 'to', 'than'].includes(word.toLowerCase())) {
                 return word.toLowerCase();
             }
             return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
         })
         .join(' ')
         .replace(/\s+to\s+/gi, ' - ')
-        .replace(/\s+and\s+/gi, ' & ');
+        .replace(/\s+and\s+/gi, ' & ')
+        .replace(/\bless than\b/gi, '<')
+        .replace(/\bgreater than\b/gi, '>');
 }
 
 /**

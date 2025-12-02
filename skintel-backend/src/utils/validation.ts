@@ -147,17 +147,17 @@ export const formatLabel = (value: string): string => {
   return value
     .split('_')
     .map(word => {
-      // Keep numbers as is
       if (/^\d+$/.test(word)) return word;
-      // Keep units lowercase (hrs, hr, hours, celsius, etc)
-      if (['hrs', 'hr', 'hours', 'celsius', 'and', 'to'].includes(word.toLowerCase())) {
+      if (['hrs', 'hr', 'hours', 'celsius', 'and', 'to', 'than'].includes(word.toLowerCase())) {
         return word.toLowerCase();
       }
       return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
     })
     .join(' ')
     .replace(/\s+to\s+/gi, ' - ')
-    .replace(/\s+and\s+/gi, ' & ');
+    .replace(/\s+and\s+/gi, ' & ')
+    .replace(/\bless than\b/gi, '<')
+    .replace(/\bgreater than\b/gi, '>');
 };
 
 /**
