@@ -60,7 +60,7 @@ jobs:
           CLERK_SECRET_KEY="${{ secrets.CLERK_SECRET_KEY }}"
           CLERK_PUBLISHABLE_KEY="${{ secrets.CLERK_PUBLISHABLE_KEY }}"
           FIREBASE_SERVICE_ACCOUNT='${{ secrets.FIREBASE_SERVICE_ACCOUNT }}'
-          SENTRY_DSN="${{ secrets.SENTRY_DSN }}"
+          SENTRY_DSN="${{ secrets.SENTRY_DSN_PROD }}"
           DATABASE_URL="${{ secrets.DATABASE_URL_PROD }}"
           ENVEOF
             
