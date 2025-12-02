@@ -64,12 +64,11 @@ jobs:
           DATABASE_URL="${{ secrets.DATABASE_URL_PROD }}"
           ENVEOF
             
-            # Stop existing services and start new ones
+            # Stop existing services and start new ones with minimal downtime
             sudo docker compose -f docker-compose.prod.yml down || true
             # added as temp fix
             sudo docker system prune -f  # Clean up unused images/containers
-            sudo docker compose -f docker-compose.prod.yml build --no-cache  # Force rebuild without cache
-            sudo docker compose -f docker-compose.prod.yml up -d --force-recreate
+            sudo docker compose -f docker-compose.prod.yml up -d --build --force-recreate
           EOF
           
           # Clean up SSH key
