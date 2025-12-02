@@ -21,8 +21,9 @@ face_mesh = None
 # MediaPipe Face Mesh Landmark Indices
 LANDMARK_INDICES = {
     'lips': [61, 146, 91, 181, 84, 17, 314, 405, 321, 375, 291, 409, 270, 269, 267, 0, 37, 39, 40, 185],
-    'left_eye': [263, 249, 390, 373, 374, 380, 381, 382, 362, 398, 384, 385, 386, 387, 388, 466],
-    'right_eye': [33, 7, 163, 144, 145, 153, 154, 155, 133, 173, 157, 158, 159, 160, 161, 246],
+    # Extended eye regions - taller to touch under-eye area
+    'left_eye': [263, 249, 390, 373, 374, 380, 381, 382, 362, 398, 384, 385, 386, 387, 388, 466, 359, 255, 339, 254, 253, 252, 256, 341],
+    'right_eye': [33, 7, 163, 144, 145, 153, 154, 155, 133, 173, 157, 158, 159, 160, 161, 246, 130, 25, 110, 24, 23, 22, 26, 112],
     'left_eyebrow': [276, 283, 282, 295, 285, 300, 293, 334, 296, 336],
     'right_eyebrow': [46, 53, 52, 65, 55, 70, 63, 105, 66, 107],
     'nose': [1, 2, 98, 327, 195, 5, 4, 275, 440, 220, 45, 274, 237, 44, 19],
@@ -125,6 +126,7 @@ class IssueAnnotationResponse(BaseModel):
     status: str
     annotated_image: str
     total_issues: int
+    issues: List[SkinIssue]
     image_info: ImageInfo
 
 
@@ -289,6 +291,9 @@ def annotate_image_with_issues(image_array: np.ndarray, issues: List[SkinIssue])
                 points.append([x, y])
             
             points = np.array(points, dtype=np.int32)
+            
+            # Update the issue's landmarks with the actual coordinates used
+            issue.dlib_68_facial_landmarks = [IssuePoint(x=int(p[0]), y=int(p[1])) for p in points]
             
             if len(points) > 0:
                 if 'eye' in issue.region.lower() or 'lip' in issue.region.lower():
@@ -570,6 +575,7 @@ async def annotate_skin_issues_from_url(request: AnnotationRequest):
             status="success",
             annotated_image=annotated_image_data,
             total_issues=len(issues),
+            issues=issues,  # Return updated issues with correct landmarks
             image_info=ImageInfo(
                 filename=filename,
                 width=image.width,

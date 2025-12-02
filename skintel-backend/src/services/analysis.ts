@@ -432,6 +432,11 @@ export async function analyzeProgress(
           prefix: 'annotated-issues-progress'
         });
         annotatedImageUrl = uploadResult.url;
+        
+        // Use the updated issues with correct MediaPipe landmarks
+        if (annotationResponse.data.issues) {
+          parsed.remaining_issues = annotationResponse.data.issues;
+        }
       }
     }
   } catch (annotationError) {
