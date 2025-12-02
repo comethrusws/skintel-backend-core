@@ -12,6 +12,48 @@ import logging
 import requests
 from urllib.parse import urlparse
 import base64
+import mediapipe as mp
+
+mp_face_mesh = mp.solutions.face_mesh
+face_mesh = None
+
+# MediaPipe Face Mesh Landmark Indices
+LANDMARK_INDICES = {
+    'lips': [61, 146, 91, 181, 84, 17, 314, 405, 321, 375, 291, 409, 270, 269, 267, 0, 37, 39, 40, 185],
+    'left_eye': [263, 249, 390, 373, 374, 380, 381, 382, 362, 398, 384, 385, 386, 387, 388, 466],
+    'right_eye': [33, 7, 163, 144, 145, 153, 154, 155, 133, 173, 157, 158, 159, 160, 161, 246],
+    'left_eyebrow': [276, 283, 282, 295, 285, 300, 293, 334, 296, 336],
+    'right_eyebrow': [46, 53, 52, 65, 55, 70, 63, 105, 66, 107],
+    'nose': [1, 2, 98, 327, 195, 5, 4, 275, 440, 220, 45, 274, 237, 44, 19], # Simplified nose
+    'face_oval': [10, 338, 297, 332, 284, 251, 389, 356, 454, 323, 361, 288, 397, 365, 379, 378, 400, 377, 152, 148, 176, 149, 150, 136, 172, 58, 132, 93, 234, 127, 162, 21, 54, 103, 67, 109],
+    'forehead': [10, 338, 297, 332, 284, 251, 389, 356, 454, 323, 361, 288, 397, 365, 379, 378, 400, 377, 152, 148, 176, 149, 150, 136, 172, 58, 132, 93, 234, 127, 162, 21, 54, 103, 67, 109] # Fallback to face oval or specific forehead points if needed
+}
+
+def get_region_landmarks(region_name: str) -> List[int]:
+    region_name = region_name.lower()
+    if 'lip' in region_name or 'mouth' in region_name:
+        return LANDMARK_INDICES['lips']
+    elif 'left_eye' in region_name: # Specific eye
+        return LANDMARK_INDICES['left_eye']
+    elif 'right_eye' in region_name:
+        return LANDMARK_INDICES['right_eye']
+    elif 'eye' in region_name: # General eye - tricky, maybe return both or handle logic elsewhere. For now default to both if generic 'eye' but usually issues are specific.
+        # If generic 'eye' is passed, we might need to check which eye the issue coordinates are closer to, 
+        # but the current logic re-detects. 
+        # Let's assume the issue region string is specific enough or we default to face oval if unknown.
+        return LANDMARK_INDICES['left_eye'] + LANDMARK_INDICES['right_eye'] 
+    elif 'eyebrow' in region_name:
+        return LANDMARK_INDICES['left_eyebrow'] + LANDMARK_INDICES['right_eyebrow']
+    elif 'nose' in region_name:
+        return LANDMARK_INDICES['nose']
+    elif 'forehead' in region_name:
+         # Approximate forehead using top of face oval and some brow points
+         return [10, 338, 297, 332, 284, 251, 389, 356, 454, 323, 361, 288, 397, 365, 379, 378, 400, 377] 
+    elif 'cheek' in region_name:
+        # Cheeks are hard to define with just lines, maybe just use face oval or specific cheek contours
+        return LANDMARK_INDICES['face_oval']
+    else:
+        return LANDMARK_INDICES['face_oval']
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -88,13 +130,21 @@ predictor = None
 @app.on_event("startup")
 async def startup_event():
     """init Dlib predictor on startup"""
-    global predictor
+    global predictor, face_mesh
     try:
         predictor_path = "shape_predictor_68_face_landmarks.dat"
         predictor = dlib.shape_predictor(predictor_path)
         logger.info("Dlib predictor loaded successfully")
+        
+        face_mesh = mp_face_mesh.FaceMesh(
+            static_image_mode=True,
+            max_num_faces=1,
+            refine_landmarks=True,
+            min_detection_confidence=0.5
+        )
+        logger.info("MediaPipe Face Mesh loaded successfully")
     except Exception as e:
-        logger.error(f"Failed to load Dlib predictor: {e}")
+        logger.error(f"Failed to load predictors: {e}")
         raise
 
 def extract_landmarks(image_array: np.ndarray) -> List[Dict[str, int]]:
@@ -146,19 +196,72 @@ def extract_landmarks(image_array: np.ndarray) -> List[Dict[str, int]]:
 
 def annotate_image_with_issues(image_array: np.ndarray, issues: List[SkinIssue]) -> str:
     """
-    Draw skin issues on the image with numbered polygon regions and a legend
+    Draw skin issues on the image using MediaPipe Face Mesh for smoother contours.
     
     Args:
-        image_array: Original image as numpy array
-        issues: List of skin issues with landmarks
+        image_array: Original image as numpy array (RGB)
+        issues: List of skin issues
     
     Returns:
         Base64 encoded PNG image with data URI prefix
     """
-    annotated = image_array.copy()
+    # MediaPipe expects RGB
+    results = face_mesh.process(image_array)
     
+    annotated = image_array.copy()
+    # Convert to BGR for OpenCV drawing
     annotated_bgr = cv2.cvtColor(annotated, cv2.COLOR_RGB2BGR)
     
+    if not results.multi_face_landmarks:
+        logger.warning("No face detected by MediaPipe for annotation")
+        # Fallback or return original? Let's return original with a warning or try to use the passed landmarks (which are dlib based and bad, but better than nothing)
+        # For now, let's just return the image with legend but no drawings if no face found, or maybe just the dlib points if we really wanted to support fallback.
+        # But the user specifically hates the dlib points.
+        pass
+    else:
+        face_landmarks = results.multi_face_landmarks[0]
+        h, w, _ = annotated_bgr.shape
+        
+        severity_colors = {
+            'mild': (0, 255, 255),     # Yellow
+            'moderate': (0, 165, 255), # Orange
+            'severe': (0, 0, 255),     # Red
+            'critical': (128, 0, 128)  # Purple
+        }
+        
+        for idx, issue in enumerate(issues, start=1):
+            color = severity_colors.get(issue.severity.lower(), (255, 255, 255))
+            
+            # Determine which landmarks to use based on region
+            indices = get_region_landmarks(issue.region)
+            
+            # If we have specific dlib landmarks in the issue, we might want to find the closest MediaPipe region
+            # But for now, we rely on the region name mapping.
+            
+            # Extract points
+            points = []
+            for index in indices:
+                lm = face_landmarks.landmark[index]
+                x, y = int(lm.x * w), int(lm.y * h)
+                points.append([x, y])
+            
+            points = np.array(points, dtype=np.int32)
+            
+            if len(points) > 0:
+                # Draw smooth closed contour
+                # cv2.polylines(annotated_bgr, [points], isClosed=True, color=color, thickness=2, lineType=cv2.LINE_AA)
+                
+                # To make it look even better/smoother, we can use a convex hull or just the points if they are ordered.
+                # MediaPipe points for eyes/lips are ordered. For others they might not be.
+                # Let's try convex hull for regions that might be unordered or scattered
+                if 'eye' in issue.region.lower() or 'lip' in issue.region.lower():
+                     cv2.polylines(annotated_bgr, [points], isClosed=True, color=color, thickness=2, lineType=cv2.LINE_AA)
+                else:
+                    hull = cv2.convexHull(points)
+                    cv2.polylines(annotated_bgr, [hull], isClosed=True, color=color, thickness=2, lineType=cv2.LINE_AA)
+
+    # Draw Legend (reuse existing logic mostly)
+    legend_items = []
     severity_colors = {
         'mild': (0, 255, 255),
         'moderate': (0, 165, 255),
@@ -166,46 +269,8 @@ def annotate_image_with_issues(image_array: np.ndarray, issues: List[SkinIssue])
         'critical': (128, 0, 128)
     }
     
-    legend_items = []
-    
-    def draw_dotted_poly(img, pts, color, thickness=2, dash_len=5):
-        for i in range(len(pts)):
-            p1 = pts[i]
-            p2 = pts[(i + 1) % len(pts)]
-            
-            dist = np.linalg.norm(p2 - p1)
-            if dist == 0: continue
-            
-            dashes = int(dist / dash_len)
-            if dashes == 0: continue
-            
-            dx = (p2[0] - p1[0]) / dashes
-            dy = (p2[1] - p1[1]) / dashes
-            
-            for j in range(0, dashes, 2):
-                start = (int(p1[0] + dx * j), int(p1[1] + dy * j))
-                end = (int(p1[0] + dx * (j + 1)), int(p1[1] + dy * (j + 1)))
-                cv2.line(img, start, end, color, thickness)
-
     for idx, issue in enumerate(issues, start=1):
         color = severity_colors.get(issue.severity.lower(), (255, 255, 255))
-        
-        points = np.array([[pt.x, pt.y] for pt in issue.dlib_68_facial_landmarks], dtype=np.int32)
-        
-        if len(points) == 0:
-            continue
-            
-        centroid = np.mean(points, axis=0)
-        if 'eye' in issue.region.lower():
-            scale = 2.1
-        else:
-            scale = 1.9
-            
-        points = (points - centroid) * scale + centroid
-        points = points.astype(np.int32)
-        
-        draw_dotted_poly(annotated_bgr, points, color, thickness=2, dash_len=4)
-        
         issue_label = issue.type.replace('_', ' ').title()
         legend_items.append({
             'number': idx,

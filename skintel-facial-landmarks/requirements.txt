@@ -11,3 +11,4 @@ pydantic==2.5.0
 requests==2.31.0
 # dlib - use pre-built binary package
 dlib-bin
+mediapipe
