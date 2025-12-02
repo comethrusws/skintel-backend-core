@@ -40,11 +40,12 @@ function buildPrompt(): string {
     '  ],\n' +
     '  "overall_assessment": "Combination skin with mild acne and moderate dark circles",\n' +
     '  "score": 72,\n' +
+    '  "estimated_improvement_score": 85,\n' +
     '  "care_plan_4_weeks": [\n' +
-    '    {"week": 1, "preview": "Start gentle cleansing routine with salicylic acid", "improvement_expected": "15%"},\n' +
-    '    {"week": 2, "preview": "Add eye cream for dark circles and maintain cleansing", "improvement_expected": "30%"},\n' +
-    '    {"week": 3, "preview": "Introduce retinol treatment and sun protection", "improvement_expected": "50%"},\n' +
-    '    {"week": 4, "preview": "Maintain routine and assess overall progress", "improvement_expected": "70%"}\n' +
+    '    {"week": 1, "preview": "Start gentle cleansing routine with salicylic acid", "improvement_expected": "15%", "weekly_improvement_score": 75},\n' +
+    '    {"week": 2, "preview": "Add eye cream for dark circles and maintain cleansing", "improvement_expected": "30%", "weekly_improvement_score": 78},\n' +
+    '    {"week": 3, "preview": "Introduce retinol treatment and sun protection", "improvement_expected": "50%", "weekly_improvement_score": 82},\n' +
+    '    {"week": 4, "preview": "Maintain routine and assess overall progress", "improvement_expected": "70%", "weekly_improvement_score": 85}\n' +
     '  ],\n' +
     '  "images_analyzed": ["front", "left", "right"]\n' +
     '}'

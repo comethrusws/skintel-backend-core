@@ -194,6 +194,51 @@ const router = Router();
  *     responses:
  *       200:
  *         description: Analysis retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 user_id:
+ *                   type: string
+ *                 analysis:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       answer_id:
+ *                         type: string
+ *                       question_id:
+ *                         type: string
+ *                       screen_id:
+ *                         type: string
+ *                       analysis:
+ *                         $ref: '#/components/schemas/AnalysisResult'
+ *                       score:
+ *                         type: number
+ *                       weekly_plan:
+ *                         type: array
+ *                         items:
+ *                           $ref: '#/components/schemas/WeeklyPlanItem'
+ *                       analysis_type:
+ *                         type: string
+ *                         enum: [INITIAL, PROGRESS]
+ *                       plan_start_date:
+ *                         type: string
+ *                         format: date-time
+ *                       plan_end_date:
+ *                         type: string
+ *                         format: date-time
+ *                       status:
+ *                         type: string
+ *                       processed_at:
+ *                         type: string
+ *                         format: date-time
+ *                       created_at:
+ *                         type: string
+ *                         format: date-time
+ *                       error:
+ *                         type: string
  *       401:
  *         description: Authentication required
  * 

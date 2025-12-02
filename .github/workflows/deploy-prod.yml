@@ -1,9 +1,6 @@
-name: Integrations Deploy to AWS 
+name: Production Deploy to AWS
 
 on:
-  push:
-    branches:
-      - main
   workflow_dispatch:
 
 jobs:

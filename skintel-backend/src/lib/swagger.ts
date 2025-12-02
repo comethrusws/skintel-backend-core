@@ -94,6 +94,50 @@ const options = {
             details: { type: 'array', items: { type: 'object' } },
           },
         },
+        WeeklyPlanItem: {
+          type: 'object',
+          properties: {
+            week: { type: 'integer' },
+            preview: { type: 'string' },
+            improvement_expected: { type: 'string' },
+            weekly_improvement_score: { type: 'integer' },
+          },
+        },
+        AnalysisResult: {
+          type: 'object',
+          properties: {
+            issues: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  type: { type: 'string' },
+                  region: { type: 'string' },
+                  severity: { type: 'string' },
+                  visible_in: { type: 'array', items: { type: 'string' } },
+                  dlib_68_facial_landmarks: {
+                    type: 'array',
+                    items: {
+                      type: 'object',
+                      properties: {
+                        x: { type: 'number' },
+                        y: { type: 'number' },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+            overall_assessment: { type: 'string' },
+            images_analyzed: { type: 'array', items: { type: 'string' } },
+            score: { type: 'integer' },
+            estimated_improvement_score: { type: 'integer' },
+            care_plan_4_weeks: {
+              type: 'array',
+              items: { $ref: '#/components/schemas/WeeklyPlanItem' },
+            },
+          },
+        },
       },
     },
   },
