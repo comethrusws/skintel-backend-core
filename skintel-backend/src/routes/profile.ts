@@ -187,7 +187,7 @@ const router = Router();
  * /v1/profile/analysis:
  *   get:
  *     summary: Get user facial analysis
- *     description: Retrieve user's facial analysis data
+ *     description: Retrieve user's facial analysis data with formatted labels for issues.
  *     tags: [Profile]
  *     security:
  *       - BearerAuth: []
@@ -201,6 +201,7 @@ const router = Router();
  *               properties:
  *                 user_id:
  *                   type: string
+ *                   example: user_2f9fb498-08c6-43e4-a56f-8e91c67007d6
  *                 analysis:
  *                   type: array
  *                   items:
@@ -208,21 +209,188 @@ const router = Router();
  *                     properties:
  *                       answer_id:
  *                         type: string
+ *                         example: progress_1764685586997_7007d6
  *                       question_id:
  *                         type: string
+ *                         example: q_face_photo_front
  *                       screen_id:
  *                         type: string
+ *                         example: progress_analysis
  *                       analysis:
- *                         $ref: '#/components/schemas/AnalysisResult'
+ *                         type: object
+ *                         description: Analysis data WITHOUT score and care_plan_4_weeks (those are at top level)
+ *                         properties:
+ *                           issues:
+ *                             type: array
+ *                             items:
+ *                               type: object
+ *                               properties:
+ *                                 type:
+ *                                   type: string
+ *                                   example: dark_circles
+ *                                 type_label:
+ *                                   type: string
+ *                                   example: Dark Circles
+ *                                 region:
+ *                                   type: string
+ *                                   example: left_under_eye
+ *                                 region_label:
+ *                                   type: string
+ *                                   example: Left Under Eye
+ *                                 severity:
+ *                                   type: string
+ *                                   example: mild
+ *                                 severity_label:
+ *                                   type: string
+ *                                   example: Mild
+ *                                 visible_in:
+ *                                   type: array
+ *                                   items:
+ *                                     type: string
+ *                                   example: [front, left]
+ *                                 dlib_68_facial_landmarks:
+ *                                   type: array
+ *                                   items:
+ *                                     type: object
+ *                                     properties:
+ *                                       x:
+ *                                         type: number
+ *                                       y:
+ *                                         type: number
+ *                           remaining_issues:
+ *                             type: array
+ *                             description: For PROGRESS analysis type - remaining issues with labels
+ *                             items:
+ *                               type: object
+ *                               properties:
+ *                                 type:
+ *                                   type: string
+ *                                 type_label:
+ *                                   type: string
+ *                                 region:
+ *                                   type: string
+ *                                 region_label:
+ *                                   type: string
+ *                                 severity:
+ *                                   type: string
+ *                                 severity_label:
+ *                                   type: string
+ *                                 visible_in:
+ *                                   type: array
+ *                                   items:
+ *                                     type: string
+ *                                 dlib_68_facial_landmarks:
+ *                                   type: array
+ *                                   items:
+ *                                     type: object
+ *                                     properties:
+ *                                       x:
+ *                                         type: number
+ *                                       y:
+ *                                         type: number
+ *                           issues_improved:
+ *                             type: array
+ *                             description: For PROGRESS analysis type - issues that have improved with labels
+ *                             items:
+ *                               type: object
+ *                               properties:
+ *                                 issue_type:
+ *                                   type: string
+ *                                   example: dark_circles
+ *                                 issue_type_label:
+ *                                   type: string
+ *                                   example: Dark Circles
+ *                                 initial_severity:
+ *                                   type: string
+ *                                   example: moderate
+ *                                 initial_severity_label:
+ *                                   type: string
+ *                                   example: Moderate
+ *                                 current_severity:
+ *                                   type: string
+ *                                   example: mild
+ *                                 current_severity_label:
+ *                                   type: string
+ *                                   example: Mild
+ *                                 improvement_percentage:
+ *                                   type: number
+ *                                   example: 40
+ *                           overall_assessment:
+ *                             type: string
+ *                             example: Generally healthy facial skin with mild acne
+ *                           images_analyzed:
+ *                             type: array
+ *                             items:
+ *                               type: string
+ *                             example: [front, left, right]
+ *                           important_notes:
+ *                             type: string
+ *                           estimated_improvement_score:
+ *                             type: number
+ *                             example: 88
+ *                           estimated_weekly_scores:
+ *                             type: array
+ *                             items:
+ *                               type: number
+ *                             example: [80, 82, 85, 88]
+ *                           updated_weekly_scores:
+ *                             type: array
+ *                             description: For PROGRESS analysis type
+ *                             items:
+ *                               type: number
+ *                           overall_progress_score:
+ *                             type: number
+ *                             description: For PROGRESS analysis type
+ *                           score_change:
+ *                             type: number
+ *                             description: For PROGRESS analysis type
+ *                           plan_adherence:
+ *                             type: object
+ *                             description: For PROGRESS analysis type
+ *                           visual_improvements:
+ *                             type: array
+ *                             description: For PROGRESS analysis type
+ *                             items:
+ *                               type: string
+ *                           areas_needing_attention:
+ *                             type: array
+ *                             description: For PROGRESS analysis type
+ *                             items:
+ *                               type: string
+ *                           updated_recommendations:
+ *                             type: array
+ *                             description: For PROGRESS analysis type
+ *                             items:
+ *                               type: string
+ *                           next_week_focus:
+ *                             type: string
+ *                             description: For PROGRESS analysis type
  *                       score:
  *                         type: number
+ *                         example: 78
+ *                         description: Current skin health score (0-100)
  *                       weekly_plan:
  *                         type: array
+ *                         description: 4-week skincare improvement plan
  *                         items:
- *                           $ref: '#/components/schemas/WeeklyPlanItem'
+ *                           type: object
+ *                           properties:
+ *                             week:
+ *                               type: number
+ *                               example: 1
+ *                             preview:
+ *                               type: string
+ *                               example: Start gentle twice-daily cleansing routine
+ *                             improvement_expected:
+ *                               type: string
+ *                               example: 10%
+ *                             weekly_improvement_score:
+ *                               type: number
+ *                               example: 80
  *                       analysis_type:
  *                         type: string
  *                         enum: [INITIAL, PROGRESS]
+ *                         example: PROGRESS
  *                       plan_start_date:
  *                         type: string
  *                         format: date-time
@@ -231,6 +399,8 @@ const router = Router();
  *                         format: date-time
  *                       status:
  *                         type: string
+ *                         enum: [PROCESSING, COMPLETED, FAILED]
+ *                         example: COMPLETED
  *                       processed_at:
  *                         type: string
  *                         format: date-time
@@ -239,6 +409,7 @@ const router = Router();
  *                         format: date-time
  *                       error:
  *                         type: string
+ *                         nullable: true
  *       401:
  *         description: Authentication required
  * 
