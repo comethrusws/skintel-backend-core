@@ -79,8 +79,18 @@ export function validateProfileQuestionValue(questionId: string, value: any): bo
 export function formatOptionLabel(option: string): string {
     return option
         .split('_')
-        .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-        .join(' ');
+        .map(word => {
+            // Keep numbers as is, capitalize first letter of text
+            if (/^\d+$/.test(word)) return word;
+            // Keep units lowercase (hrs, hr, celsius, etc)
+            if (['hrs', 'hr', 'hours', 'celsius', 'and', 'to'].includes(word.toLowerCase())) {
+                return word.toLowerCase();
+            }
+            return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
+        })
+        .join(' ')
+        .replace(/\s+to\s+/gi, ' - ')
+        .replace(/\s+and\s+/gi, ' & ');
 }
 
 /**

@@ -609,6 +609,81 @@ router.get('/weekly', authenticateUser, asyncHandler(async (req: AuthenticatedRe
   res.json(response);
 }));
 
+/**
+ * @swagger
+ * /v1/profile/onboarding-answers:
+ *   get:
+ *     summary: Get all onboarding answers
+ *     description: Retrieve all onboarding questions and their answers with label mapping for better readability
+ *     tags: [Profile]
+ *     security:
+ *       - BearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Onboarding answers retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 user_id:
+ *                   type: string
+ *                 answers:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       question_id:
+ *                         type: string
+ *                       question_text:
+ *                         type: string
+ *                       type:
+ *                         type: string
+ *                         enum: [single, multi, slider, image, boolean, derived]
+ *                       status:
+ *                         type: string
+ *                         enum: [answered, skipped]
+ *                       value:
+ *                         oneOf:
+ *                           - type: object
+ *                             properties:
+ *                               value:
+ *                                 type: string
+ *                               label:
+ *                                 type: string
+ *                           - type: array
+ *                             items:
+ *                               type: object
+ *                               properties:
+ *                                 value:
+ *                                   type: string
+ *                                 label:
+ *                                   type: string
+ *                           - type: number
+ *                           - type: boolean
+ *                           - type: object
+ *                       options:
+ *                         type: array
+ *                         items:
+ *                           type: object
+ *                           properties:
+ *                             value:
+ *                               type: string
+ *                             label:
+ *                               type: string
+ *                       saved_at:
+ *                         type: string
+ *                         format: date-time
+ *       401:
+ *         description: Authentication required
+ *       404:
+ *         description: User not found
+ */
+router.get('/onboarding-answers', authenticateUser, asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+  const response = await ProfileService.getOnboardingAnswers(req.userId!);
+  res.json(response);
+}));
+
 router.get('/questions', authenticateUser, asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
   const response = await ProfileService.getQuestions(req.userId!);
   res.json(response);

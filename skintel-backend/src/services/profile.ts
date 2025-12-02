@@ -3,6 +3,7 @@ import { Prisma } from '@prisma/client';
 import { getTaskProgress } from './tasks';
 import { maybePresignUrl } from '../lib/s3';
 import { PROFILE_QUESTIONS, PROFILE_SCREEN_ID, getProfileQuestion, validateProfileQuestionValue, mapOptionsWithLabels } from '../lib/profileQuestions';
+import { VALID_QUESTION_IDS, getExpectedType, getValidValues, formatLabel, getQuestionText } from '../utils/validation';
 
 export class ProfileService {
     static async getProfile(userId: string) {
@@ -765,6 +766,77 @@ export class ProfileService {
             }),
             status: 'skipped',
             created_at: now.toISOString(),
+        };
+    }
+
+    static async getOnboardingAnswers(userId: string) {
+        const user = await prisma.user.findUnique({
+            where: { userId }
+        });
+
+        if (!user) {
+            throw { status: 404, message: 'User not found' };
+        }
+
+        const answers = await prisma.onboardingAnswer.findMany({
+            where: {
+                userId,
+                screenId: { not: PROFILE_SCREEN_ID }
+            },
+            orderBy: { savedAt: 'desc' }
+        });
+
+        const answerMap = new Map();
+        answers.forEach(answer => {
+            if (!answerMap.has(answer.questionId)) {
+                answerMap.set(answer.questionId, answer);
+            }
+        });
+
+        const formattedAnswers = Array.from(answerMap.values()).map(answer => {
+            const questionType = getExpectedType(answer.questionId);
+            const validValues = getValidValues(answer.questionId);
+            const questionText = getQuestionText(answer.questionId);
+
+            const response: any = {
+                question_id: answer.questionId,
+                question_text: questionText,
+                type: answer.type,
+                status: answer.status,
+                saved_at: answer.savedAt.toISOString()
+            };
+
+            // Format value with labels
+            if (answer.type === 'single' && typeof answer.value === 'string') {
+                response.value = {
+                    value: answer.value,
+                    label: formatLabel(answer.value)
+                };
+            } else if (answer.type === 'multi' && Array.isArray(answer.value)) {
+                response.value = answer.value.map((val: string) => ({
+                    value: val,
+                    label: formatLabel(val)
+                }));
+            } else if (answer.type === 'image' && typeof answer.value === 'object' && answer.value !== null) {
+                response.value = answer.value;
+            } else {
+                response.value = answer.value;
+            }
+
+            // Add options with labels for single/multi choice questions
+            if ((answer.type === 'single' || answer.type === 'multi') && validValues) {
+                response.options = validValues.map(option => ({
+                    value: option,
+                    label: formatLabel(option)
+                }));
+            }
+
+            return response;
+        });
+
+        return {
+            user_id: userId,
+            answers: formattedAnswers
         };
     }
 }

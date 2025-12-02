@@ -139,3 +139,51 @@ export const validateQuestionValue = (questionId: string, value: any): boolean =
       return false;
   }
 };
+
+/**
+ * Convert underscore-separated value to readable label
+ */
+export const formatLabel = (value: string): string => {
+  return value
+    .split('_')
+    .map(word => {
+      // Keep numbers as is
+      if (/^\d+$/.test(word)) return word;
+      // Keep units lowercase (hrs, hr, hours, celsius, etc)
+      if (['hrs', 'hr', 'hours', 'celsius', 'and', 'to'].includes(word.toLowerCase())) {
+        return word.toLowerCase();
+      }
+      return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
+    })
+    .join(' ')
+    .replace(/\s+to\s+/gi, ' - ')
+    .replace(/\s+and\s+/gi, ' & ');
+};
+
+/**
+ * Get question text for onboarding questions
+ */
+export const getQuestionText = (questionId: string): string => {
+  const questionTexts: Record<string, string> = {
+    q_skin_concerns: 'What are your main skin concerns?',
+    q_skin_sensitivity: 'How sensitive is your skin?',
+    q_skin_type: 'What is your skin type?',
+    q_goal: 'What are your skincare goals?',
+    q_profile_gender: 'What is your gender?',
+    q_age: 'What is your age?',
+    q_profile_ethnicity: 'What is your ethnicity?',
+    q_time_spent_outdoors: 'How much time do you spend outdoors?',
+    q_profile_sun_exposure: 'How much sun exposure do you get?',
+    q_profile_weather_conditions: 'What are your local weather conditions?',
+    q_regime_product: 'What products are you currently using?',
+    q_medical_conditions: 'Do you have any medical conditions?',
+    q_hormone_factors: 'Are there any hormone-related factors?',
+    q_face_photo_front: 'Front face photo',
+    q_face_photo_left: 'Left face photo',
+    q_face_photo_right: 'Right face photo',
+    q_skin_closeup: 'Skin closeup photo',
+    q_onboarding_complete: 'Onboarding completed',
+    q_onboarding_status: 'Onboarding status'
+  };
+  return questionTexts[questionId] || questionId;
+};
