@@ -385,7 +385,33 @@ export class TasksService {
       }
     });
 
-    const formattedTasks = tasks.map(task => {
+    // Get all completions for this user
+    const allCompletions = await prisma.taskCompletion.findMany({
+      where: { userId },
+      orderBy: { completedAt: 'desc' }
+    });
+
+    // Get active plan to determine date range
+    const activePlan = await prisma.facialLandmarks.findFirst({
+      where: {
+        userId,
+        planStartDate: { not: null }
+      },
+      orderBy: { createdAt: 'desc' }
+    });
+
+    const today = new Date();
+    const planStartDate = activePlan?.planStartDate || today;
+
+    // Calculate which days have passed for each week
+    const daysSinceStart = Math.floor((today.getTime() - planStartDate.getTime()) / (1000 * 60 * 60 * 24));
+    const currentDay = Math.min(daysSinceStart + 1, 28);
+    const currentWeek = Math.min(Math.floor(daysSinceStart / 7) + 1, 4);
+
+    // Filter tasks to only include current and past weeks
+    const relevantTasks = tasks.filter(task => task.week <= currentWeek);
+
+    const formattedTasks = relevantTasks.map(task => {
       const taskUserProducts = task.userProducts ?
         userProducts.filter(p => (task.userProducts as string[]).includes(p.id))
           .map(p => {
@@ -397,6 +423,20 @@ export class TasksService {
             };
           }) : [];
 
+      const taskCompletions = allCompletions.filter(c => c.taskId === task.id);
+
+      const weekStartDay = (task.week - 1) * 7 + 1;
+      const weekEndDay = Math.min(task.week * 7, currentDay - 1); // Exclude today
+      const daysExpected = Math.max(0, weekEndDay - weekStartDay + 1);
+
+      const completedDays = taskCompletions.length;
+      const missedDays = Math.max(0, daysExpected - completedDays);
+
+      const todayStr = today.toISOString().split('T')[0];
+      const completionDates = taskCompletions
+        .map(c => c.completedAt.toISOString().split('T')[0])
+        .filter(date => date !== todayStr);
+
       return {
         id: task.id,
         week: task.week,
@@ -407,9 +447,16 @@ export class TasksService {
         priority: task.priority,
         isActive: task.isActive,
         recommendedProducts: task.recommendedProducts as string[] || [],
-        userProducts: taskUserProducts
+        userProducts: taskUserProducts,
+        completionStats: {
+          completedDays,
+          missedDays,
+          daysExpected,
+          completionRate: daysExpected > 0 ? Math.round((completedDays / daysExpected) * 100) : 0,
+          completionDates
+        }
       };
-    });
+    }).filter(task => task.completionStats.daysExpected > 0); // Only include tasks with past expected days
 
     // Group tasks by week for better organization
     const tasksByWeek: Record<number, typeof formattedTasks> = {};
@@ -420,11 +467,26 @@ export class TasksService {
       tasksByWeek[task.week].push(task);
     });
 
+    const totalCompleted = formattedTasks.reduce((sum, t) => sum + t.completionStats.completedDays, 0);
+    const totalMissed = formattedTasks.reduce((sum, t) => sum + t.completionStats.missedDays, 0);
+    const totalExpected = formattedTasks.reduce((sum, t) => sum + t.completionStats.daysExpected, 0);
+
     return {
       tasks: formattedTasks,
       tasksByWeek,
       totalTasks: formattedTasks.length,
-      weeks: Object.keys(tasksByWeek).map(Number).sort((a, b) => a - b)
+      weeks: Object.keys(tasksByWeek).map(Number).sort((a, b) => a - b),
+      overallStats: {
+        totalCompleted,
+        totalMissed,
+        totalExpected,
+        completionRate: totalExpected > 0 ? Math.round((totalCompleted / totalExpected) * 100) : 0
+      },
+      planInfo: {
+        startDate: planStartDate.toISOString().split('T')[0],
+        currentDay,
+        planActive: !!activePlan
+      }
     };
   }
 

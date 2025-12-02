@@ -14,14 +14,14 @@ const taskCompletionSchema = z.object({
  * @swagger
  * /v1/tasks/all:
  *   get:
- *     summary: Get all tasks
- *     description: Retrieve all tasks for the current user across all weeks (both active and inactive)
+ *     summary: Get all missed and completed tasks
+ *     description: Retrieve all tasks from previous days only (excludes today and future) with missed and completed days count
  *     tags: [Tasks]
  *     security:
  *       - BearerAuth: []
  *     responses:
  *       200:
- *         description: All tasks retrieved successfully
+ *         description: All tasks retrieved successfully with completion stats
  *         content:
  *           application/json:
  *             schema:
@@ -29,18 +29,38 @@ const taskCompletionSchema = z.object({
  *               properties:
  *                 tasks:
  *                   type: array
- *                   description: All tasks in a flat array (includes both active and inactive tasks)
+ *                   description: All past tasks (excludes today) with completionStats (completedDays, missedDays, daysExpected, completionRate, completionDates from previous days only)
  *                 tasksByWeek:
  *                   type: object
  *                   description: Tasks grouped by week (1-4)
  *                 totalTasks:
  *                   type: integer
- *                   description: Total number of tasks (active and inactive)
+ *                   description: Total number of tasks
  *                 weeks:
  *                   type: array
  *                   items:
  *                     type: integer
  *                   description: Array of weeks that have tasks
+ *                 overallStats:
+ *                   type: object
+ *                   properties:
+ *                     totalCompleted:
+ *                       type: integer
+ *                     totalMissed:
+ *                       type: integer
+ *                     totalExpected:
+ *                       type: integer
+ *                     completionRate:
+ *                       type: integer
+ *                 planInfo:
+ *                   type: object
+ *                   properties:
+ *                     startDate:
+ *                       type: string
+ *                     currentDay:
+ *                       type: integer
+ *                     planActive:
+ *                       type: boolean
  *       401:
  *         description: Authentication required
  */
