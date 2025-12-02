@@ -1,11 +1,21 @@
 import dotenv from 'dotenv';
 dotenv.config();
 
+import * as Sentry from '@sentry/node';
+
+Sentry.init({
+  dsn: process.env.SENTRY_DSN,
+  integrations: [
+    Sentry.httpIntegration(),
+    Sentry.expressIntegration(),
+  ],
+  tracesSampleRate: 1.0,
+});
+
 import express, { Express, Request, Response } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
-import * as Sentry from '@sentry/node';
 import { clerkMiddleware } from '@clerk/express';
 import { sessionsRouter } from './routes/sessions';
 import { onboardingRouter } from './routes/onboarding';
@@ -32,18 +42,7 @@ import { clerk } from './lib/clerk';
 import { paymentRouter } from './routes/payment';
 import { errorHandler, notFoundHandler } from './middleware/error';
 
-dotenv.config();
-
 const app: Express = express();
-
-Sentry.init({
-  dsn: process.env.SENTRY_DSN,
-  integrations: [
-    Sentry.httpIntegration(),
-    Sentry.expressIntegration(),
-  ],
-  tracesSampleRate: 1.0,
-});
 
 const port = process.env.PORT || 3000;
 
