@@ -132,6 +132,24 @@ const options = {
             images_analyzed: { type: 'array', items: { type: 'string' } },
             score: { type: 'integer' },
             estimated_improvement_score: { type: 'integer' },
+            estimated_weekly_scores: {
+              type: 'object',
+              properties: {
+                week_1: { type: 'number' },
+                week_2: { type: 'number' },
+                week_3: { type: 'number' },
+                week_4: { type: 'number' },
+              },
+            },
+            updated_weekly_scores: {
+              type: 'object',
+              properties: {
+                week_1: { type: 'number' },
+                week_2: { type: 'number' },
+                week_3: { type: 'number' },
+                week_4: { type: 'number' },
+              },
+            },
             care_plan_4_weeks: {
               type: 'array',
               items: { $ref: '#/components/schemas/WeeklyPlanItem' },

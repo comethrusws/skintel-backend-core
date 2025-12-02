@@ -75,6 +75,30 @@ const progressAnalysisSchema = z.object({
  *                 estimated_improvement_score:
  *                   type: number
  *                   description: Target improvement score from initial analysis
+ *                 estimated_weekly_scores:
+ *                   type: object
+ *                   description: Estimated weekly scores from initial analysis
+ *                   properties:
+ *                     week_1:
+ *                       type: number
+ *                     week_2:
+ *                       type: number
+ *                     week_3:
+ *                       type: number
+ *                     week_4:
+ *                       type: number
+ *                 updated_weekly_scores:
+ *                   type: object
+ *                   description: Updated weekly scores from current progress analysis
+ *                   properties:
+ *                     week_1:
+ *                       type: number
+ *                     week_2:
+ *                       type: number
+ *                     week_3:
+ *                       type: number
+ *                     week_4:
+ *                       type: number
  *                 initial_analysis:
  *                   type: object
  *                   properties:
