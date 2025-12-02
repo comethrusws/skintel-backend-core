@@ -5,6 +5,7 @@ import express, { Express, Request, Response } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
+import * as Sentry from '@sentry/node';
 import { clerkMiddleware } from '@clerk/express';
 import { sessionsRouter } from './routes/sessions';
 import { onboardingRouter } from './routes/onboarding';
@@ -34,6 +35,16 @@ import { errorHandler, notFoundHandler } from './middleware/error';
 dotenv.config();
 
 const app: Express = express();
+
+Sentry.init({
+  dsn: process.env.SENTRY_DSN,
+  integrations: [
+    Sentry.httpIntegration(),
+    Sentry.expressIntegration(),
+  ],
+  tracesSampleRate: 1.0,
+});
+
 const port = process.env.PORT || 3000;
 
 const maxRequestSize = process.env.MAX_REQUEST_SIZE || '50mb';
@@ -103,6 +114,8 @@ app.get('/health', async (req: Request, res: Response) => {
     res.status(503).json({ status: 'error', error: 'Database connection failed' });
   }
 });
+
+Sentry.setupExpressErrorHandler(app);
 
 app.use(notFoundHandler);
 app.use(errorHandler);
