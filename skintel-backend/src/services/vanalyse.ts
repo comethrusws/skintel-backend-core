@@ -173,6 +173,8 @@ export class VanalyseService {
         if (right_image_url) imagesAnalyzed.push('right');
 
         const estimatedImprovementScore = initialAnalysisData?.estimated_improvement_score || null;
+        const estimatedWeeklyScores = initialAnalysisData?.estimated_weekly_scores || null;
+        const updatedWeeklyScores = currentAnalysis?.updated_weekly_scores || null;
 
         return {
             answer_id: answerId,
@@ -187,6 +189,8 @@ export class VanalyseService {
             initial_score: initialAnalysis.score,
             current_score: currentAnalysis.score,
             estimated_improvement_score: estimatedImprovementScore,
+            estimated_weekly_scores: estimatedWeeklyScores,
+            updated_weekly_scores: updatedWeeklyScores,
             initial_analysis: {
                 issues: initialAnalysisData?.issues || [],
                 overall_assessment: initialAnalysisData?.overall_assessment || null
