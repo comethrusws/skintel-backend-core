@@ -425,17 +425,23 @@ export class TasksService {
 
       const taskCompletions = allCompletions.filter(c => c.taskId === task.id);
 
-      const weekStartDay = (task.week - 1) * 7 + 1;
-      const weekEndDay = Math.min(task.week * 7, currentDay - 1); // Exclude today
-      const daysExpected = Math.max(0, weekEndDay - weekStartDay + 1);
-
-      const completedDays = taskCompletions.length;
-      const missedDays = Math.max(0, daysExpected - completedDays);
-
+      // Get completion dates (excluding today)
       const todayStr = today.toISOString().split('T')[0];
       const completionDates = taskCompletions
         .map(c => c.completedAt.toISOString().split('T')[0])
         .filter(date => date !== todayStr);
+
+      // Get unique completion dates to count actual days completed
+      const uniqueCompletionDates = [...new Set(completionDates)];
+
+      // Calculate which days this task was expected (only up to yesterday, excluding today)
+      const weekStartDay = (task.week - 1) * 7 + 1;
+      const weekEndDay = Math.min(task.week * 7, currentDay - 1); // Exclude today
+      const daysExpected = Math.max(0, weekEndDay - weekStartDay + 1);
+
+      // Count completed days (unique dates only) and missed days
+      const completedDays = uniqueCompletionDates.length;
+      const missedDays = Math.max(0, daysExpected - completedDays);
 
       return {
         id: task.id,
