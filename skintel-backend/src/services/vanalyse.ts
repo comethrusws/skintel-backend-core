@@ -172,6 +172,8 @@ export class VanalyseService {
         if (left_image_url) imagesAnalyzed.push('left');
         if (right_image_url) imagesAnalyzed.push('right');
 
+        const estimatedImprovementScore = initialAnalysisData?.estimated_improvement_score || null;
+
         return {
             answer_id: answerId,
             current_analysis: currentAnalysis,
@@ -183,7 +185,12 @@ export class VanalyseService {
             plan_start_date: activePlan.planStartDate?.toISOString(),
             plan_end_date: activePlan.planEndDate?.toISOString(),
             initial_score: initialAnalysis.score,
-            current_score: currentAnalysis.score
+            current_score: currentAnalysis.score,
+            estimated_improvement_score: estimatedImprovementScore,
+            initial_analysis: {
+                issues: initialAnalysisData?.issues || [],
+                overall_assessment: initialAnalysisData?.overall_assessment || null
+            }
         };
     }
 

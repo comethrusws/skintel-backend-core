@@ -52,8 +52,11 @@ const progressAnalysisSchema = z.object({
  *               properties:
  *                 answer_id:
  *                   type: string
- *                 analysis:
+ *                 current_analysis:
  *                   $ref: '#/components/schemas/AnalysisResult'
+ *                 progress_update:
+ *                   type: object
+ *                   description: Progress comparison data
  *                 landmarks:
  *                   type: object
  *                 images_analyzed:
@@ -63,6 +66,28 @@ const progressAnalysisSchema = z.object({
  *                 analysis_type:
  *                   type: string
  *                   enum: [PROGRESS]
+ *                 initial_score:
+ *                   type: number
+ *                   description: Initial skin score
+ *                 current_score:
+ *                   type: number
+ *                   description: Current skin score
+ *                 estimated_improvement_score:
+ *                   type: number
+ *                   description: Target improvement score from initial analysis
+ *                 initial_analysis:
+ *                   type: object
+ *                   properties:
+ *                     issues:
+ *                       type: array
+ *                     overall_assessment:
+ *                       type: string
+ *                 days_elapsed:
+ *                   type: number
+ *                 plan_start_date:
+ *                   type: string
+ *                 plan_end_date:
+ *                   type: string
  *       400:
  *         description: Missing required data or no active plan
  *       401:
