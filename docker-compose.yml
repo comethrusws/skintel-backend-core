@@ -12,6 +12,7 @@ services:
       - API_BASE_URL=${API_BASE_URL}
       - MAX_REQUEST_SIZE=${MAX_REQUEST_SIZE}
       - DATABASE_URL=postgresql://postgres:password@skintel-database:5432/skintel_db
+      - DATABASE_URL_PROD=postgresql://postgres:password@skintel-database:5432/skintel_db
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - LANDMARK_URL=http://skintel-facial-landmarks:8000
       - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
