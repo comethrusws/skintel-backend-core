@@ -53,7 +53,7 @@ const progressAnalysisSchema = z.object({
  *                 answer_id:
  *                   type: string
  *                 analysis:
- *                   type: object
+ *                   $ref: '#/components/schemas/AnalysisResult'
  *                 landmarks:
  *                   type: object
  *                 images_analyzed:

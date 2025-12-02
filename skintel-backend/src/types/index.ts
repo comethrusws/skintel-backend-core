@@ -189,6 +189,7 @@ export interface WeeklyPlanItem {
   week: number;
   preview: string;
   improvement_expected: string;
+  weekly_improvement_score?: number;
 }
 
 export interface EnhancedAnalysisResult {
@@ -202,6 +203,7 @@ export interface EnhancedAnalysisResult {
   overall_assessment: string;
   images_analyzed: string[];
   score: number;
+  estimated_improvement_score?: number;
   care_plan_4_weeks: WeeklyPlanItem[];
 }
 
