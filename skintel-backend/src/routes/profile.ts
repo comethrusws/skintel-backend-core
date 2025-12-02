@@ -484,6 +484,9 @@ const router = Router();
  *                     properties:
  *                       question_id:
  *                         type: string
+ *                       question_text:
+ *                         type: string
+ *                         description: The human-readable question text
  *                       saved:
  *                         type: boolean
  *                       saved_at:

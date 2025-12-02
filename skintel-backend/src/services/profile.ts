@@ -588,6 +588,15 @@ export class ProfileService {
     }
 
     static async saveAnswers(userId: string, answers: any[]) {
+        // Ensure user exists before saving answers
+        const user = await prisma.user.findUnique({
+            where: { userId }
+        });
+
+        if (!user) {
+            throw { status: 404, message: 'User not found' };
+        }
+
         const savedAnswers = [];
         const now = new Date();
 
@@ -660,6 +669,7 @@ export class ProfileService {
 
                 savedAnswers.push({
                     question_id,
+                    question_text: question?.question_text || question_id,
                     saved: true,
                     saved_at: now.toISOString(),
                 });
@@ -680,6 +690,7 @@ export class ProfileService {
 
                 savedAnswers.push({
                     question_id,
+                    question_text: question?.question_text || question_id,
                     saved: true,
                     saved_at: now.toISOString(),
                 });
