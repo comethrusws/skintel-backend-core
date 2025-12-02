@@ -64,6 +64,7 @@ jobs:
           CLERK_PUBLISHABLE_KEY="${{ secrets.CLERK_PUBLISHABLE_KEY }}"
           FIREBASE_SERVICE_ACCOUNT='${{ secrets.FIREBASE_SERVICE_ACCOUNT }}'
           SENTRY_DSN="${{ secrets.SENTRY_DSN }}"
+          DATABASE_URL="postgresql://postgres:password@skintel-database:5432/skintel_db"
           ENVEOF
             
             # Stop existing services and start new ones
