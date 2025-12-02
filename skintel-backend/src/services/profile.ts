@@ -2,8 +2,43 @@ import { prisma } from '../lib/prisma';
 import { Prisma } from '@prisma/client';
 import { getTaskProgress } from './tasks';
 import { maybePresignUrl } from '../lib/s3';
-import { PROFILE_QUESTIONS, PROFILE_SCREEN_ID, getProfileQuestion, validateProfileQuestionValue, mapOptionsWithLabels } from '../lib/profileQuestions';
+import { PROFILE_QUESTIONS, PROFILE_SCREEN_ID, getProfileQuestion, validateProfileQuestionValue, mapOptionsWithLabels, formatOptionLabel } from '../lib/profileQuestions';
 import { VALID_QUESTION_IDS, getExpectedType, getValidValues, formatLabel, getQuestionText } from '../utils/validation';
+
+function formatAnalysisIssues(analysis: any): any {
+    if (!analysis || typeof analysis !== 'object') return analysis;
+
+    const formatted = { ...analysis };
+
+    if (Array.isArray(formatted.issues)) {
+        formatted.issues = formatted.issues.map((issue: any) => ({
+            ...issue,
+            type_label: formatOptionLabel(issue.type || ''),
+            region_label: formatOptionLabel(issue.region || ''),
+            severity_label: formatOptionLabel(issue.severity || '')
+        }));
+    }
+
+    if (Array.isArray(formatted.remaining_issues)) {
+        formatted.remaining_issues = formatted.remaining_issues.map((issue: any) => ({
+            ...issue,
+            type_label: formatOptionLabel(issue.type || ''),
+            region_label: formatOptionLabel(issue.region || ''),
+            severity_label: formatOptionLabel(issue.severity || '')
+        }));
+    }
+
+    if (Array.isArray(formatted.issues_improved)) {
+        formatted.issues_improved = formatted.issues_improved.map((issue: any) => ({
+            ...issue,
+            issue_type_label: formatOptionLabel(issue.issue_type || ''),
+            initial_severity_label: formatOptionLabel(issue.initial_severity || ''),
+            current_severity_label: formatOptionLabel(issue.current_severity || '')
+        }));
+    }
+
+    return formatted;
+}
 
 export class ProfileService {
     static async getProfile(userId: string) {
@@ -161,13 +196,24 @@ export class ProfileService {
                     });
                 }
 
+                let analysisData = landmark.analysis ?
+                    (typeof landmark.analysis === 'string' ? JSON.parse(landmark.analysis) : landmark.analysis)
+                    : null;
+
+                // Format issues with labels
+                analysisData = formatAnalysisIssues(analysisData);
+
+                // Remove duplicated fields from analysis to avoid duplication at top level
+                if (analysisData) {
+                    const { care_plan_4_weeks, score, ...restAnalysis } = analysisData;
+                    analysisData = restAnalysis;
+                }
+
                 return {
                     answer_id: landmark.answerId,
                     question_id: landmark.answer.questionId,
                     screen_id: landmark.answer.screenId,
-                    analysis: landmark.analysis ?
-                        (typeof landmark.analysis === 'string' ? JSON.parse(landmark.analysis) : landmark.analysis)
-                        : null,
+                    analysis: analysisData,
                     score: landmark.score,
                     weekly_plan: weeklyPlan,
                     analysis_type: landmark.analysisType,
