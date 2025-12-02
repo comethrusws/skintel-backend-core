@@ -589,25 +589,35 @@ export class TasksService {
         c.completedAt >= weekStart && c.completedAt <= weekEnd
       );
 
+      // Count unique task-day completions for the week
+      const uniqueWeekCompletions = new Set(
+        weekCompletions.map(c => `${c.taskId}-${c.completedAt.toISOString().split('T')[0]}`)
+      );
+
       const criticalTasks = weekTasks.filter(t => t.priority === 'critical');
       const criticalCompletions = weekCompletions.filter(c => {
         const task = weekTasks.find(t => t.id === c.taskId);
         return task?.priority === 'critical';
       });
 
+      // Count unique critical task-day completions
+      const uniqueCriticalCompletions = new Set(
+        criticalCompletions.map(c => `${c.taskId}-${c.completedAt.toISOString().split('T')[0]}`)
+      );
+
       const weekDaysPassed = Math.min(7, Math.max(0,
         Math.floor((today.getTime() - weekStart.getTime()) / (1000 * 60 * 60 * 24)) + 1
       ));
 
       const totalTasksPossible = weekTasks.length * Math.min(weekDaysPassed, 7);
-      const score = totalTasksPossible > 0 ? (weekCompletions.length / totalTasksPossible) * 100 : 0;
+      const score = totalTasksPossible > 0 ? (uniqueWeekCompletions.size / totalTasksPossible) * 100 : 0;
 
       weeklyScores.push({
         week,
         score: Math.round(score),
-        completedTasks: weekCompletions.length,
+        completedTasks: uniqueWeekCompletions.size,
         totalTasks: totalTasksPossible,
-        criticalTasksCompleted: criticalCompletions.length,
+        criticalTasksCompleted: uniqueCriticalCompletions.size,
         criticalTasksTotal: criticalTasks.length * Math.min(weekDaysPassed, 7)
       });
     }
@@ -624,12 +634,15 @@ export class TasksService {
         c.completedAt.toISOString().split('T')[0] === dateStr
       );
 
-      const dayScore = dayTasks.length > 0 ? (dayCompletions.length / dayTasks.length) * 100 : 0;
+      // Count unique task completions for this day
+      const uniqueDayCompletions = new Set(dayCompletions.map(c => c.taskId));
+
+      const dayScore = dayTasks.length > 0 ? (uniqueDayCompletions.size / dayTasks.length) * 100 : 0;
 
       last7Days.push({
         date: dateStr,
         score: Math.round(dayScore),
-        tasksCompleted: dayCompletions.length,
+        tasksCompleted: uniqueDayCompletions.size,
         tasksTotal: dayTasks.length
       });
     }
