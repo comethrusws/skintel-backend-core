@@ -13,6 +13,7 @@ import requests
 from urllib.parse import urlparse
 import base64
 import mediapipe as mp
+from scipy.interpolate import splprep, splev
 
 mp_face_mesh = mp.solutions.face_mesh
 face_mesh = None
@@ -26,7 +27,9 @@ LANDMARK_INDICES = {
     'right_eyebrow': [46, 53, 52, 65, 55, 70, 63, 105, 66, 107],
     'nose': [1, 2, 98, 327, 195, 5, 4, 275, 440, 220, 45, 274, 237, 44, 19], # Simplified nose
     'face_oval': [10, 338, 297, 332, 284, 251, 389, 356, 454, 323, 361, 288, 397, 365, 379, 378, 400, 377, 152, 148, 176, 149, 150, 136, 172, 58, 132, 93, 234, 127, 162, 21, 54, 103, 67, 109],
-    'forehead': [10, 338, 297, 332, 284, 251, 389, 356, 454, 323, 361, 288, 397, 365, 379, 378, 400, 377, 152, 148, 176, 149, 150, 136, 172, 58, 132, 93, 234, 127, 162, 21, 54, 103, 67, 109] # Fallback to face oval or specific forehead points if needed
+    'forehead': [10, 338, 297, 332, 284, 251, 389, 356, 454, 323, 361, 288, 397, 365, 379, 378, 400, 377, 152, 148, 176, 149, 150, 136, 172, 58, 132, 93, 234, 127, 162, 21, 54, 103, 67, 109], # Fallback to face oval or specific forehead points if needed
+    'left_under_eye': [382, 362, 263, 466, 388, 387, 386, 385, 384, 398], # Approximate under eye area
+    'right_under_eye': [33, 246, 161, 160, 159, 158, 157, 173, 133, 155]  # Approximate under eye area
 }
 
 def get_region_landmarks(region_name: str) -> List[int]:
@@ -37,20 +40,15 @@ def get_region_landmarks(region_name: str) -> List[int]:
         return LANDMARK_INDICES['left_eye']
     elif 'right_eye' in region_name:
         return LANDMARK_INDICES['right_eye']
-    elif 'eye' in region_name: # General eye - tricky, maybe return both or handle logic elsewhere. For now default to both if generic 'eye' but usually issues are specific.
-        # If generic 'eye' is passed, we might need to check which eye the issue coordinates are closer to, 
-        # but the current logic re-detects. 
-        # Let's assume the issue region string is specific enough or we default to face oval if unknown.
+    elif 'eye' in region_name: 
         return LANDMARK_INDICES['left_eye'] + LANDMARK_INDICES['right_eye'] 
     elif 'eyebrow' in region_name:
         return LANDMARK_INDICES['left_eyebrow'] + LANDMARK_INDICES['right_eyebrow']
     elif 'nose' in region_name:
         return LANDMARK_INDICES['nose']
     elif 'forehead' in region_name:
-         # Approximate forehead using top of face oval and some brow points
          return [10, 338, 297, 332, 284, 251, 389, 356, 454, 323, 361, 288, 397, 365, 379, 378, 400, 377] 
     elif 'cheek' in region_name:
-        # Cheeks are hard to define with just lines, maybe just use face oval or specific cheek contours
         return LANDMARK_INDICES['face_oval']
     else:
         return LANDMARK_INDICES['face_oval']
@@ -184,7 +182,6 @@ def extract_landmarks(image_array: np.ndarray) -> List[Dict[str, int]]:
     for i in range(68):
         x = landmarks.part(i).x
         y = landmarks.part(i).y
-        
         if scale != 1.0:
             x = int(x / scale)
             y = int(y / scale)
@@ -194,29 +191,35 @@ def extract_landmarks(image_array: np.ndarray) -> List[Dict[str, int]]:
     return landmark_points
 
 
+def get_smooth_curve(points: np.ndarray, num_points: int = 100) -> np.ndarray:
+    """
+    Generate a smooth curve from a set of points using spline interpolation.
+    """
+    if len(points) < 3:
+        return points
+        
+    # Close the loop for interpolation
+    points = np.vstack((points, points[0]))
+    
+    try:
+        tck, u = splprep(points.T, u=None, s=0.0, per=1)
+        u_new = np.linspace(u.min(), u.max(), num_points)
+        x_new, y_new = splev(u_new, tck, der=0)
+        
+        smooth_points = np.column_stack((x_new, y_new)).astype(np.int32)
+        return smooth_points
+    except Exception as e:
+        logger.warning(f"Spline interpolation failed: {e}")
+        return points[:-1] # Return original points without the closing duplicate
+
 def annotate_image_with_issues(image_array: np.ndarray, issues: List[SkinIssue]) -> str:
-    """
-    Draw skin issues on the image using MediaPipe Face Mesh for smoother contours.
-    
-    Args:
-        image_array: Original image as numpy array (RGB)
-        issues: List of skin issues
-    
-    Returns:
-        Base64 encoded PNG image with data URI prefix
-    """
-    # MediaPipe expects RGB
     results = face_mesh.process(image_array)
     
     annotated = image_array.copy()
-    # Convert to BGR for OpenCV drawing
     annotated_bgr = cv2.cvtColor(annotated, cv2.COLOR_RGB2BGR)
     
     if not results.multi_face_landmarks:
         logger.warning("No face detected by MediaPipe for annotation")
-        # Fallback or return original? Let's return original with a warning or try to use the passed landmarks (which are dlib based and bad, but better than nothing)
-        # For now, let's just return the image with legend but no drawings if no face found, or maybe just the dlib points if we really wanted to support fallback.
-        # But the user specifically hates the dlib points.
         pass
     else:
         face_landmarks = results.multi_face_landmarks[0]
@@ -232,13 +235,14 @@ def annotate_image_with_issues(image_array: np.ndarray, issues: List[SkinIssue])
         for idx, issue in enumerate(issues, start=1):
             color = severity_colors.get(issue.severity.lower(), (255, 255, 255))
             
-            # Determine which landmarks to use based on region
             indices = get_region_landmarks(issue.region)
             
-            # If we have specific dlib landmarks in the issue, we might want to find the closest MediaPipe region
-            # But for now, we rely on the region name mapping.
+            if issue.type.lower() in ['dark_circles', 'dark circles', 'eye_bags', 'puffy_eyes']:
+                if 'left' in issue.region.lower():
+                    indices = LANDMARK_INDICES['left_under_eye']
+                elif 'right' in issue.region.lower():
+                    indices = LANDMARK_INDICES['right_under_eye']
             
-            # Extract points
             points = []
             for index in indices:
                 lm = face_landmarks.landmark[index]
@@ -248,19 +252,18 @@ def annotate_image_with_issues(image_array: np.ndarray, issues: List[SkinIssue])
             points = np.array(points, dtype=np.int32)
             
             if len(points) > 0:
-                # Draw smooth closed contour
-                # cv2.polylines(annotated_bgr, [points], isClosed=True, color=color, thickness=2, lineType=cv2.LINE_AA)
-                
-                # To make it look even better/smoother, we can use a convex hull or just the points if they are ordered.
-                # MediaPipe points for eyes/lips are ordered. For others they might not be.
-                # Let's try convex hull for regions that might be unordered or scattered
                 if 'eye' in issue.region.lower() or 'lip' in issue.region.lower():
-                     cv2.polylines(annotated_bgr, [points], isClosed=True, color=color, thickness=2, lineType=cv2.LINE_AA)
+                     smooth_points = get_smooth_curve(points)
+                     cv2.polylines(annotated_bgr, [smooth_points], isClosed=True, color=color, thickness=1, lineType=cv2.LINE_AA)
                 else:
                     hull = cv2.convexHull(points)
-                    cv2.polylines(annotated_bgr, [hull], isClosed=True, color=color, thickness=2, lineType=cv2.LINE_AA)
+                    hull = np.squeeze(hull)
+                    if len(hull.shape) == 1: # Handle case with single point or malformed hull
+                         hull = hull.reshape(-1, 2)
+                         
+                    smooth_points = get_smooth_curve(hull)
+                    cv2.polylines(annotated_bgr, [smooth_points], isClosed=True, color=color, thickness=1, lineType=cv2.LINE_AA)
 
-    # Draw Legend (reuse existing logic mostly)
     legend_items = []
     severity_colors = {
         'mild': (0, 255, 255),
@@ -566,7 +569,6 @@ async def get_landmarks_info():
 
 @app.post("/detect-landmarks/", response_model=LandmarksResponse)
 async def detect_landmarks_legacy(file: UploadFile = File(...)):
-    """this is legacy endpoint. use /api/v1/landmarks instead, this is deprecated"""
     return await create_landmarks_detection(file)
 
 @app.exception_handler(HTTPException)

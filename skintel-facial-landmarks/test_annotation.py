@@ -15,7 +15,14 @@ issues = [
         "region": "left_eye",
         "severity": "moderate",
         "visible_in": ["front"],
-        "dlib_68_facial_landmarks": [] # Empty as we rely on re-detection
+        "dlib_68_facial_landmarks": [] 
+    },
+    {
+        "type": "dark_circles",
+        "region": "right_eye",
+        "severity": "mild",
+        "visible_in": ["front"],
+        "dlib_68_facial_landmarks": []
     },
     {
         "type": "dryness",
