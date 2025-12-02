@@ -15,13 +15,13 @@ const taskCompletionSchema = z.object({
  * /v1/tasks/all:
  *   get:
  *     summary: Get all missed and completed tasks
- *     description: Retrieve all tasks from previous days only (excludes today and future) with missed and completed days count
+ *     description: Retrieve all tasks from previous days only (excludes today and future) with completion history
  *     tags: [Tasks]
  *     security:
  *       - BearerAuth: []
  *     responses:
  *       200:
- *         description: All tasks retrieved successfully with completion stats
+ *         description: All past tasks with completion statistics
  *         content:
  *           application/json:
  *             schema:
@@ -29,38 +29,81 @@ const taskCompletionSchema = z.object({
  *               properties:
  *                 tasks:
  *                   type: array
- *                   description: All past tasks (excludes today) with completionStats (completedDays, missedDays, daysExpected, completionRate, completionDates from previous days only)
- *                 tasksByWeek:
- *                   type: object
- *                   description: Tasks grouped by week (1-4)
- *                 totalTasks:
- *                   type: integer
- *                   description: Total number of tasks
- *                 weeks:
- *                   type: array
+ *                   description: Array of past tasks (excludes today and future)
  *                   items:
- *                     type: integer
- *                   description: Array of weeks that have tasks
- *                 overallStats:
+ *                     type: object
+ *                     properties:
+ *                       id:
+ *                         type: string
+ *                       week:
+ *                         type: integer
+ *                         description: Week number (1-4)
+ *                       title:
+ *                         type: string
+ *                       description:
+ *                         type: string
+ *                       timeOfDay:
+ *                         type: string
+ *                         enum: [morning, evening, anytime]
+ *                       category:
+ *                         type: string
+ *                         enum: [cleansing, treatment, moisturizing, protection, lifestyle]
+ *                       priority:
+ *                         type: string
+ *                         enum: [critical, important, optional]
+ *                       isActive:
+ *                         type: boolean
+ *                       recommendedProducts:
+ *                         type: array
+ *                         items:
+ *                           type: string
+ *                       userProducts:
+ *                         type: array
+ *                         items:
+ *                           type: object
+ *                           properties:
+ *                             id:
+ *                               type: string
+ *                             name:
+ *                               type: string
+ *                             category:
+ *                               type: string
+ *                       completionStats:
+ *                         type: object
+ *                         properties:
+ *                           completedDays:
+ *                             type: integer
+ *                             description: Number of days this task was completed
+ *                           missedDays:
+ *                             type: integer
+ *                             description: Number of days this task was missed
+ *                           daysExpected:
+ *                             type: integer
+ *                             description: Total days this task should have been done
+ *                           completionRate:
+ *                             type: integer
+ *                             description: Percentage (0-100) of completion
+ *                           completionDates:
+ *                             type: array
+ *                             items:
+ *                               type: string
+ *                               format: date
+ *                             description: Array of dates when task was completed (excludes today)
+ *                 summary:
  *                   type: object
  *                   properties:
  *                     totalCompleted:
  *                       type: integer
+ *                       description: Total completed task instances across all tasks
  *                     totalMissed:
  *                       type: integer
+ *                       description: Total missed task instances across all tasks
  *                     totalExpected:
  *                       type: integer
+ *                       description: Total expected task instances
  *                     completionRate:
  *                       type: integer
- *                 planInfo:
- *                   type: object
- *                   properties:
- *                     startDate:
- *                       type: string
- *                     currentDay:
- *                       type: integer
- *                     planActive:
- *                       type: boolean
+ *                       description: Overall completion percentage (0-100)
  *       401:
  *         description: Authentication required
  */

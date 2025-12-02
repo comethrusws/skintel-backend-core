@@ -458,34 +458,18 @@ export class TasksService {
       };
     }).filter(task => task.completionStats.daysExpected > 0); // Only include tasks with past expected days
 
-    // Group tasks by week for better organization
-    const tasksByWeek: Record<number, typeof formattedTasks> = {};
-    formattedTasks.forEach(task => {
-      if (!tasksByWeek[task.week]) {
-        tasksByWeek[task.week] = [];
-      }
-      tasksByWeek[task.week].push(task);
-    });
-
+    // Calculate overall stats
     const totalCompleted = formattedTasks.reduce((sum, t) => sum + t.completionStats.completedDays, 0);
     const totalMissed = formattedTasks.reduce((sum, t) => sum + t.completionStats.missedDays, 0);
     const totalExpected = formattedTasks.reduce((sum, t) => sum + t.completionStats.daysExpected, 0);
 
     return {
       tasks: formattedTasks,
-      tasksByWeek,
-      totalTasks: formattedTasks.length,
-      weeks: Object.keys(tasksByWeek).map(Number).sort((a, b) => a - b),
-      overallStats: {
+      summary: {
         totalCompleted,
         totalMissed,
         totalExpected,
         completionRate: totalExpected > 0 ? Math.round((totalCompleted / totalExpected) * 100) : 0
-      },
-      planInfo: {
-        startDate: planStartDate.toISOString().split('T')[0],
-        currentDay,
-        planActive: !!activePlan
       }
     };
   }
