@@ -1,4 +1,4 @@
-name: Integrations Deploy to AWS 
+name: Deploy to AWS (EC2 via SCP + Docker Compose)
 
 on:
   push:
