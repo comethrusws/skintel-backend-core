@@ -31,7 +31,7 @@ const options = {
         description: 'Development server',
       },
       {
-        url: process.env.API_BASE_URL || 'https://skintel.srecraft.io',
+        url: process.env.API_BASE_URL,
         description: 'Production server',
       },
     ],
