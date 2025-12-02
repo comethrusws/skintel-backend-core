@@ -7,6 +7,16 @@ interface WaterIntakeSuggestion {
   reason: string;
 }
 
+export interface WaterIntakeResponse {
+  date: string;
+  recommended: WaterIntakeSuggestion;
+  actual: {
+    amount: number;
+    unit: string;
+  } | null;
+  progress: number | null;
+}
+
 export interface DailyWaterIntakeSummary {
   date: string; // ISO date (yyyy-mm-dd)
   actualAmount: number | null;
@@ -16,7 +26,37 @@ export interface DailyWaterIntakeSummary {
 }
 
 export class WaterIntakeService {
-  static async getWaterIntakeSuggestion(userId: string): Promise<WaterIntakeSuggestion> {
+  static async getWaterIntakeSuggestion(userId: string): Promise<WaterIntakeResponse> {
+    // Get today's date normalized to UTC midnight
+    const today = this.normalizeDate();
+
+    // Fetch recommendation
+    const recommendation = await this.getRecommendation(userId);
+
+    // Fetch today's actual intake
+    const log = await prisma.waterIntakeLog.findUnique({
+      where: {
+        userId_date: {
+          userId,
+          date: today,
+        },
+      },
+    });
+
+    const actualAmount = log?.amountMl ?? null;
+    const progress = actualAmount && recommendation.amount
+      ? Math.min(1, actualAmount / recommendation.amount)
+      : null;
+
+    return {
+      date: today.toISOString().slice(0, 10),
+      recommended: recommendation,
+      actual: actualAmount ? { amount: actualAmount, unit: 'ml' } : null,
+      progress,
+    };
+  }
+
+  private static async getRecommendation(userId: string): Promise<WaterIntakeSuggestion> {
     const latestLandmarks = await prisma.facialLandmarks.findFirst({
       where: {
         OR: [
@@ -120,7 +160,7 @@ export class WaterIntakeService {
       amountMl = Math.round(amount * 1000);
     }
 
-    const recommendation = await this.getWaterIntakeSuggestion(userId);
+    const recommendation = await this.getRecommendation(userId);
 
     const log = await prisma.waterIntakeLog.upsert({
       where: {
