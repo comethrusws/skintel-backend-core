@@ -15,7 +15,7 @@ const router = Router();
  *       - BearerAuth: []
  *     responses:
  *       200:
- *         description: Water intake information
+ *         description: Water intake information retrieved successfully
  *         content:
  *           application/json:
  *             schema:
@@ -24,9 +24,11 @@ const router = Router();
  *                 date:
  *                   type: string
  *                   format: date
+ *                   description: Today's date in ISO format (yyyy-mm-dd)
  *                   example: "2025-12-02"
  *                 recommended:
  *                   type: object
+ *                   description: Recommended daily water intake based on user's skin analysis
  *                   properties:
  *                     amount:
  *                       type: number
@@ -40,10 +42,11 @@ const router = Router();
  *                 actual:
  *                   type: object
  *                   nullable: true
- *                   description: Actual water intake logged by the user for today. Null if no intake has been logged.
+ *                   description: Actual water intake logged by the user for today. Null if no intake has been logged yet.
  *                   properties:
  *                     amount:
  *                       type: number
+ *                       description: Total accumulated water intake for today in ml
  *                       example: 1800
  *                     unit:
  *                       type: string
@@ -51,11 +54,13 @@ const router = Router();
  *                 progress:
  *                   type: number
  *                   nullable: true
- *                   description: Progress towards recommended intake (0-1). Null if no intake has been logged.
+ *                   description: Progress towards recommended intake (0-1). Calculated as actual / recommended. Null if no intake has been logged.
  *                   example: 0.72
+ *       500:
+ *         description: Internal server error
  *   put:
  *     summary: Update daily water intake for a user
- *     description: Record how much water the user actually drank on a given day and compare it against the recommended intake.
+ *     description: Record how much water the user actually drank on a given day and compare it against the recommended intake. This endpoint INCREMENTS the existing water intake amount for the specified date - it adds to any previously logged amount rather than replacing it. If no previous record exists for the date, it creates a new entry.
  *     tags: [Dashboard]
  *     security:
  *       - BearerAuth: []
@@ -70,10 +75,11 @@ const router = Router();
  *                 type: string
  *                 format: date
  *                 description: ISO date (yyyy-mm-dd). Defaults to today if omitted.
+ *                 example: "2025-12-02"
  *               amount:
  *                 type: number
- *                 description: Amount of water consumed.
- *                 example: 1800
+ *                 description: Amount of water consumed to ADD to the daily total (not replace).
+ *                 example: 250
  *               unit:
  *                 type: string
  *                 description: Unit of the amount. Currently supports "ml" or "l". Defaults to "ml".
@@ -82,7 +88,7 @@ const router = Router();
  *               - amount
  *     responses:
  *       200:
- *         description: Daily water intake updated and compared with recommendation.
+ *         description: Daily water intake updated and compared with recommendation. Returns the total accumulated water intake for the day.
  *         content:
  *           application/json:
  *             schema:
@@ -91,8 +97,10 @@ const router = Router();
  *                 date:
  *                   type: string
  *                   format: date
+ *                   example: "2025-12-02"
  *                 actualAmount:
  *                   type: number
+ *                   description: Total water intake for the day after adding the new amount
  *                   example: 1800
  *                 actualUnit:
  *                   type: string
@@ -102,16 +110,20 @@ const router = Router();
  *                   properties:
  *                     amount:
  *                       type: number
+ *                       example: 2500
  *                     unit:
  *                       type: string
+ *                       example: "ml"
  *                     reason:
  *                       type: string
+ *                       example: "To maintain hydration for dry skin."
  *                 progress:
  *                   type: number
  *                   nullable: true
- *                   description: Progress towards recommended intake (0-1). Null if not applicable.
+ *                   description: Progress towards recommended intake (0-1). Calculated as actualAmount / recommended.amount. Null if recommendation is not available.
+ *                   example: 0.72
  *       400:
- *         description: Invalid input data.
+ *         description: Invalid input data (e.g., missing amount, invalid unit, invalid date format).
  *       500:
  *         description: Internal server error.
  */
