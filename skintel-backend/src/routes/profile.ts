@@ -1,6 +1,6 @@
 import { Router, Response } from 'express';
 import { authenticateUser, AuthenticatedRequest } from '../middleware/auth';
-import { profileUpdateRequestSchema, profileQuestionsAnswerRequestSchema, profileLocationUpdateSchema } from '../lib/validation';
+import { profileUpdateRequestSchema, profileQuestionsAnswerRequestSchema, profileLocationUpdateSchema, addProfileQuestionSchema } from '../lib/validation';
 import { asyncHandler } from '../utils/asyncHandler';
 import { ProfileService } from '../services/profile';
 
@@ -625,6 +625,113 @@ router.post('/questions/answer', authenticateUser, asyncHandler(async (req: Auth
   }
 
   const response = await ProfileService.saveAnswers(req.userId!, validationResult.data.answers);
+  res.json(response);
+}));
+
+/**
+ * @swagger
+ * /v1/profile/questions/add:
+ *   post:
+ *     summary: Add a custom profile question
+ *     description: Add a new custom question to the user's profile questions list
+ *     tags: [Profile]
+ *     security:
+ *       - BearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - question_id
+ *               - question_text
+ *               - type
+ *             properties:
+ *               question_id:
+ *                 type: string
+ *                 description: Unique identifier for the question (must start with 'q_profile_')
+ *                 example: q_profile_custom_meditation
+ *               question_text:
+ *                 type: string
+ *                 maxLength: 200
+ *                 description: The question text to display
+ *                 example: Do you practice meditation regularly?
+ *               type:
+ *                 type: string
+ *                 enum: [single, slider]
+ *                 description: Type of question
+ *               options:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *                 description: Options for single-choice questions (required if type is 'single')
+ *                 example: ['never', 'sometimes', 'daily']
+ *               min_value:
+ *                 type: number
+ *                 description: Minimum value for slider questions (required if type is 'slider')
+ *                 example: 0
+ *               max_value:
+ *                 type: number
+ *                 description: Maximum value for slider questions (required if type is 'slider')
+ *                 example: 60
+ *               default_value:
+ *                 type: number
+ *                 description: Default value for slider questions (required if type is 'slider')
+ *                 example: 15
+ *     responses:
+ *       200:
+ *         description: Custom question added successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 user_id:
+ *                   type: string
+ *                 question_id:
+ *                   type: string
+ *                 question_text:
+ *                   type: string
+ *                 type:
+ *                   type: string
+ *                   enum: [single, slider]
+ *                 options:
+ *                   type: array
+ *                   items:
+ *                     type: string
+ *                 min_value:
+ *                   type: number
+ *                 max_value:
+ *                   type: number
+ *                 default_value:
+ *                   type: number
+ *                 status:
+ *                   type: string
+ *                   enum: [new]
+ *                 created_at:
+ *                   type: string
+ *                   format: date-time
+ *       400:
+ *         description: Invalid request data
+ *       401:
+ *         description: Authentication required
+ *       404:
+ *         description: User not found
+ *       409:
+ *         description: Question with this ID already exists
+ */
+router.post('/questions/add', authenticateUser, asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+  const validationResult = addProfileQuestionSchema.safeParse(req.body);
+  if (!validationResult.success) {
+    res.status(400).json({
+      error: 'Invalid request data',
+      details: validationResult.error.errors
+    });
+    return;
+  }
+
+  const response = await ProfileService.addCustomQuestion(req.userId!, validationResult.data);
   res.json(response);
 }));
 

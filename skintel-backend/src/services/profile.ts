@@ -703,4 +703,68 @@ export class ProfileService {
             answers: savedAnswers,
         };
     }
+
+    static async addCustomQuestion(userId: string, questionData: {
+        question_id: string;
+        question_text: string;
+        type: 'single' | 'slider';
+        options?: string[];
+        min_value?: number;
+        max_value?: number;
+        default_value?: number;
+    }) {
+        const user = await prisma.user.findUnique({
+            where: { userId }
+        });
+
+        if (!user) {
+            throw { status: 404, message: 'User not found' };
+        }
+
+        const existingQuestion = await prisma.onboardingAnswer.findFirst({
+            where: {
+                userId,
+                questionId: questionData.question_id,
+                screenId: PROFILE_SCREEN_ID,
+            }
+        });
+
+        if (existingQuestion) {
+            throw {
+                status: 409,
+                message: `Question with ID ${questionData.question_id} already exists`,
+            };
+        }
+
+        const answerId = `ans_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+        const now = new Date();
+
+        await prisma.onboardingAnswer.create({
+            data: {
+                answerId,
+                userId,
+                screenId: PROFILE_SCREEN_ID,
+                questionId: questionData.question_id,
+                type: questionData.type,
+                value: Prisma.JsonNull,
+                status: 'skipped',
+                savedAt: now,
+            },
+        });
+
+        return {
+            user_id: userId,
+            question_id: questionData.question_id,
+            question_text: questionData.question_text,
+            type: questionData.type,
+            ...(questionData.type === 'single' && { options: questionData.options }),
+            ...(questionData.type === 'slider' && {
+                min_value: questionData.min_value,
+                max_value: questionData.max_value,
+                default_value: questionData.default_value,
+            }),
+            status: 'skipped',
+            created_at: now.toISOString(),
+        };
+    }
 }

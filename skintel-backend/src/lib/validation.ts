@@ -164,6 +164,43 @@ export const profileQuestionsAnswerRequestSchema = z.object({
   answers: z.array(profileQuestionAnswerSchema).min(1),
 });
 
+export const addProfileQuestionSchema = z.object({
+  question_id: z.string().min(1).regex(/^q_profile_/, "Question ID must start with 'q_profile_'"),
+  question_text: z.string().min(1).max(200),
+  type: z.enum(['single', 'slider']),
+  options: z.array(z.string().min(1)).optional(),
+  min_value: z.number().optional(),
+  max_value: z.number().optional(),
+  default_value: z.number().optional(),
+}).refine(
+  (data) => {
+    if (data.type === 'single') {
+      return data.options && data.options.length > 0;
+    }
+    return true;
+  },
+  {
+    message: "Single type questions must have options array",
+    path: ["options"]
+  }
+).refine(
+  (data) => {
+    if (data.type === 'slider') {
+      return typeof data.min_value === 'number' && 
+             typeof data.max_value === 'number' && 
+             typeof data.default_value === 'number' &&
+             data.min_value < data.max_value &&
+             data.default_value >= data.min_value &&
+             data.default_value <= data.max_value;
+    }
+    return true;
+  },
+  {
+    message: "Slider type questions must have valid min_value, max_value, and default_value",
+    path: ["min_value"]
+  }
+);
+
 export const paymentVerifySchema = z.object({
   receipt_data: z.string().min(1),
   product_id: z.string().min(1),
