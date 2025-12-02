@@ -649,9 +649,13 @@ export class TasksService {
     }
     longestStreak = Math.max(longestStreak, currentStreak);
 
-    // vverall score
+    const uniqueCompletions = new Set(
+      allCompletions.map(c => `${c.taskId}-${c.completedAt.toISOString().split('T')[0]}`)
+    );
+    const totalTasksCompleted = uniqueCompletions.size;
+    
     const totalTasksPossible = allTasks.length * Math.min(currentDay, 28);
-    const overallScore = totalTasksPossible > 0 ? (allCompletions.length / totalTasksPossible) * 100 : 0;
+    const overallScore = totalTasksPossible > 0 ? (totalTasksCompleted / totalTasksPossible) * 100 : 0;
 
     return {
       userId,
@@ -661,7 +665,7 @@ export class TasksService {
       weeklyScores,
       dailyStreak,
       longestStreak,
-      totalTasksCompleted: allCompletions.length,
+      totalTasksCompleted,
       totalTasksPossible,
       planStartDate: planStart.toISOString(),
       planEndDate: planEnd.toISOString(),
