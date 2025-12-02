@@ -1,0 +1,38 @@
+FROM node:24-alpine
+
+# Install postgresql-client for pg_isready and openssl for Prisma
+RUN apk add --no-cache postgresql-client openssl bash
+
+WORKDIR /app
+
+COPY package*.json ./
+
+RUN npm i
+
+COPY . .
+
+RUN npm run db:generate
+
+ARG NODE_ENV=${NODE_ENV:-development}
+ARG DATABASE_URL=${DATABASE_URL}
+
+ENV NODE_ENV=${NODE_ENV}
+ENV DATABASE_URL=${DATABASE_URL}
+
+# Create a startup script that waits for database and runs migration
+RUN echo '#!/bin/bash' > /app/start-migrate.sh && \
+    echo 'echo "DATABASE_URL: $DATABASE_URL"' >> /app/start-migrate.sh && \
+    echo 'echo "Extracting database host from DATABASE_URL..."' >> /app/start-migrate.sh && \
+    echo 'DB_HOST=$(echo $DATABASE_URL | sed -n "s/.*@\([^:]*\):.*/\1/p")' >> /app/start-migrate.sh && \
+    echo 'echo "Database host: $DB_HOST"' >> /app/start-migrate.sh && \
+    echo 'echo "Waiting for database to be ready..."' >> /app/start-migrate.sh && \
+    echo 'until pg_isready -h "$DB_HOST" -p 5432 -U postgres; do' >> /app/start-migrate.sh && \
+    echo '  echo "Database is unavailable - sleeping"' >> /app/start-migrate.sh && \
+    echo '  sleep 2' >> /app/start-migrate.sh && \
+    echo 'done' >> /app/start-migrate.sh && \
+    echo 'echo "Database is ready - running migrations..."' >> /app/start-migrate.sh && \
+    echo 'npx prisma db push' >> /app/start-migrate.sh && \
+    echo 'echo "Migration completed successfully!"' >> /app/start-migrate.sh && \
+    chmod +x /app/start-migrate.sh
+
+CMD ["/app/start-migrate.sh"]

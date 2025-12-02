@@ -1,0 +1,57 @@
+services:
+  migrate:
+    build:
+      context: skintel-backend
+      dockerfile: Dockerfile.migrate.prod
+    environment:
+      - NODE_ENV=${NODE_ENV:-production}
+      - DATABASE_URL=${DATABASE_URL}
+
+  skintel-backend:
+    build:
+      context: skintel-backend
+      dockerfile: Dockerfile
+    ports:
+      - 3000:3000
+    environment:
+      - NODE_ENV=${NODE_ENV:-production}
+      - PORT=${PORT:-3000}
+      - JWT_SECRET=${JWT_SECRET}
+      - API_BASE_URL=${API_BASE_URL}
+      - MAX_REQUEST_SIZE=${MAX_REQUEST_SIZE}
+      - DATABASE_URL=${DATABASE_URL}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - LANDMARK_URL=http://skintel-facial-landmarks:8000
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+      - AWS_REGION=${AWS_REGION}
+      - S3_BUCKET_NAME=${S3_BUCKET_NAME}
+      - S3_PUBLIC_BASE_URL=${S3_PUBLIC_BASE_URL}
+      - S3_OBJECT_ACL=${S3_OBJECT_ACL}
+      - OPENWEATHER_API_KEY=${OPENWEATHER_API_KEY}
+      - SLACK_WEBHOOK_URL=${SLACK_WEBHOOK_URL}
+      - CLERK_SECRET_KEY=${CLERK_SECRET_KEY}
+      - IOS_BUNDLE_ID=${IOS_BUNDLE_ID}
+      - APPLE_SHARED_SECRET=${APPLE_SHARED_SECRET}
+      - CLERK_PUBLISHABLE_KEY=${CLERK_PUBLISHABLE_KEY}
+      - FIREBASE_SERVICE_ACCOUNT=${FIREBASE_SERVICE_ACCOUNT}
+      - SENTRY_DSN=${SENTRY_DSN}
+      - APPLE_ISSUER_ID=${APPLE_ISSUER_ID}
+      - APPLE_KEY_ID=${APPLE_KEY_ID}
+      - APPLE_BUNDLE_ID=${APPLE_BUNDLE_ID}
+      - APPLE_API_URL_PRODUCTION=${APPLE_API_URL_PRODUCTION}
+      - APPLE_API_URL_SANDBOX=${APPLE_API_URL_SANDBOX}
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  skintel-facial-landmarks:
+    build:
+      context: skintel-facial-landmarks
+      dockerfile: Dockerfile
+    ports:
+      - 8000:8000
+    environment:
+      - PYTHONPATH=/app
+    restart: unless-stopped

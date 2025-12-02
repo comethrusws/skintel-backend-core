@@ -65,11 +65,11 @@ jobs:
           ENVEOF
             
             # Stop existing services and start new ones
-            sudo docker compose down || true
+            sudo docker compose -f docker-compose.prod.yml down || true
             # added as temp fix
             sudo docker system prune -f  # Clean up unused images/containers
-            sudo docker compose build  # Force rebuild without cache
-            sudo docker compose up -d --force-recreate
+            sudo docker compose -f docker-compose.prod.yml build --no-cache  # Force rebuild without cache
+            sudo docker compose -f docker-compose.prod.yml up -d --force-recreate
           EOF
           
           # Clean up SSH key
