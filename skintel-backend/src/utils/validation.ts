@@ -45,7 +45,7 @@ export const VALID_VALUES = {
   q_skin_concerns: [
     'acne', 'dark_spots', 'wrinkles', 'fine_lines', 'dryness', 'oiliness',
     'redness', 'sensitivity', 'dullness', 'aging', 'firmness', 'spots', 'melasma', 'uneven_tone',
-    'hyperpigmentation', 'blackheads', 'whiteheads', 'scarring','pores_and_texture', 'no_major_concerns', 'dehydration'
+    'hyperpigmentation', 'blackheads', 'whiteheads', 'scarring','pores_and_texture', 'no_major_concerns', 'dehydration','not_sure'
   ],
   q_skin_sensitivity: [
     'not_sensitive', 'mildly_sensitive', 'very_sensitive', 'not_sure'],
@@ -53,23 +53,23 @@ export const VALID_VALUES = {
     'oily', 'dry', 'combination', 'normal', 'dehydrated', 'not_sure'
   ],
   q_goal: [
-    'healthy_glow', 'clear_skin', 'hydration', 'anti_aging', 'brightening', 'oil_control',
+    'healthy_glow', 'clear_skin', 'hydration', 'not_sure', 'anti_aging', 'brightening', 'oil_control',
     'pore_minimizing', 'acne_treatment', 'even_skin_tone', 'sun_protection', 'clear_and_blemish_free', 'even_tone','smooth_texture','hydrated_and_plump'
   ],
-  q_profile_gender: ['female', 'male', 'nonbinary', 'prefer_not_to_say','female_pregnant'],
+  q_profile_gender: ['female', 'male', 'nonbinary', 'prefer_not_to_say','female_pregnant','keep_private'],
   q_profile_ethnicity: [
     'east_asian', 'black', 'hispanic','latino', 'white','caucasian', 'middle_eastern', 'native_american', 'south_asian', 'african_descent',
-    'pacific_islander', 'mixed', 'south_east_asian','indigenious_australian' ,'prefer_not_to_say'
+    'pacific_islander', 'mixed', 'south_east_asian','indigenious_australian' ,'prefer_not_to_say','keep_private'
   ],
   q_time_spent_outdoors: [ '0_to_1_hr', '1_to_3_hours', 'more_than_3_hours' ],
   q_profile_weather_conditions: ['hot', 'temperate', 'cold', 'minus_10_to_15_celsius', '6_to_29_celsius', '30_celsius_and_above'],
   q_medical_conditions: [
-    'eczema', 'psoriasis', 'rosacea', 'contact_dermatitis', 'allergies', 'medications', 'breakouts','blackheads',
+    'eczema', 'psoriasis', 'rosacea', 'not_sure', 'contact_dermatitis', 'allergies', 'medications', 'breakouts','blackheads',
     'pcos', 'seborrheic_dermatitis', 'none', 'other','spots', 'melasma', 'uneven_tone', 'fragrances','preservatives', 'metals', 'hormonal_treatments'
   ],
   q_hormone_factors: [
     'pregnancy', 'menopause', 'pms', 'puberty', 'hormonal_acne',
-    'birth_control', 'hormone_therapy', 'high_stress', 'none'
+    'birth_control', 'hormone_therapy', 'high_stress', 'none','not_sure'
   ]
 } as const;
 

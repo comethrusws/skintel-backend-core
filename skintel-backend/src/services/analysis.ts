@@ -26,6 +26,8 @@ function buildPrompt(): string {
     '6. Provide an overall skin health score out of 100\n' +
     '7. Create a 4-week improvement plan with weekly previews and expected improvement percentages\n' +
     '8. Return the facial issues in 68 face landmark data format in JSON\n' +
+    '9. make sure to also analyse for any lip related issues like pigmentation'+
+
     '\n' +
     'Example JSON output (clearly highlight the issues visible in the images) and respond strictly in the following json format! DO NOT ADD ANYTHING ELSE:\n' +
     '{\n' +
@@ -73,6 +75,7 @@ function buildProgressPrompt(): string {
     '3. Assess adherence to the 4-week improvement plan\n' +
     '4. Provide progress score and updated recommendations\n' +
     '5. Identify visual improvements and areas needing attention\n' +
+    '6. make sure to also analyse for any lip related issues like pigmentation'+
     '\n' +
     'Respond strictly in this JSON format:\n' +
     '{\n' +
