@@ -1,6 +1,6 @@
 export const VALID_QUESTION_IDS = [
   'q_skin_concerns',
-  'q_skin_sensitivity', 
+  'q_skin_sensitivity',
   'q_skin_type',
   'q_goal',
   'q_profile_gender',
@@ -29,6 +29,7 @@ export const QUESTION_TYPES = {
   q_age: 'slider',
   q_profile_ethnicity: 'single',
   q_time_spent_outdoors: 'single',
+  q_profile_sun_exposure: 'single',
   q_profile_weather_conditions: 'single',
   q_regime_product: 'multi',
   q_medical_conditions: 'multi',
@@ -45,7 +46,7 @@ export const VALID_VALUES = {
   q_skin_concerns: [
     'acne', 'dark_spots', 'wrinkles', 'fine_lines', 'dryness', 'oiliness',
     'redness', 'sensitivity', 'dullness', 'aging', 'firmness', 'spots', 'melasma', 'uneven_tone',
-    'hyperpigmentation', 'blackheads', 'whiteheads', 'scarring','pores_and_texture', 'no_major_concerns', 'dehydration','not_sure'
+    'hyperpigmentation', 'blackheads', 'whiteheads', 'scarring', 'pores_and_texture', 'no_major_concerns', 'dehydration', 'not_sure'
   ],
   q_skin_sensitivity: [
     'not_sensitive', 'mildly_sensitive', 'very_sensitive', 'not_sure'],
@@ -54,22 +55,23 @@ export const VALID_VALUES = {
   ],
   q_goal: [
     'healthy_glow', 'clear_skin', 'hydration', 'not_sure', 'anti_aging', 'brightening', 'oil_control',
-    'pore_minimizing', 'acne_treatment', 'even_skin_tone', 'sun_protection', 'clear_and_blemish_free', 'even_tone','smooth_texture','hydrated_and_plump'
+    'pore_minimizing', 'acne_treatment', 'even_skin_tone', 'sun_protection', 'clear_and_blemish_free', 'even_tone', 'smooth_texture', 'hydrated_and_plump'
   ],
-  q_profile_gender: ['female', 'male', 'nonbinary', 'prefer_not_to_say','female_pregnant','keep_private'],
+  q_profile_gender: ['female', 'male', 'nonbinary', 'prefer_not_to_say', 'female_pregnant', 'keep_private'],
   q_profile_ethnicity: [
-    'east_asian', 'black', 'hispanic','latino', 'white','caucasian', 'middle_eastern', 'native_american', 'south_asian', 'african_descent',
-    'pacific_islander', 'mixed', 'south_east_asian','indigenious_australian' ,'prefer_not_to_say','keep_private'
+    'east_asian', 'black', 'hispanic', 'latino', 'white', 'caucasian', 'middle_eastern', 'native_american', 'south_asian', 'african_descent',
+    'pacific_islander', 'mixed', 'south_east_asian', 'indigenious_australian', 'prefer_not_to_say', 'keep_private'
   ],
-  q_time_spent_outdoors: [ '0_to_1_hr', '1_to_3_hours', 'more_than_3_hours' ],
+  q_time_spent_outdoors: ['0_to_1_hr', '1_to_3_hours', 'more_than_3_hours'],
+  q_profile_sun_exposure: ['minimal', 'moderate', 'high', 'very_high', 'not_sure'],
   q_profile_weather_conditions: ['hot', 'temperate', 'cold', 'minus_10_to_15_celsius', '6_to_29_celsius', '30_celsius_and_above'],
   q_medical_conditions: [
-    'eczema', 'psoriasis', 'rosacea', 'not_sure', 'contact_dermatitis', 'allergies', 'medications', 'breakouts','blackheads',
-    'pcos', 'seborrheic_dermatitis', 'none', 'other','spots', 'melasma', 'uneven_tone', 'fragrances','preservatives', 'metals', 'hormonal_treatments'
+    'eczema', 'psoriasis', 'rosacea', 'not_sure', 'contact_dermatitis', 'allergies', 'medications', 'breakouts', 'blackheads',
+    'pcos', 'seborrheic_dermatitis', 'none', 'other', 'spots', 'melasma', 'uneven_tone', 'fragrances', 'preservatives', 'metals', 'hormonal_treatments'
   ],
   q_hormone_factors: [
     'pregnancy', 'menopause', 'pms', 'puberty', 'hormonal_acne',
-    'birth_control', 'hormone_therapy', 'high_stress', 'none','not_sure'
+    'birth_control', 'hormone_therapy', 'high_stress', 'none', 'not_sure'
   ]
 } as const;
 
@@ -96,7 +98,7 @@ export const validateQuestionValue = (questionId: string, value: any): boolean =
       if (typeof value !== 'string') return false;
       const validValues = getValidValues(questionId);
       if (!validValues) return true;
-      return validValues.some(v => 
+      return validValues.some(v =>
         v.toLowerCase().replace(/[_\s]/g, '') === value.toLowerCase().replace(/[_\s]/g, '')
       );
     }
@@ -105,8 +107,8 @@ export const validateQuestionValue = (questionId: string, value: any): boolean =
       if (value.length === 0) return true;
       const validValues = getValidValues(questionId);
       if (!validValues) return value.every(v => typeof v === 'string');
-      return value.every(v => 
-        typeof v === 'string' && validValues.some(vv => 
+      return value.every(v =>
+        typeof v === 'string' && validValues.some(vv =>
           vv.toLowerCase().replace(/[_\s]/g, '') === v.toLowerCase().replace(/[_\s]/g, '')
         )
       );

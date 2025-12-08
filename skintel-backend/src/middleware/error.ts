@@ -7,7 +7,7 @@ export const notFoundHandler = (req: Request, res: Response, next: NextFunction)
 };
 
 export const errorHandler = (err: any, req: Request, res: Response, next: NextFunction) => {
-    const statusCode = res.statusCode === 200 ? 500 : res.statusCode;
+    const statusCode = err.status || err.statusCode || (res.statusCode === 200 ? 500 : res.statusCode);
 
     console.error('Error:', err.message);
     if (err.stack) {
@@ -16,6 +16,7 @@ export const errorHandler = (err: any, req: Request, res: Response, next: NextFu
 
     res.status(statusCode).json({
         error: statusCode === 500 ? 'Internal Server Error' : err.message,
+        details: err.details,
         stack: process.env.NODE_ENV === 'production' ? 'stack suppressed' : err.stack,
     });
 };
