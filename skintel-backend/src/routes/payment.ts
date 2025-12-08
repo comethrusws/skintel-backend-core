@@ -108,6 +108,106 @@ router.post('/verify-ios', authenticateUser, asyncHandler(async (req: Authentica
 
 /**
  * @swagger
+ * /v1/payment/verify-transaction:
+ *   post:
+ *     summary: Verify iOS In-App Purchase using Transaction ID
+ *     description: Verifies the purchase with Apple using the Transaction ID and updates the user's plan if valid.
+ *     tags: [Subscription]
+ *     security:
+ *       - BearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               transaction_id:
+ *                 type: string
+ *                 description: The transaction ID from the client
+ *               product_id:
+ *                 type: string
+ *                 description: The product ID purchased (e.g., 'com.skintel.weekly', 'com.skintel.monthly')
+ *             required:
+ *               - transaction_id
+ *               - product_id
+ *     responses:
+ *       200:
+ *         description: Payment verified and plan updated
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 plan_type:
+ *                   type: string
+ *                   enum: [WEEKLY, MONTHLY]
+ *                 expires_date:
+ *                   type: string
+ *       400:
+ *         description: Invalid request or verification failed
+ *       401:
+ *         description: Authentication required
+ *       500:
+ *         description: Internal server error
+ */
+router.post('/verify-transaction', authenticateUser, asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+    const { transaction_id, product_id } = req.body;
+
+    if (!transaction_id || !product_id) {
+        res.status(400).json({
+            error: 'Invalid request data',
+            details: 'transaction_id and product_id are required'
+        });
+        return;
+    }
+
+    const userId = req.userId!;
+
+    const verificationResult = await PaymentService.verifyTransactionId(transaction_id);
+
+    if (!verificationResult.isValid) {
+        res.status(400).json({
+            error: 'Transaction verification failed',
+            details: verificationResult.error
+        });
+        return;
+    }
+
+    let planType: 'WEEKLY' | 'MONTHLY';
+
+    // Use the product_id from the verification result if available, otherwise fallback to request
+    const verifiedProductId = verificationResult.productId || product_id;
+
+    if (verifiedProductId.toLowerCase().includes('weekly')) {
+        planType = 'WEEKLY';
+    } else if (verifiedProductId.toLowerCase().includes('monthly')) {
+        planType = 'MONTHLY';
+    } else {
+        res.status(400).json({ error: 'Unknown product ID for plan mapping' });
+        return;
+    }
+
+    // Update user plan
+    const updatedUser = await PaymentService.updateUserPlan(
+        userId,
+        planType,
+        verificationResult.originalTransactionId,
+        verificationResult.expiresDate
+    );
+
+    res.json({
+        success: true,
+        plan_type: updatedUser.planType,
+        expires_date: verificationResult.expiresDate,
+        environment: verificationResult.environment
+    });
+}));
+
+/**
+ * @swagger
  * /v1/payment/cancel-reason:
  *   post:
  *     summary: Submit cancellation reason

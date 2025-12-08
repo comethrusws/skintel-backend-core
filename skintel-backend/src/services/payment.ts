@@ -16,6 +16,9 @@ const BUNDLE_ID = process.env.APPLE_BUNDLE_ID;
 const APPLE_API_URL_PRODUCTION = process.env.APPLE_API_URL_PRODUCTION;
 const APPLE_API_URL_SANDBOX = process.env.APPLE_API_URL_SANDBOX;
 
+const APPLE_TRANSACTION_URL_PRODUCTION = 'https://api.storekit.itunes.apple.com/inApps/v1/transactions';
+const APPLE_TRANSACTION_URL_SANDBOX = 'https://api.storekit-sandbox.itunes.apple.com/inApps/v1/transactions';
+
 interface IAPVerificationResult {
     isValid: boolean;
     productId?: string;
@@ -90,6 +93,70 @@ export class PaymentService {
 
         } catch (error) {
             console.error('Apple Receipt Verification Error:', error);
+            return {
+                isValid: false,
+                error: error instanceof Error ? error.message : 'Unknown error during verification',
+            };
+        }
+    }
+
+    /**
+     * Verifies an Apple In-App Purchase using the Transaction ID via App Store Server API.
+     * Tries production first, then sandbox if production returns 404.
+     */
+    static async verifyTransactionId(transactionId: string): Promise<IAPVerificationResult> {
+        try {
+            const token = this.generateAppStoreJWT();
+            let url = `${APPLE_TRANSACTION_URL_PRODUCTION}/${transactionId}`;
+            let response;
+            let environment: 'Sandbox' | 'Production' = 'Production';
+
+            try {
+                response = await axios.get(url, {
+                    headers: { Authorization: `Bearer ${token}` }
+                });
+            } catch (error: any) {
+                if (error.response?.status === 404) {
+                    console.log('Transaction not found in Production, trying Sandbox...');
+                    url = `${APPLE_TRANSACTION_URL_SANDBOX}/${transactionId}`;
+                    environment = 'Sandbox';
+                    response = await axios.get(url, {
+                        headers: { Authorization: `Bearer ${token}` }
+                    });
+                } else {
+                    throw error;
+                }
+            }
+
+            const data = response.data;
+            if (!data || !data.signedTransactionInfo) {
+                return {
+                    isValid: false,
+                    error: 'No signedTransactionInfo found in response',
+                };
+            }
+
+            const decoded: any = jwt.decode(data.signedTransactionInfo);
+
+            if (!decoded) {
+                return {
+                    isValid: false,
+                    error: 'Failed to decode signedTransactionInfo',
+                };
+            }
+
+            return {
+                isValid: true,
+                productId: decoded.productId,
+                transactionId: decoded.transactionId,
+                originalTransactionId: decoded.originalTransactionId,
+                purchaseDate: decoded.purchaseDate ? new Date(decoded.purchaseDate).toISOString() : undefined,
+                expiresDate: decoded.expiresDate ? new Date(decoded.expiresDate).toISOString() : undefined,
+                environment: environment,
+            };
+
+        } catch (error) {
+            console.error('Apple Transaction Verification Error:', error);
             return {
                 isValid: false,
                 error: error instanceof Error ? error.message : 'Unknown error during verification',
@@ -194,12 +261,12 @@ export class PaymentService {
                 return { isActive: false };
             }
 
-           const status = lastTransaction.status;
-           const signedTransactionInfo = lastTransaction.signedTransactionInfo;
+            const status = lastTransaction.status;
+            const signedTransactionInfo = lastTransaction.signedTransactionInfo;
 
-           let activeSubscription = null;
+            let activeSubscription = null;
 
-           for (const group of data.data) {
+            for (const group of data.data) {
                 for (const transaction of group.lastTransactions) {
                     if (transaction.status === 1 || transaction.status === 4) { // Active or Grace Period
                         activeSubscription = transaction;
