@@ -12,8 +12,8 @@ const router = Router();
  * @swagger
  * /v1/payment/verify-ios:
  *   post:
- *     summary: Verify iOS In-App Purchase receipt
- *     description: Verifies the receipt with Apple and updates the user's plan if valid.
+ *     summary: Verify iOS In-App Purchase receipt with transaction data
+ *     description: Verifies the receipt with Apple and updates the user's plan if valid (uses transaction data blob).
  *     tags: [Subscription]
  *     security:
  *       - BearerAuth: []
