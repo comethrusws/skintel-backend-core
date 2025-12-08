@@ -291,8 +291,8 @@ router.post('/cancel-reason', authenticateUser, asyncHandler(async (req: Authent
  */
 router.get('/plans', authenticateUser, (req: AuthenticatedRequest, res: Response) => {
     const plans = [
-        { id: 'com.skintel.weekly', name: 'Weekly Plan', type: 'WEEKLY' },
-        { id: 'com.skintel.monthly', name: 'Monthly Plan', type: 'MONTHLY' }
+        { id: 'weekly_subscription', name: 'Weekly Plan', type: 'WEEKLY' },
+        { id: 'monthly_subscription', name: 'Monthly Plan', type: 'MONTHLY' }
     ];
     res.json({ plans });
 });
