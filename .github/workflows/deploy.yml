@@ -50,6 +50,7 @@ jobs:
           AWS_REGION="${{ secrets.AWS_REGION }}"
           IOS_BUNDLE_ID="${{ secrets.IOS_BUNDLE_ID }}"
           APPLE_SHARED_SECRET="${{ secrets.APPLE_SHARED_SECRET }}"
+          APPLE_PRIVATE_KEY="${{ secrets.APPLE_PRIVATE_KEY }}"
           S3_BUCKET_NAME="${{ secrets.S3_BUCKET_NAME }}"
           S3_PUBLIC_BASE_URL="${{ secrets.S3_PUBLIC_BASE_URL }}"
           S3_OBJECT_ACL="${{ secrets.S3_OBJECT_ACL }}"
