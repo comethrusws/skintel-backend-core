@@ -648,9 +648,13 @@ export class ProfileService {
         const now = new Date();
 
         for (const answer of answers) {
-            const { question_id, value, status } = answer;
+            let { question_id, value, status } = answer;
 
             const question = getProfileQuestion(question_id);
+
+            if (question && question.type === 'slider' && typeof value === 'string' && !isNaN(Number(value)) && value.trim() !== '') {
+                value = Number(value);
+            }
 
             if (status === 'answered' && value !== null && question) {
                 const isValid = validateProfileQuestionValue(question_id, value);
