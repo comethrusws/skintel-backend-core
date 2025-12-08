@@ -68,6 +68,24 @@ export async function analyzeProduct(imageUrl: string): Promise<object> {
 
 export async function createProduct(userId: string, imageUrls: string[]): Promise<{ id: string; imageUrl: string; productData: object; createdAt: Date; updatedAt: Date }> {
   const primaryImageUrl = imageUrls[0];
+
+  const existingProduct = await prisma.product.findFirst({
+    where: {
+      userId,
+      imageUrl: primaryImageUrl
+    }
+  });
+
+  if (existingProduct) {
+    return {
+      id: existingProduct.id,
+      imageUrl: existingProduct.imageUrl,
+      productData: (existingProduct.productData as object) || {},
+      createdAt: existingProduct.createdAt,
+      updatedAt: existingProduct.updatedAt,
+    };
+  }
+
   const productData = await analyzeProduct(primaryImageUrl);
 
   const product = await prisma.product.create({
