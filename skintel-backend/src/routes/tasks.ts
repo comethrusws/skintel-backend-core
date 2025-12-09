@@ -89,6 +89,30 @@ const taskCompletionSchema = z.object({
  *                               type: string
  *                               format: date
  *                             description: Array of dates when task was completed (excludes today)
+                previousTasks:
+                  type: array
+                  description: Detailed history of all past task instances
+                  items:
+                    type: object
+                    properties:
+                      taskId:
+                        type: string
+                      taskTitle:
+                        type: string
+                      date:
+                        type: string
+                        format: date
+                      isCompleted:
+                        type: boolean
+                      status:
+                        type: string
+                        enum: [completed, missed]
+                      week:
+                        type: integer
+                      priority:
+                        type: string
+                      category:
+                        type: string
  *                 summary:
  *                   type: object
  *                   properties:
