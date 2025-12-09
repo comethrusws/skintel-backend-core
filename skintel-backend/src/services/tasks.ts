@@ -487,6 +487,8 @@ export class TasksService {
         previousTasks.push({
           taskId: task.id,
           taskTitle: task.title,
+          description: task.description,
+          timeOfDay: task.timeOfDay,
           date: dateStr,
           isCompleted,
           status: isCompleted ? 'completed' : 'missed',

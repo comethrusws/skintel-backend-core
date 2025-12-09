@@ -99,6 +99,11 @@ const taskCompletionSchema = z.object({
  *                         type: string
  *                       taskTitle:
  *                         type: string
+ *                       description:
+ *                         type: string
+ *                       timeOfDay:
+ *                         type: string
+ *                         enum: [morning, evening, anytime]
  *                       date:
  *                         type: string
  *                         format: date
