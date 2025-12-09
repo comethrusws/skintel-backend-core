@@ -9,6 +9,109 @@ import { sendSlackNotification } from '../services/slack';
 const router = Router();
 
 
+/**
+ * @swagger
+ * /v1/payment/verify-ios:
+ *   post:
+ *     summary: Verify iOS In-App Purchase using JWS from StoreKit 2
+ *     description: Verifies the purchase by decoding the JWS (jwsRepresentation) from StoreKit 2 and updates the user's plan if valid.
+ *     tags: [Subscription]
+ *     security:
+ *       - BearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               jws_transaction:
+ *                 type: string
+ *                 description: The JWS (jwsRepresentation) from StoreKit 2 transaction
+ *             required:
+ *               - jws_transaction
+ *     responses:
+ *       200:
+ *         description: Payment verified and plan updated
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 plan_type:
+ *                   type: string
+ *                   enum: [WEEKLY, MONTHLY]
+ *                 expires_date:
+ *                   type: string
+ *                 environment:
+ *                   type: string
+ *                   enum: [Sandbox, Production]
+ *       400:
+ *         description: Invalid request or verification failed
+ *       401:
+ *         description: Authentication required
+ *       500:
+ *         description: Internal server error
+ */
+router.post('/verify-ios', authenticateUser, asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+    const { jws_transaction } = req.body;
+
+    if (!jws_transaction) {
+        res.status(400).json({
+            error: 'Invalid request data',
+            details: 'jws_transaction is required'
+        });
+        return;
+    }
+
+    const userId = req.userId!;
+
+    // Verify the JWS transaction
+    const verificationResult = PaymentService.verifyJWSTransaction(jws_transaction);
+
+    if (!verificationResult.isValid) {
+        res.status(400).json({
+            error: 'Transaction verification failed',
+            details: verificationResult.error
+        });
+        return;
+    }
+
+    let planType: 'WEEKLY' | 'MONTHLY';
+
+    const verifiedProductId = verificationResult.productId || '';
+
+    if (verifiedProductId.toLowerCase().includes('weekly')) {
+        planType = 'WEEKLY';
+    } else if (verifiedProductId.toLowerCase().includes('monthly')) {
+        planType = 'MONTHLY';
+    } else {
+        res.status(400).json({
+            error: 'Unknown product ID for plan mapping',
+            details: `Product ID: ${verifiedProductId}`
+        });
+        return;
+    }
+
+    // Update user plan
+    const updatedUser = await PaymentService.updateUserPlan(
+        userId,
+        planType,
+        verificationResult.originalTransactionId,
+        verificationResult.expiresDate
+    );
+
+    res.json({
+        success: true,
+        plan_type: updatedUser.planType,
+        expires_date: verificationResult.expiresDate,
+        environment: verificationResult.environment
+    });
+}));
+
+
 
 /**
  * @swagger

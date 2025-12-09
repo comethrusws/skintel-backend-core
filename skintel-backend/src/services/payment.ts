@@ -60,6 +60,57 @@ export class PaymentService {
 
 
     /**
+     * Verifies an Apple In-App Purchase using the JWS (JSON Web Signature) from StoreKit 2.
+     * The JWS is a signed JWT that contains all transaction information.
+     * This method decodes the JWS and extracts the transaction details.
+     */
+    static verifyJWSTransaction(jwsTransaction: string): IAPVerificationResult {
+        try {
+            if (!jwsTransaction || typeof jwsTransaction !== 'string') {
+                return {
+                    isValid: false,
+                    error: 'Invalid JWS transaction: must be a non-empty string'
+                };
+            }
+
+            const decoded: any = jwt.decode(jwsTransaction);
+
+            if (!decoded) {
+                return {
+                    isValid: false,
+                    error: 'Failed to decode JWS transaction'
+                };
+            }
+
+            if (!decoded.transactionId) {
+                return {
+                    isValid: false,
+                    error: 'Missing transactionId in decoded JWS'
+                };
+            }
+
+            const environment: 'Sandbox' | 'Production' =
+                decoded.environment === 'Production' ? 'Production' : 'Sandbox';
+
+            return {
+                isValid: true,
+                productId: decoded.productId,
+                transactionId: decoded.transactionId,
+                originalTransactionId: decoded.originalTransactionId,
+                purchaseDate: decoded.purchaseDate ? new Date(decoded.purchaseDate).toISOString() : undefined,
+                expiresDate: decoded.expiresDate ? new Date(decoded.expiresDate).toISOString() : undefined,
+                environment: environment,
+            };
+        } catch (error: any) {
+            console.error('JWS Transaction Verification Error:', error);
+            return {
+                isValid: false,
+                error: error instanceof Error ? error.message : 'Unknown error during JWS verification'
+            };
+        }
+    }
+
+    /**
      * Verifies an Apple In-App Purchase using the Transaction ID via App Store Server API.
      * Uses Get Transaction History (v2) to find the latest transaction for the original transaction ID.
      */
