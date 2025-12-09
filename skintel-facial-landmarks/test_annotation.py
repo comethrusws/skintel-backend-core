@@ -1,65 +1,76 @@
-import requests
-import base64
-import json
+import cv2
+import numpy as np
+import mediapipe as mp
+from main import annotate_image_with_issues, SkinIssue, IssuePoint
+import os
 
-# URL of the image to annotate
-IMAGE_URL = "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=774&q=80"
+# Initialize MediaPipe Face Mesh (normally done in startup_event)
+import main
+main.mp_face_mesh = mp.solutions.face_mesh
+main.face_mesh = main.mp_face_mesh.FaceMesh(
+    static_image_mode=True,
+    max_num_faces=1,
+    refine_landmarks=True,
+    min_detection_confidence=0.5
+)
 
-# API Endpoint
-API_URL = "http://localhost:8000/api/v1/annotate-issues-from-url"
-
-# Dummy issues
-issues = [
-    {
-        "type": "dark_circles",
-        "region": "left_eye",
-        "severity": "moderate",
-        "visible_in": ["front"],
-        "dlib_68_facial_landmarks": [] 
-    },
-    {
-        "type": "dark_circles",
-        "region": "right_eye",
-        "severity": "mild",
-        "visible_in": ["front"],
-        "dlib_68_facial_landmarks": []
-    },
-    {
-        "type": "dryness",
-        "region": "lips",
-        "severity": "mild",
-        "visible_in": ["front"],
-        "dlib_68_facial_landmarks": []
-    },
-    {
-        "type": "acne",
-        "region": "forehead",
-        "severity": "severe",
-        "visible_in": ["front"],
-        "dlib_68_facial_landmarks": []
-    }
-]
-
-payload = {
-    "image_url": IMAGE_URL,
-    "issues": issues
-}
-
-try:
-    response = requests.post(API_URL, json=payload)
-    response.raise_for_status()
+def test_annotation():
+    # Path to the test image
+    image_path = "../public/front.jpeg"
     
-    data = response.json()
-    if data["status"] == "success":
-        img_data = data["annotated_image"].split(",")[1]
-        with open("annotated_result.png", "wb") as f:
-            f.write(base64.b64decode(img_data))
-        print("Successfully saved annotated_result.png")
-    else:
-        print("API returned error status")
-        print(data)
+    if not os.path.exists(image_path):
+        print(f"Error: Image not found at {image_path}")
+        return
 
-except Exception as e:
-    print(f"Error: {e}")
-    if 'response' in locals():
-        print(response.text)
+    # Read image
+    image = cv2.imread(image_path)
+    if image is None:
+        print("Error: Failed to read image")
+        return
+    
+    # Convert to RGB (OpenCV uses BGR)
+    image_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+
+    # Define a test issue for dark circles
+    issues = [
+        SkinIssue(
+            type="dark_circles",
+            region="left_under_eye",
+            severity="moderate",
+            visible_in=["front"],
+            dlib_68_facial_landmarks=[] # Will be populated by the function
+        ),
+        SkinIssue(
+            type="dark_circles",
+            region="right_under_eye",
+            severity="moderate",
+            visible_in=["front"],
+            dlib_68_facial_landmarks=[]
+        )
+    ]
+
+    print("Annotating image...")
+    # The function returns a base64 string, but it also modifies the image in place if we were passing it differently? 
+    # No, annotate_image_with_issues returns a base64 string.
+    # But wait, let's look at main.py again. 
+    # It takes image_array and returns a base64 string.
+    
+    result_base64 = annotate_image_with_issues(image_rgb, issues)
+    
+    print(f"Annotation complete. Result length: {len(result_base64)}")
+    
+    # Decode base64 and save to file for inspection
+    import base64
+    
+    # Remove header if present
+    if "base64," in result_base64:
+        result_base64 = result_base64.split("base64,")[1]
+        
+    img_data = base64.b64decode(result_base64)
+    with open("annotated_result.png", "wb") as f:
+        f.write(img_data)
+        
+    print("Saved annotated image to 'annotated_result.png'")
+
+if __name__ == "__main__":
+    test_annotation()

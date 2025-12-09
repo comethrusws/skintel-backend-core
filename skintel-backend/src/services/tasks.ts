@@ -422,16 +422,24 @@ export class TasksService {
       const taskCompletions = allCompletions.filter(c => c.taskId === task.id);
 
       const todayStr = today.toISOString().split('T')[0];
-      const completionDates = taskCompletions
-        .map(c => c.completedAt.toISOString().split('T')[0])
-        .filter(date => date !== todayStr);
-
-      const uniqueCompletionDates = [...new Set(completionDates)];
 
       const weekStartDay = (task.week - 1) * 7 + 1;
-      const weekEndDay = Math.min(task.week * 7, currentDay - 1); // Exclude today
+      const weekEndDay = Math.min(task.week * 7, currentDay - 1);
       const daysExpected = Math.max(0, weekEndDay - weekStartDay + 1);
 
+      const taskWeekStart = new Date(planStartDate);
+      taskWeekStart.setDate(taskWeekStart.getDate() + (task.week - 1) * 7);
+      const taskWeekStartStr = taskWeekStart.toISOString().split('T')[0];
+
+      const taskWeekEnd = new Date(planStartDate);
+      taskWeekEnd.setDate(taskWeekEnd.getDate() + task.week * 7 - 1);
+      const taskWeekEndStr = taskWeekEnd.toISOString().split('T')[0];
+
+      const completionDates = taskCompletions
+        .map(c => c.completedAt.toISOString().split('T')[0])
+        .filter(date => date !== todayStr && date >= taskWeekStartStr && date <= taskWeekEndStr);
+
+      const uniqueCompletionDates = [...new Set(completionDates)];
       const completedDays = uniqueCompletionDates.length;
       const missedDays = Math.max(0, daysExpected - completedDays);
 
