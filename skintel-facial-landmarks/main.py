@@ -30,9 +30,8 @@ LANDMARK_INDICES = {
     'face_oval': [10, 338, 297, 332, 284, 251, 389, 356, 454, 323, 361, 288, 397, 365, 379, 378, 400, 377, 152, 148, 176, 149, 150, 136, 172, 58, 132, 93, 234, 127, 162, 21, 54, 103, 67, 109],
     'forehead': [10, 338, 297, 332, 284, 251, 389, 356, 454, 323, 67, 109, 10],
     # Smaller, more precise under-eye regions (strictly below lash line for dark circles)
-    'left_under_eye': [345, 346, 347, 348, 349, 264, 372, 265, 353, 340],
-    'right_under_eye': [116, 117, 118, 119, 120, 34, 143, 35, 124, 111],
-    # Smaller cheek areas - just the prominent cheek zone
+    'left_under_eye': [247, 30, 29, 27, 28, 56, 190, 243, 112, 26, 22, 23, 24, 110, 25],
+    'right_under_eye': [467, 260, 259, 257, 258, 286, 414, 463, 341, 256, 252, 253, 254, 339, 255],    # Smaller cheek areas - just the prominent cheek zone
     'left_cheek': [266, 426, 436, 416, 376, 352, 280, 330],
     'right_cheek': [36, 206, 216, 192, 147, 123, 50, 101],
     # T-zone smaller region
