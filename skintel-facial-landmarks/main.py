@@ -29,9 +29,14 @@ LANDMARK_INDICES = {
     'nose': [1, 2, 98, 327, 195, 5, 4, 275, 440, 220, 45, 274, 237, 44, 19],
     'face_oval': [10, 338, 297, 332, 284, 251, 389, 356, 454, 323, 361, 288, 397, 365, 379, 378, 400, 377, 152, 148, 176, 149, 150, 136, 172, 58, 132, 93, 234, 127, 162, 21, 54, 103, 67, 109],
     'forehead': [10, 338, 297, 332, 284, 251, 389, 356, 454, 323, 67, 109, 10],
-    # Smaller, more precise under-eye regions (strictly below lash line for dark circles)
-    'left_under_eye': [247, 30, 29, 27, 28, 56, 190, 243, 112, 26, 22, 23, 24, 110, 25],
-    'right_under_eye': [467, 260, 259, 257, 258, 286, 414, 463, 341, 256, 252, 253, 254, 339, 255],    # Smaller cheek areas - just the prominent cheek zone
+    # Tear trough regions - precise infraorbital fold where dark circles appear
+    # These landmarks trace the crescent-shaped area directly below the lower lash line
+    'left_under_eye': [111, 117, 118, 119, 120, 121, 128, 245, 193, 122, 196, 3, 51, 45],
+    'right_under_eye': [340, 346, 347, 348, 349, 350, 357, 465, 417, 351, 419, 248, 281, 275],
+    # Specific tear trough for dark circles - tighter crescent under eye
+    'left_tear_trough': [111, 117, 118, 119, 120, 121, 128, 245],
+    'right_tear_trough': [340, 346, 347, 348, 349, 350, 357, 465],
+    # Smaller cheek areas - just the prominent cheek zone
     'left_cheek': [266, 426, 436, 416, 376, 352, 280, 330],
     'right_cheek': [36, 206, 216, 192, 147, 123, 50, 101],
     # T-zone smaller region
@@ -282,14 +287,14 @@ def annotate_image_with_issues(image_array: np.ndarray, issues: List[SkinIssue])
             ]
             
             if is_dark_circle:
-                # Force under-eye region for dark circles - NO EXCEPTIONS
+                # Force tear trough region for dark circles - the infraorbital fold
                 if 'left' in issue.region.lower():
-                    indices = LANDMARK_INDICES['left_under_eye']
+                    indices = LANDMARK_INDICES['left_tear_trough']
                 elif 'right' in issue.region.lower():
-                    indices = LANDMARK_INDICES['right_under_eye']
+                    indices = LANDMARK_INDICES['right_tear_trough']
                 else:
-                    # If no specific side mentioned, mark both
-                    indices = LANDMARK_INDICES['left_under_eye'] + LANDMARK_INDICES['right_under_eye']
+                    # If no specific side mentioned, mark both tear troughs
+                    indices = LANDMARK_INDICES['left_tear_trough'] + LANDMARK_INDICES['right_tear_trough']
             # Special handling for uneven skin tone - use broader regions
             elif issue.type.lower() in ['uneven_skin_tone', 'uneven skin tone', 'hyperpigmentation', 'post_inflammatory_hyperpigmentation']:
                 if 'cheek' in issue.region.lower():
