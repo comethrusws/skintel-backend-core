@@ -18,10 +18,8 @@ from scipy.interpolate import splprep, splev
 mp_face_mesh = mp.solutions.face_mesh
 face_mesh = None
 
-# MediaPipe Face Mesh Landmark Indices
 LANDMARK_INDICES = {
     'lips': [61, 146, 91, 181, 84, 17, 314, 405, 321, 375, 291, 409, 270, 269, 267, 0, 37, 39, 40, 185],
-    # Extended eye regions - taller to touch under-eye area
     'left_eye': [263, 249, 390, 373, 374, 380, 381, 382, 362, 398, 384, 385, 386, 387, 388, 466, 359, 255, 339, 254, 253, 252, 256, 341],
     'right_eye': [33, 7, 163, 144, 145, 153, 154, 155, 133, 173, 157, 158, 159, 160, 161, 246, 130, 25, 110, 24, 23, 22, 26, 112],
     'left_eyebrow': [276, 283, 282, 295, 285, 300, 293, 334, 296, 336],
@@ -29,31 +27,18 @@ LANDMARK_INDICES = {
     'nose': [1, 2, 98, 327, 195, 5, 4, 275, 440, 220, 45, 274, 237, 44, 19],
     'face_oval': [10, 338, 297, 332, 284, 251, 389, 356, 454, 323, 361, 288, 397, 365, 379, 378, 400, 377, 152, 148, 176, 149, 150, 136, 172, 58, 132, 93, 234, 127, 162, 21, 54, 103, 67, 109],
     'forehead': [10, 338, 297, 332, 284, 251, 389, 356, 454, 323, 67, 109, 10],
-    # Tear trough regions - precise infraorbital fold where dark circles appear
-    # These landmarks trace the crescent-shaped area directly below the lower lash line
     'left_under_eye': [111, 117, 118, 119, 120, 121, 128, 245, 193, 122, 196, 3, 51, 45],
     'right_under_eye': [340, 346, 347, 348, 349, 350, 357, 465, 417, 351, 419, 248, 281, 275],
-    # Specific tear trough for dark circles - tighter crescent under eye
     'left_tear_trough': [111, 117, 118, 119, 120, 121, 128, 245],
     'right_tear_trough': [340, 346, 347, 348, 349, 350, 357, 465],
-    # Smaller cheek areas - just the prominent cheek zone
     'left_cheek': [266, 426, 436, 416, 376, 352, 280, 330],
     'right_cheek': [36, 206, 216, 192, 147, 123, 50, 101],
-    # T-zone smaller region
     't_zone': [10, 151, 9, 8, 168, 6, 197, 195, 5, 4, 1, 19, 94, 2]
 }
 
 def get_region_landmarks(region_name: str, is_dark_circle: bool = False) -> List[int]:
-    """
-    Get landmark indices for a given region name.
-    
-    Args:
-        region_name: Name of the facial region
-        is_dark_circle: If True, forces under-eye region for eye-related queries
-    """
     region_name = region_name.lower()
     
-    # If it's a dark circle, ALWAYS return under-eye landmarks
     if is_dark_circle and 'eye' in region_name:
         if 'left' in region_name:
             return LANDMARK_INDICES['left_under_eye']
@@ -62,7 +47,6 @@ def get_region_landmarks(region_name: str, is_dark_circle: bool = False) -> List
         else:
             return LANDMARK_INDICES['left_under_eye'] + LANDMARK_INDICES['right_under_eye']
     
-    # Prioritize under-eye detection for under-eye keywords
     if 'under' in region_name and 'eye' in region_name:
         if 'left' in region_name:
             return LANDMARK_INDICES['left_under_eye']
@@ -152,7 +136,7 @@ class IssueAnnotationResponse(BaseModel):
 
 app = FastAPI(
     title="Skintel Facial Landmarks API",
-    description="microservice for facial landmarks detection for Skintel ",
+    description="microservice for facial landmarks detection for Skintel",
     version="1.0.0",
     docs_url="/docs",
     redoc_url="/redoc"
@@ -171,7 +155,6 @@ predictor = None
 
 @app.on_event("startup")
 async def startup_event():
-    """init Dlib predictor on startup"""
     global predictor, face_mesh
     try:
         predictor_path = "shape_predictor_68_face_landmarks.dat"
@@ -190,7 +173,6 @@ async def startup_event():
         raise
 
 def extract_landmarks(image_array: np.ndarray) -> List[Dict[str, int]]:
-    """extract all 68 facial landmarks from img"""
     height, width = image_array.shape[:2]
     max_width = 800
     scale = 1.0
@@ -236,13 +218,9 @@ def extract_landmarks(image_array: np.ndarray) -> List[Dict[str, int]]:
 
 
 def get_smooth_curve(points: np.ndarray, num_points: int = 100) -> np.ndarray:
-    """
-    Generate a smooth curve from a set of points using spline interpolation.
-    """
     if len(points) < 3:
         return points
         
-    # Close the loop for interpolation
     points = np.vstack((points, points[0]))
     
     try:
@@ -254,7 +232,7 @@ def get_smooth_curve(points: np.ndarray, num_points: int = 100) -> np.ndarray:
         return smooth_points
     except Exception as e:
         logger.warning(f"Spline interpolation failed: {e}")
-        return points[:-1] # Return original points without the closing duplicate
+        return points[:-1]
 
 def annotate_image_with_issues(image_array: np.ndarray, issues: List[SkinIssue]) -> str:
     results = face_mesh.process(image_array)
@@ -270,16 +248,15 @@ def annotate_image_with_issues(image_array: np.ndarray, issues: List[SkinIssue])
         h, w, _ = annotated_bgr.shape
         
         severity_colors = {
-            'mild': (0, 255, 255),     # Yellow
-            'moderate': (0, 165, 255), # Orange
-            'severe': (0, 0, 255),     # Red
-            'critical': (128, 0, 128)  # Purple
+            'mild': (0, 255, 255),
+            'moderate': (0, 165, 255),
+            'severe': (0, 0, 255),
+            'critical': (128, 0, 128)
         }
         
         for idx, issue in enumerate(issues, start=1):
             color = severity_colors.get(issue.severity.lower(), (255, 255, 255))
             
-            # Dark circle and under-eye specific detection
             is_dark_circle = issue.type.lower() in [
                 'dark_circles', 'dark circles', 'eye_bags', 
                 'puffy_eyes', 'under_eye_circles', 'under-eye circles',
@@ -287,15 +264,12 @@ def annotate_image_with_issues(image_array: np.ndarray, issues: List[SkinIssue])
             ]
             
             if is_dark_circle:
-                # Force tear trough region for dark circles - the infraorbital fold
                 if 'left' in issue.region.lower():
                     indices = LANDMARK_INDICES['left_tear_trough']
                 elif 'right' in issue.region.lower():
                     indices = LANDMARK_INDICES['right_tear_trough']
                 else:
-                    # If no specific side mentioned, mark both tear troughs
                     indices = LANDMARK_INDICES['left_tear_trough'] + LANDMARK_INDICES['right_tear_trough']
-            # Special handling for uneven skin tone - use broader regions
             elif issue.type.lower() in ['uneven_skin_tone', 'uneven skin tone', 'hyperpigmentation', 'post_inflammatory_hyperpigmentation']:
                 if 'cheek' in issue.region.lower():
                     if 'left' in issue.region.lower():
@@ -309,7 +283,6 @@ def annotate_image_with_issues(image_array: np.ndarray, issues: List[SkinIssue])
                 else:
                     indices = get_region_landmarks(issue.region, is_dark_circle=False)
             else:
-                # For all other issues, use the normal region detection
                 indices = get_region_landmarks(issue.region, is_dark_circle=False)
             
             points = []
@@ -320,64 +293,58 @@ def annotate_image_with_issues(image_array: np.ndarray, issues: List[SkinIssue])
             
             points = np.array(points, dtype=np.int32)
             
-            # Update the issue's landmarks with the actual coordinates used
             issue.dlib_68_facial_landmarks = [IssuePoint(x=int(p[0]), y=int(p[1])) for p in points]
             
             if len(points) > 0:
-                # For dark circles and under-eye issues, draw a crescent/moon shape
-                # This is a closed shape that covers the tear trough without going over the eye
                 if is_dark_circle or 'under' in issue.region.lower():
-                    # Sort points from left to right for a proper arc
                     sorted_points = points[np.argsort(points[:, 0])]
                     
                     if len(sorted_points) >= 3:
                         try:
-                            # Calculate bounding box of the tear trough points
                             x_min, y_min = sorted_points.min(axis=0)
                             x_max, y_max = sorted_points.max(axis=0)
                             
-                            # Calculate ellipse parameters
                             center_x = int((x_min + x_max) / 2)
-                            center_y = int(y_min)  # Top of the crescent at the landmark top
+                            center_y = int(y_min)
                             
-                            # Ellipse axes for outer arc
-                            axis_x = int((x_max - x_min) / 2)  # Half width
-                            outer_axis_y = int(h * 0.06)  # Outer height (bottom edge of crescent) - taller
-                            inner_axis_y = int(h * 0.015)  # Inner height (top edge of crescent, hugs the eye)
+                            axis_x = int((x_max - x_min) / 2)
+                            outer_axis_y = int(h * 0.06)
+                            inner_axis_y = int(h * 0.015)
                             
-                            # Generate points for outer arc (bottom of crescent) - 0° to 180°
                             num_points = 50
                             angles = np.linspace(0, np.pi, num_points)
                             outer_arc_x = center_x + axis_x * np.cos(angles)
                             outer_arc_y = center_y + outer_axis_y * np.sin(angles)
                             outer_arc = np.column_stack((outer_arc_x, outer_arc_y))
                             
-                            # Generate points for inner arc (top of crescent) - 180° to 0° (reversed)
                             inner_arc_x = center_x + axis_x * np.cos(angles[::-1])
                             inner_arc_y = center_y + inner_axis_y * np.sin(angles[::-1])
                             inner_arc = np.column_stack((inner_arc_x, inner_arc_y))
                             
-                            # Combine to form closed crescent shape
-                            crescent_shape = np.vstack([outer_arc, inner_arc]).astype(np.int32)
+                            crescent_raw = np.vstack([outer_arc, inner_arc])
                             
-                            # Draw the closed crescent outline
+                            try:
+                                tck, u = splprep(crescent_raw.T, u=None, s=20.0, per=1)
+                                u_new = np.linspace(0, 1, 150)
+                                x_smooth, y_smooth = splev(u_new, tck, der=0)
+                                crescent_shape = np.column_stack((x_smooth, y_smooth)).astype(np.int32)
+                            except:
+                                crescent_shape = crescent_raw.astype(np.int32)
+                            
                             cv2.polylines(annotated_bgr, [crescent_shape], isClosed=True, color=color, thickness=2, lineType=cv2.LINE_AA)
                         except Exception as e:
                             logger.warning(f"Crescent drawing failed for dark circle: {e}")
-                            # Fallback to simple convex hull
                             hull = cv2.convexHull(sorted_points)
                             cv2.polylines(annotated_bgr, [hull], isClosed=True, color=color, thickness=2, lineType=cv2.LINE_AA)
                     else:
                         cv2.polylines(annotated_bgr, [sorted_points], isClosed=False, color=color, thickness=2, lineType=cv2.LINE_AA)
-                # For eyes and lips, use smooth curves
                 elif 'eye' in issue.region.lower() or 'lip' in issue.region.lower():
                     smooth_points = get_smooth_curve(points)
                     cv2.polylines(annotated_bgr, [smooth_points], isClosed=True, color=color, thickness=1, lineType=cv2.LINE_AA)
                 else:
-                    # For other regions, use convex hull
                     hull = cv2.convexHull(points)
                     hull = np.squeeze(hull)
-                    if len(hull.shape) == 1: # Handle case with single point or malformed hull
+                    if len(hull.shape) == 1:
                          hull = hull.reshape(-1, 2)
                          
                     smooth_points = get_smooth_curve(hull)
@@ -491,11 +458,10 @@ def annotate_image_with_issues(image_array: np.ndarray, issues: List[SkinIssue])
 
 @app.get("/", response_model=Dict[str, str])
 async def get_api_info():
-    """Get API info"""
     return {
         "service": "Skintel Facial Landmarks API",
         "version": "1.0.0",
-        "description": "microservice for facial landmarks detection for Skintel ",
+        "description": "microservice for facial landmarks detection for Skintel",
         "endpoints": {
             "health": "GET /health",
             "landmarks": "POST /api/v1/landmarks",
@@ -505,7 +471,6 @@ async def get_api_info():
 
 @app.get("/health", response_model=HealthResponse)
 async def get_health():
-    """health check endpoint"""
     return HealthResponse(
         status="healthy",
         service="facial-landmarks-api",
@@ -514,13 +479,6 @@ async def get_health():
 
 @app.post("/api/v1/landmarks", response_model=LandmarksResponse)
 async def create_landmarks_detection(request: ImageUrlRequest):
-    """
-    detect 68 facial landmarks from image URL
-    
-    - **image_url**: URL to image file (JPEG, PNG, etc.)
-    
-    this will return facial landmarks with x, y coordinates and index for each point.
-    """
     try:
         parsed_url = urlparse(request.image_url)
         if not parsed_url.scheme or not parsed_url.netloc:
@@ -584,13 +542,6 @@ class AnnotationRequest(BaseModel):
 
 @app.post("/api/v1/annotate-issues-from-url", response_model=IssueAnnotationResponse)
 async def annotate_skin_issues_from_url(request: AnnotationRequest):
-    """
-    Annotate skin issues on an image from URL
-    
-    - **request**: JSON body containing image_url and list of issues
-    
-    Returns an annotated image with colored regions highlighting each issue.
-    """
     image_url = request.image_url
     issues = request.issues
     try:
@@ -649,7 +600,7 @@ async def annotate_skin_issues_from_url(request: AnnotationRequest):
             status="success",
             annotated_image=annotated_image_data,
             total_issues=len(issues),
-            issues=issues,  # Return updated issues with correct landmarks
+            issues=issues,
             image_info=ImageInfo(
                 filename=filename,
                 width=image.width,
@@ -669,7 +620,6 @@ async def annotate_skin_issues_from_url(request: AnnotationRequest):
 
 @app.get("/api/v1/landmarks/info")
 async def get_landmarks_info():
-    """get info of facial landmarks"""
     return {
         "total_points": 68,
         "point_groups": {
