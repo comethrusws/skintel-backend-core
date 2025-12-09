@@ -4,9 +4,6 @@ import { PlanType } from '@prisma/client';
 import { TasksService } from './tasks';
 import jwt from 'jsonwebtoken';
 
-const APPLE_VERIFY_RECEIPT_URL_SANDBOX = process.env.APPLE_VERIFY_RECEIPT_URL_SANDBOX || 'https://sandbox.itunes.apple.com/verifyReceipt';
-const APPLE_VERIFY_RECEIPT_URL_PRODUCTION = process.env.APPLE_VERIFY_RECEIPT_URL_PRODUCTION || 'https://buy.itunes.apple.com/verifyReceipt';
-
 const APPLE_SHARED_SECRET = process.env.APPLE_SHARED_SECRET;
 const APPLE_PRIVATE_KEY_RAW = process.env.APPLE_PRIVATE_KEY;
 
@@ -21,7 +18,6 @@ const APPLE_TRANSACTION_URL_SANDBOX = 'https://api.storekit-sandbox.itunes.apple
 const APPLE_SUBSCRIPTION_URL_PRODUCTION = 'https://api.storekit.itunes.apple.com/inApps/v2/subscriptions';
 const APPLE_SUBSCRIPTION_URL_SANDBOX = 'https://api.storekit-sandbox.itunes.apple.com/inApps/v2/subscriptions';
 
-// Apple error codes
 const ERROR_CODE_TRANSACTION_NOT_FOUND = 4040010;
 
 interface IAPVerificationResult {
@@ -45,36 +41,20 @@ export class PaymentService {
             throw new Error('Private key is empty');
         }
 
-        // Remove any quotes that might be wrapping the key
-        key = key.trim().replace(/^["']|["']$/g, '');
+        let formattedKey = key.trim().replace(/^["']|["']$/g, '');
 
-        // If key has literal \n characters (not actual newlines), replace them
-        if (key.includes('\\n')) {
-            key = key.replace(/\\n/g, '\n');
+        if (formattedKey.includes('\\n')) {
+            formattedKey = formattedKey.replace(/\\n/g, '\n');
         }
 
-        if (!key.includes('-----BEGIN PRIVATE KEY-----')) {
+        if (!formattedKey.includes('-----BEGIN PRIVATE KEY-----')) {
             throw new Error('Invalid private key format: missing BEGIN header');
         }
-        if (!key.includes('-----END PRIVATE KEY-----')) {
+        if (!formattedKey.includes('-----END PRIVATE KEY-----')) {
             throw new Error('Invalid private key format: missing END footer');
         }
 
-        let lines = key.split('\n').map(line => line.trim()).filter(line => line);
-
-        if (lines.length === 3) {
-            const header = lines[0];
-            const footer = lines[2];
-            const base64Content = lines[1]; 
-
-            const base64Lines = [];
-            for (let i = 0; i < base64Content.length; i += 64) {
-                base64Lines.push(base64Content.slice(i, i + 64));
-            }
-
-            return [header, ...base64Lines, footer].join('\n');
-        }
-        return lines.join('\n');
+        return formattedKey;
     }
 
 
@@ -87,9 +67,6 @@ export class PaymentService {
         try {
             const token = this.generateAppStoreJWT();
 
-            // Try sandbox first (most common during development)
-            // Use history endpoint to get all transactions for this original transaction ID
-            // We append ?sort=DESCENDING to get the latest one first
             const historyPath = `/inApps/v2/history/${transactionId}?sort=DESCENDING`;
 
             let url = `https://api.storekit-sandbox.itunes.apple.com${historyPath}`;
@@ -103,7 +80,6 @@ export class PaymentService {
                 });
                 console.log('Transaction history found in Sandbox');
             } catch (sandboxError: any) {
-                // If not found in sandbox, try production
                 if (sandboxError.response?.status === 404 || sandboxError.response?.status === 401) {
                     console.log('Transaction history not found in Sandbox, trying Production...');
                     url = `https://api.storekit.itunes.apple.com${historyPath}`;
@@ -150,7 +126,6 @@ export class PaymentService {
                 };
             }
 
-            // The first one should be the latest due to sort=DESCENDING
             const latestSignedTransaction = data.signedTransactions[0];
             const decoded: any = jwt.decode(latestSignedTransaction);
 
@@ -230,9 +205,9 @@ export class PaymentService {
         }
 
         try {
-            // Format the private key properly
             const formattedKey = this.formatPrivateKey(APPLE_PRIVATE_KEY_RAW);
 
+            const keyLines = formattedKey.split('\n');
             const now = Math.floor(Date.now() / 1000);
 
             const payload = {
@@ -254,10 +229,7 @@ export class PaymentService {
                 header: header
             });
 
-            // Decode and log for debugging (remove in production)
             const decoded = jwt.decode(token, { complete: true });
-            console.log('Generated JWT Header:', decoded?.header);
-            console.log('Generated JWT Payload:', decoded?.payload);
 
             return token;
         } catch (error) {
@@ -274,18 +246,15 @@ export class PaymentService {
         try {
             const token = this.generateAppStoreJWT();
 
-            // Try sandbox first
             let url = `${APPLE_SUBSCRIPTION_URL_SANDBOX}/${originalTransactionId}`;
             let response;
 
-            console.log('Attempting to get subscription status in Sandbox...');
             try {
                 response = await axios.get(url, {
                     headers: { Authorization: `Bearer ${token}` }
                 });
                 console.log('Subscription found in Sandbox');
             } catch (sandboxError: any) {
-                // If not found in sandbox, try production
                 if (sandboxError.response?.status === 404 || sandboxError.response?.status === 401) {
                     console.log('Subscription not found in Sandbox, trying Production...');
                     url = `${APPLE_SUBSCRIPTION_URL_PRODUCTION}/${originalTransactionId}`;
@@ -325,7 +294,6 @@ export class PaymentService {
                 return { isActive: false };
             }
 
-            // Find active subscription (status 1 = Active, 4 = Billing Grace Period)
             let activeSubscription = null;
 
             for (const group of data.data) {
