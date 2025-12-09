@@ -324,14 +324,67 @@ def annotate_image_with_issues(image_array: np.ndarray, issues: List[SkinIssue])
             issue.dlib_68_facial_landmarks = [IssuePoint(x=int(p[0]), y=int(p[1])) for p in points]
             
             if len(points) > 0:
-                # For dark circles and under-eye issues, use smooth curves
+                # For dark circles and under-eye issues, draw a crescent/moon shape
+                # This is a closed shape that covers the tear trough without going over the eye
                 if is_dark_circle or 'under' in issue.region.lower():
-                    hull = cv2.convexHull(points)
-                    hull = np.squeeze(hull)
-                    if len(hull.shape) == 1:
-                         hull = hull.reshape(-1, 2)
-                    smooth_points = get_smooth_curve(hull, num_points=150)
-                    cv2.polylines(annotated_bgr, [smooth_points], isClosed=True, color=color, thickness=2, lineType=cv2.LINE_AA)
+                    # Sort points from left to right for a proper arc
+                    sorted_points = points[np.argsort(points[:, 0])]
+                    
+                    if len(sorted_points) >= 3:
+                        try:
+                            from scipy.interpolate import splprep, splev
+                            
+                            # Shift points up to be closer to the eye
+                            # Move the whole shape upward to hug the lower eyelid
+                            upward_shift = int(h * 0.025)  # Shift up by 2.5% of image height
+                            sorted_points_shifted = sorted_points.copy().astype(float)
+                            sorted_points_shifted[:, 1] -= upward_shift
+                            
+                            # Create the top edge (shifted tear trough curve - closer to eye)
+                            tck_top, u_top = splprep(sorted_points_shifted.T, u=None, s=0.0, per=0)
+                            u_new = np.linspace(u_top.min(), u_top.max(), 40)
+                            x_top, y_top = splev(u_new, tck_top, der=0)
+                            top_curve = np.column_stack((x_top, y_top))
+                            
+                            # Create the bottom edge by offsetting downward from the shifted position
+                            # Increased thickness for a taller crescent
+                            offset_y = int(h * 0.05)  # Crescent thickness - 5% of image height (taller)
+                            bottom_points = sorted_points_shifted.copy()
+                            bottom_points[:, 1] += offset_y
+                            
+                            # Smooth the bottom curve
+                            tck_bottom, u_bottom = splprep(bottom_points.T, u=None, s=0.0, per=0)
+                            x_bottom, y_bottom = splev(u_new, tck_bottom, der=0)
+                            bottom_curve = np.column_stack((x_bottom, y_bottom))
+                            
+                            # Combine: top curve left-to-right, then bottom curve right-to-left (to close the shape)
+                            crescent_raw = np.vstack([top_curve, bottom_curve[::-1]])
+                            
+                            # Smooth the entire crescent shape with high smoothing to round the edges
+                            # Use much higher smoothing factor to eliminate sharp corners
+                            try:
+                                tck_smooth, u_smooth = splprep(crescent_raw.T, u=None, s=50.0, per=1)  # High smoothing, closed curve
+                                u_final = np.linspace(0, 1, 200)
+                                x_smooth, y_smooth = splev(u_final, tck_smooth, der=0)
+                                crescent_shape = np.column_stack((x_smooth, y_smooth)).astype(np.int32)
+                            except:
+                                crescent_shape = crescent_raw.astype(np.int32)
+                            
+                            # Draw the closed crescent outline
+                            cv2.polylines(annotated_bgr, [crescent_shape], isClosed=True, color=color, thickness=2, lineType=cv2.LINE_AA)
+                        except Exception as e:
+                            logger.warning(f"Spline interpolation failed for dark circle: {e}")
+                            # Fallback: create a simple offset crescent
+                            upward_shift = int(h * 0.025)
+                            offset_y = int(h * 0.05)
+                            top_points = sorted_points.copy()
+                            top_points[:, 1] -= upward_shift
+                            bottom_points = top_points.copy()
+                            bottom_points[:, 1] += offset_y
+                            crescent = np.vstack([top_points, bottom_points[::-1]])
+                            cv2.polylines(annotated_bgr, [crescent], isClosed=True, color=color, thickness=2, lineType=cv2.LINE_AA)
+                    else:
+                        cv2.polylines(annotated_bgr, [sorted_points], isClosed=False, color=color, thickness=2, lineType=cv2.LINE_AA)
                 # For eyes and lips, use smooth curves
                 elif 'eye' in issue.region.lower() or 'lip' in issue.region.lower():
                     smooth_points = get_smooth_curve(points)
