@@ -60,18 +60,18 @@ export const VALID_VALUES = {
   q_profile_gender: ['female', 'male', 'nonbinary', 'prefer_not_to_say', 'female_pregnant', 'keep_private'],
   q_profile_ethnicity: [
     'east_asian', 'black', 'hispanic', 'latino', 'white', 'caucasian', 'middle_eastern', 'native_american', 'south_asian', 'african_descent',
-    'pacific_islander', 'mixed', 'south_east_asian', 'indigenious_australian', 'prefer_not_to_say', 'keep_private'
+    'pacific_islander', 'mixed', 'south_east_asian', 'indigenious_australian', 'indigenous_australian', 'prefer_not_to_say', 'keep_private'
   ],
   q_time_spent_outdoors: ['0_to_1_hr', '1_to_3_hours', 'more_than_3_hours'],
-  q_profile_sun_exposure: ['minimal', 'moderate', 'high', 'very_high', 'not_sure'],
-  q_profile_weather_conditions: ['hot', 'temperate', 'cold', 'minus_10_to_15_celsius', '6_to_29_celsius', '30_celsius_and_above'],
+  q_profile_sun_exposure: ['minimal', 'moderate', 'high', 'very_high', 'not_sure', '0_to_1_hr', '1_to_3_hours', 'more_than_3_hours'],
+  q_profile_weather_conditions: ['hot', 'temperate', 'cold', 'minus_10_to_15_celsius', '6_to_29_celsius', '16_to_29_celsius', '30_celsius_and_above'],
   q_medical_conditions: [
     'eczema', 'psoriasis', 'rosacea', 'not_sure', 'contact_dermatitis', 'allergies', 'medications', 'breakouts', 'blackheads',
     'pcos', 'seborrheic_dermatitis', 'none', 'other', 'spots', 'melasma', 'uneven_tone', 'fragrances', 'preservatives', 'metals', 'hormonal_treatments'
   ],
   q_hormone_factors: [
     'pregnancy', 'menopause', 'pms', 'puberty', 'hormonal_acne',
-    'birth_control', 'hormone_therapy', 'high_stress', 'none', 'not_sure'
+    'birth_control', 'hormone_therapy', 'high_stress', 'none', 'not_sure', 'other'
   ]
 } as const;
 

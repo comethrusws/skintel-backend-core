@@ -385,13 +385,11 @@ export class TasksService {
       }
     });
 
-    // Get all completions for this user
     const allCompletions = await prisma.taskCompletion.findMany({
       where: { userId },
       orderBy: { completedAt: 'desc' }
     });
 
-    // Get active plan to determine date range
     const activePlan = await prisma.facialLandmarks.findFirst({
       where: {
         userId,
@@ -403,12 +401,10 @@ export class TasksService {
     const today = new Date();
     const planStartDate = activePlan?.planStartDate || today;
 
-    // Calculate which days have passed for each week
     const daysSinceStart = Math.floor((today.getTime() - planStartDate.getTime()) / (1000 * 60 * 60 * 24));
     const currentDay = Math.min(daysSinceStart + 1, 28);
     const currentWeek = Math.min(Math.floor(daysSinceStart / 7) + 1, 4);
 
-    // Filter tasks to only include current and past weeks
     const relevantTasks = tasks.filter(task => task.week <= currentWeek);
 
     const formattedTasks = relevantTasks.map(task => {
@@ -425,21 +421,17 @@ export class TasksService {
 
       const taskCompletions = allCompletions.filter(c => c.taskId === task.id);
 
-      // Get completion dates (excluding today)
       const todayStr = today.toISOString().split('T')[0];
       const completionDates = taskCompletions
         .map(c => c.completedAt.toISOString().split('T')[0])
         .filter(date => date !== todayStr);
 
-      // Get unique completion dates to count actual days completed
       const uniqueCompletionDates = [...new Set(completionDates)];
 
-      // Calculate which days this task was expected (only up to yesterday, excluding today)
       const weekStartDay = (task.week - 1) * 7 + 1;
       const weekEndDay = Math.min(task.week * 7, currentDay - 1); // Exclude today
       const daysExpected = Math.max(0, weekEndDay - weekStartDay + 1);
 
-      // Count completed days (unique dates only) and missed days
       const completedDays = uniqueCompletionDates.length;
       const missedDays = Math.max(0, daysExpected - completedDays);
 
@@ -464,13 +456,42 @@ export class TasksService {
       };
     }).filter(task => task.completionStats.daysExpected > 0); // Only include tasks with past expected days
 
-    // Calculate overall stats
     const totalCompleted = formattedTasks.reduce((sum, t) => sum + t.completionStats.completedDays, 0);
     const totalMissed = formattedTasks.reduce((sum, t) => sum + t.completionStats.missedDays, 0);
     const totalExpected = formattedTasks.reduce((sum, t) => sum + t.completionStats.daysExpected, 0);
 
+    const previousTasks: any[] = [];
+
+    for (let d = 0; d < daysSinceStart; d++) {
+      const date = new Date(planStartDate);
+      date.setDate(date.getDate() + d);
+      const dateStr = date.toISOString().split('T')[0];
+      const dayWeek = Math.min(Math.floor(d / 7) + 1, 4);
+
+      const weeksTasks = tasks.filter(t => t.week === dayWeek);
+
+      for (const task of weeksTasks) {
+        const isCompleted = allCompletions.some(c =>
+          c.taskId === task.id &&
+          c.completedAt.toISOString().split('T')[0] === dateStr
+        );
+
+        previousTasks.push({
+          taskId: task.id,
+          taskTitle: task.title,
+          date: dateStr,
+          isCompleted,
+          status: isCompleted ? 'completed' : 'missed',
+          week: dayWeek,
+          priority: task.priority,
+          category: task.category
+        });
+      }
+    }
+
     return {
       tasks: formattedTasks,
+      previousTasks,
       summary: {
         totalCompleted,
         totalMissed,
@@ -515,7 +536,6 @@ export class TasksService {
       }
     });
 
-    // Reset skip count on successful completion
     if ((task.adaptations as any)?.skipCount > 0) {
       await prisma.task.update({
         where: { id: taskId },
@@ -589,7 +609,6 @@ export class TasksService {
         c.completedAt >= weekStart && c.completedAt <= weekEnd
       );
 
-      // Count unique task-day completions for the week
       const uniqueWeekCompletions = new Set(
         weekCompletions.map(c => `${c.taskId}-${c.completedAt.toISOString().split('T')[0]}`)
       );
@@ -600,7 +619,6 @@ export class TasksService {
         return task?.priority === 'critical';
       });
 
-      // Count unique critical task-day completions
       const uniqueCriticalCompletions = new Set(
         criticalCompletions.map(c => `${c.taskId}-${c.completedAt.toISOString().split('T')[0]}`)
       );
@@ -634,7 +652,6 @@ export class TasksService {
         c.completedAt.toISOString().split('T')[0] === dateStr
       );
 
-      // Count unique task completions for this day
       const uniqueDayCompletions = new Set(dayCompletions.map(c => c.taskId));
 
       const dayScore = dayTasks.length > 0 ? (uniqueDayCompletions.size / dayTasks.length) * 100 : 0;
@@ -666,7 +683,7 @@ export class TasksService {
       allCompletions.map(c => `${c.taskId}-${c.completedAt.toISOString().split('T')[0]}`)
     );
     const totalTasksCompleted = uniqueCompletions.size;
-    
+
     const totalTasksPossible = allTasks.length * Math.min(currentDay, 28);
     const overallScore = totalTasksPossible > 0 ? (totalTasksCompleted / totalTasksPossible) * 100 : 0;
 
@@ -705,7 +722,6 @@ export class TasksService {
         }
       });
 
-      // if task was skipped 3+ times in last 3 days, we adapt it
       if (recentCompletions === 0) {
         let adaptationType: any = 'made_optional';
         let reason = 'Task consistently skipped, making optional';
@@ -762,28 +778,20 @@ export class TasksService {
   }
 
   static async ensureTasksForPlanType(userId: string, planType: 'WEEKLY' | 'MONTHLY'): Promise<void> {
-    // This method ensures that the user has the correct tasks generated for their plan type.
-    // Since we generate a 4-week plan by default during onboarding, we mostly need to ensure
-    // that the tasks are active and potentially handle any future logic where we might
-    // gate access to future weeks for weekly subscribers (though currently we allow full access).
 
-    // Check if tasks exist
+    // check if tasks exist
     const existingTasksCount = await prisma.task.count({
       where: { userId, isActive: true }
     });
 
     if (existingTasksCount === 0) {
-      // If no tasks, try to generate from existing plan
       try {
         await this.generateTasksFromPlan(userId);
       } catch (error) {
         console.log(`Could not generate tasks for user ${userId} (likely no plan yet):`, error);
-        // This is fine, they might be paying before analysis is complete
       }
     }
 
-    // Future logic: If planType is WEEKLY, we could deactivate weeks 2-4 if we wanted to be strict.
-    // For now, we follow the "Master Plan" strategy where paying unlocks the full roadmap.
     console.log(`Ensured tasks for user ${userId} with plan ${planType}`);
   }
 }
