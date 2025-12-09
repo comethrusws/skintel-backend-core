@@ -335,46 +335,69 @@ def annotate_image_with_issues(image_array: np.ndarray, issues: List[SkinIssue])
                             from scipy.interpolate import splprep, splev
                             
                             # Shift points up to be closer to the eye
-                            # Move the whole shape upward to hug the lower eyelid
-                            upward_shift = int(h * 0.025)  # Shift up by 2.5% of image height
+                            upward_shift = int(h * 0.025)
                             sorted_points_shifted = sorted_points.copy().astype(float)
                             sorted_points_shifted[:, 1] -= upward_shift
                             
-                            # Create the top edge (shifted tear trough curve - closer to eye)
+                            # Create the top edge
                             tck_top, u_top = splprep(sorted_points_shifted.T, u=None, s=0.0, per=0)
                             u_new = np.linspace(u_top.min(), u_top.max(), 40)
                             x_top, y_top = splev(u_new, tck_top, der=0)
                             top_curve = np.column_stack((x_top, y_top))
                             
-                            # Create the bottom edge by offsetting downward from the shifted position
-                            # Increased thickness for a taller crescent
-                            offset_y = int(h * 0.05)  # Crescent thickness - 5% of image height (taller)
+                            # Create the bottom edge with offset
+                            offset_y = int(h * 0.05)
                             bottom_points = sorted_points_shifted.copy()
                             bottom_points[:, 1] += offset_y
                             
-                            # Smooth the bottom curve
                             tck_bottom, u_bottom = splprep(bottom_points.T, u=None, s=0.0, per=0)
                             x_bottom, y_bottom = splev(u_new, tck_bottom, der=0)
                             bottom_curve = np.column_stack((x_bottom, y_bottom))
                             
-                            # Combine: top curve left-to-right, then bottom curve right-to-left (to close the shape)
-                            crescent_raw = np.vstack([top_curve, bottom_curve[::-1]])
+                            # Create rounded end caps using semi-circular arcs
+                            def create_arc(center, radius, start_angle, end_angle, num_points=10):
+                                """Create arc points from start_angle to end_angle"""
+                                angles = np.linspace(start_angle, end_angle, num_points)
+                                x = center[0] + radius * np.cos(angles)
+                                y = center[1] + radius * np.sin(angles)
+                                return np.column_stack((x, y))
                             
-                            # Smooth the entire crescent shape with high smoothing to round the edges
-                            # Use much higher smoothing factor to eliminate sharp corners
+                            # Left end cap (semi-circle on the left)
+                            left_top = top_curve[0]
+                            left_bottom = bottom_curve[0]
+                            left_center = (left_top + left_bottom) / 2
+                            left_radius = np.linalg.norm(left_top - left_bottom) / 2
+                            # Arc from bottom to top (going left, i.e., from 90° to 270° or π/2 to 3π/2)
+                            left_arc = create_arc(left_center, left_radius, np.pi/2, 3*np.pi/2, 15)
+                            
+                            # Right end cap (semi-circle on the right)
+                            right_top = top_curve[-1]
+                            right_bottom = bottom_curve[-1]
+                            right_center = (right_top + right_bottom) / 2
+                            right_radius = np.linalg.norm(right_top - right_bottom) / 2
+                            # Arc from top to bottom (going right, i.e., from -90° to 90° or -π/2 to π/2)
+                            right_arc = create_arc(right_center, right_radius, -np.pi/2, np.pi/2, 15)
+                            
+                            # Combine: top curve -> right arc -> bottom curve (reversed) -> left arc
+                            crescent_with_caps = np.vstack([
+                                top_curve,
+                                right_arc,
+                                bottom_curve[::-1],
+                                left_arc
+                            ])
+                            
+                            # Final smoothing pass
                             try:
-                                tck_smooth, u_smooth = splprep(crescent_raw.T, u=None, s=50.0, per=1)  # High smoothing, closed curve
+                                tck_smooth, _ = splprep(crescent_with_caps.T, u=None, s=10.0, per=1)
                                 u_final = np.linspace(0, 1, 200)
                                 x_smooth, y_smooth = splev(u_final, tck_smooth, der=0)
                                 crescent_shape = np.column_stack((x_smooth, y_smooth)).astype(np.int32)
                             except:
-                                crescent_shape = crescent_raw.astype(np.int32)
+                                crescent_shape = crescent_with_caps.astype(np.int32)
                             
-                            # Draw the closed crescent outline
                             cv2.polylines(annotated_bgr, [crescent_shape], isClosed=True, color=color, thickness=2, lineType=cv2.LINE_AA)
                         except Exception as e:
                             logger.warning(f"Spline interpolation failed for dark circle: {e}")
-                            # Fallback: create a simple offset crescent
                             upward_shift = int(h * 0.025)
                             offset_y = int(h * 0.05)
                             top_points = sorted_points.copy()
