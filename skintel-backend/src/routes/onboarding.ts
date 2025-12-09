@@ -74,8 +74,23 @@ router.put('/', idempotencyMiddleware, authenticateSession, async (req: Authenti
     const validationResult = onboardingRequestSchema.safeParse(req.body);
 
     if (!validationResult.success) {
+      const failedAnswers = validationResult.error.errors
+        .filter(err => err.path.length >= 2 && err.path[0] === 'answers')
+        .map(err => {
+          const answerIndex = err.path[1] as number;
+          const answer = req.body.answers?.[answerIndex];
+          return {
+            index: answerIndex,
+            screen_id: answer?.screen_id || 'unknown',
+            question_id: answer?.question_id || 'unknown',
+            field: err.path[2] || 'unknown',
+            error: err.message
+          };
+        });
+
       res.status(400).json({
         error: 'Invalid request data',
+        failed_answers: failedAnswers.length > 0 ? failedAnswers : undefined,
         details: validationResult.error.errors
       });
       return;

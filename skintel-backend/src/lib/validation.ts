@@ -50,10 +50,10 @@ export const onboardingAnswerSchema = z.object({
     const expectedType = getExpectedType(data.question_id);
     return expectedType === data.type;
   },
-  {
-    message: "Answer type doesn't match expected type for question_id",
+  (data) => ({
+    message: `Answer type doesn't match expected type for question_id. screen_id: ${data.screen_id}, question_id: ${data.question_id}, expected_type: ${getExpectedType(data.question_id)}, received_type: ${data.type}`,
     path: ["type"]
-  }
+  })
 ).refine(
   (data) => {
     if (data.status === 'skipped') return true;
@@ -67,10 +67,10 @@ export const onboardingAnswerSchema = z.object({
     }
     return isValid;
   },
-  {
-    message: "Invalid value for question_id",
+  (data) => ({
+    message: `Invalid value for question. screen_id: ${data.screen_id}, question_id: ${data.question_id}, value: ${JSON.stringify(data.value)}, valid_values: ${JSON.stringify(getValidValues(data.question_id))}`,
     path: ["value"]
-  }
+  })
 );
 
 export const onboardingRequestSchema = z.object({
@@ -186,12 +186,12 @@ export const addProfileQuestionSchema = z.object({
 ).refine(
   (data) => {
     if (data.type === 'slider') {
-      return typeof data.min_value === 'number' && 
-             typeof data.max_value === 'number' && 
-             typeof data.default_value === 'number' &&
-             data.min_value < data.max_value &&
-             data.default_value >= data.min_value &&
-             data.default_value <= data.max_value;
+      return typeof data.min_value === 'number' &&
+        typeof data.max_value === 'number' &&
+        typeof data.default_value === 'number' &&
+        data.min_value < data.max_value &&
+        data.default_value >= data.min_value &&
+        data.default_value <= data.max_value;
     }
     return true;
   },
