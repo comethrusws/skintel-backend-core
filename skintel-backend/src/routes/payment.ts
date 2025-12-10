@@ -95,12 +95,12 @@ router.post('/verify-ios', authenticateUser, asyncHandler(async (req: Authentica
         return;
     }
 
-    // Update user plan
     const updatedUser = await PaymentService.updateUserPlan(
         userId,
         planType,
         verificationResult.originalTransactionId,
-        verificationResult.expiresDate
+        verificationResult.expiresDate,
+        true // isActive
     );
 
     res.json({
@@ -202,7 +202,8 @@ router.post('/verify-transaction', authenticateUser, asyncHandler(async (req: Au
         userId,
         planType,
         verificationResult.originalTransactionId,
-        verificationResult.expiresDate
+        verificationResult.expiresDate,
+        true // isActive
     );
 
     res.json({
@@ -336,36 +337,25 @@ router.get('/status', authenticateUser, asyncHandler(async (req: AuthenticatedRe
 
     const user = await prisma.user.findUnique({
         where: { userId },
-        select: { originalTransactionId: true, planType: true }
+        select: {
+            isActive: true,
+            planType: true,
+            subscriptionExpiresAt: true
+        }
     });
 
-    if (!user || !user.originalTransactionId) {
+    if (!user) {
         return res.json({
             isActive: false,
-            message: 'No subscription history found'
+            message: 'User not found'
         });
     }
 
-    const status = await PaymentService.getSubscriptionStatus(user.originalTransactionId);
-
-    if (status.isActive && status.planType && status.planType !== user.planType) {
-        // sync DB if plan type changed (upg or downg)
-        await PaymentService.updateUserPlan(
-            userId,
-            status.planType,
-            user.originalTransactionId,
-            status.expiresDate
-        );
-    } else if (status.isActive && status.expiresDate) {
-        await PaymentService.updateUserPlan(
-            userId,
-            user.planType,
-            user.originalTransactionId,
-            status.expiresDate
-        );
-    }
-
-    res.json(status);
+    res.json({
+        isActive: user.isActive,
+        planType: user.planType,
+        expiresDate: user.subscriptionExpiresAt ? user.subscriptionExpiresAt.toISOString() : null
+    });
 }));
 
 export { router as paymentRouter };
