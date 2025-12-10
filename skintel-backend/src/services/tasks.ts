@@ -820,9 +820,23 @@ export class TasksService {
       orderBy: { createdAt: 'desc' }
     });
 
+    let subscriptionStartDate: Date | null = null;
+    if (user?.subscriptionExpiresAt) {
+      subscriptionStartDate = new Date(user.subscriptionExpiresAt);
+      if (planType === 'WEEKLY') {
+        subscriptionStartDate.setDate(subscriptionStartDate.getDate() - 7);
+      } else {
+        subscriptionStartDate.setDate(subscriptionStartDate.getDate() - 28);
+      }
+    }
+
     const wasExpired = user?.subscriptionExpiresAt && user.subscriptionExpiresAt < now;
-    const needsReset = wasExpired || !latestAnalysis?.planStartDate ||
-      (latestAnalysis?.planEndDate && latestAnalysis.planEndDate < now);
+    const planEndExpired = latestAnalysis?.planEndDate && latestAnalysis.planEndDate < now;
+
+    const tasksAreStale = subscriptionStartDate && latestAnalysis?.planStartDate &&
+      latestAnalysis.planStartDate < subscriptionStartDate;
+
+    const needsReset = wasExpired || !latestAnalysis?.planStartDate || planEndExpired || tasksAreStale;
 
     if (needsReset && latestAnalysis) {
       console.log(`Plan was expired for user ${userId}, resetting tasks and plan dates`);
