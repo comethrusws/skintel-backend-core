@@ -401,11 +401,15 @@ export class TasksService {
     const today = new Date();
     const planStartDate = activePlan?.planStartDate || today;
 
-    const daysSinceStart = Math.floor((today.getTime() - planStartDate.getTime()) / (1000 * 60 * 60 * 24));
+    const todayMidnight = new Date(today.toISOString().split('T')[0] + 'T00:00:00.000Z');
+    const planStartMidnight = new Date(planStartDate.toISOString().split('T')[0] + 'T00:00:00.000Z');
+
+    const daysSinceStart = Math.floor((todayMidnight.getTime() - planStartMidnight.getTime()) / (1000 * 60 * 60 * 24));
     const currentDay = Math.min(daysSinceStart + 1, 28);
     const currentWeek = Math.min(Math.floor(daysSinceStart / 7) + 1, 4);
 
-    const relevantTasks = tasks.filter(task => task.week <= currentWeek);
+    const activeTasks = tasks.filter(task => task.isActive);
+    const relevantTasks = activeTasks.filter(task => task.week <= currentWeek);
 
     const formattedTasks = relevantTasks.map(task => {
       const taskUserProducts = task.userProducts ?
@@ -471,8 +475,36 @@ export class TasksService {
     const previousTasks: any[] = [];
     const todayStr = today.toISOString().split('T')[0];
 
-    for (let d = 0; d <= daysSinceStart; d++) {
-      const date = new Date(planStartDate);
+    const allPlanStartDates = await prisma.facialLandmarks.findMany({
+      where: {
+        userId,
+        planStartDate: { not: null }
+      },
+      select: { planStartDate: true },
+      orderBy: { planStartDate: 'asc' }
+    });
+
+    let earliestDate = planStartMidnight;
+
+    if (allPlanStartDates.length > 0 && allPlanStartDates[0].planStartDate) {
+      const earliestPlanStart = new Date(allPlanStartDates[0].planStartDate.toISOString().split('T')[0] + 'T00:00:00.000Z');
+      if (earliestPlanStart < earliestDate) {
+        earliestDate = earliestPlanStart;
+      }
+    }
+
+    if (allCompletions.length > 0) {
+      const earliestCompletion = allCompletions[allCompletions.length - 1]; // Last in desc order = earliest
+      const earliestCompletionDate = new Date(earliestCompletion.completedAt.toISOString().split('T')[0] + 'T00:00:00.000Z');
+      if (earliestCompletionDate < earliestDate) {
+        earliestDate = earliestCompletionDate;
+      }
+    }
+
+    const totalDaysSinceEarliest = Math.floor((todayMidnight.getTime() - earliestDate.getTime()) / (1000 * 60 * 60 * 24));
+
+    for (let d = 0; d <= totalDaysSinceEarliest; d++) {
+      const date = new Date(earliestDate);
       date.setDate(date.getDate() + d);
       const dateStr = date.toISOString().split('T')[0];
       const dayWeek = Math.min(Math.floor(d / 7) + 1, 4);
@@ -501,6 +533,7 @@ export class TasksService {
           timeOfDay: task.timeOfDay,
           date: dateStr,
           isCompleted,
+          isActive: task.isActive, // Include this so frontend knows if task is from current plan
           status: isCompleted ? 'completed' : (isToday ? 'pending' : 'missed'),
           week: dayWeek,
           priority: task.priority,
@@ -841,6 +874,10 @@ export class TasksService {
     if (needsReset && latestAnalysis) {
       console.log(`Plan was expired for user ${userId}, resetting tasks and plan dates`);
 
+      // Store old values in case we need to rollback
+      const oldPlanStartDate = latestAnalysis.planStartDate;
+      const oldPlanEndDate = latestAnalysis.planEndDate;
+
       const planEndDate = new Date(now);
       if (planType === 'WEEKLY') {
         planEndDate.setDate(planEndDate.getDate() + 7);
@@ -865,7 +902,21 @@ export class TasksService {
         await this.generateTasksFromPlan(userId);
         console.log(`Generated fresh tasks for user ${userId} after plan renewal`);
       } catch (error) {
-        console.log(`Could not generate tasks for user ${userId}:`, error);
+        console.error(`Could not generate tasks for user ${userId}:`, error);
+
+        console.log(`Rolling back: re-activating old tasks for user ${userId}`);
+        await prisma.task.updateMany({
+          where: { userId, isActive: false },
+          data: { isActive: true }
+        });
+
+        await prisma.facialLandmarks.update({
+          where: { id: latestAnalysis.id },
+          data: {
+            planStartDate: oldPlanStartDate,
+            planEndDate: oldPlanEndDate
+          }
+        });
       }
     } else {
       const existingTasksCount = await prisma.task.count({

@@ -308,7 +308,7 @@ def annotate_image_with_issues(image_array: np.ndarray, issues: List[SkinIssue])
                             center_y = int(y_min)
                             
                             axis_x = int((x_max - x_min) / 2)
-                            outer_axis_y = int(h * 0.06)
+                            outer_axis_y = int(h * 0.05) 
                             inner_axis_y = int(h * 0.015)
                             
                             num_points = 50
@@ -331,15 +331,25 @@ def annotate_image_with_issues(image_array: np.ndarray, issues: List[SkinIssue])
                             except:
                                 crescent_shape = crescent_raw.astype(np.int32)
                             
-                            cv2.polylines(annotated_bgr, [crescent_shape], isClosed=True, color=color, thickness=2, lineType=cv2.LINE_AA)
+                            overlay = annotated_bgr.copy()
+                            cv2.fillPoly(overlay, [crescent_shape], color)
+                            cv2.addWeighted(overlay, 0.12, annotated_bgr, 0.88, 0, annotated_bgr)
+                            
+                            cv2.polylines(annotated_bgr, [crescent_shape], isClosed=True, color=color, thickness=1, lineType=cv2.LINE_AA)
                         except Exception as e:
                             logger.warning(f"Crescent drawing failed for dark circle: {e}")
                             hull = cv2.convexHull(sorted_points)
-                            cv2.polylines(annotated_bgr, [hull], isClosed=True, color=color, thickness=2, lineType=cv2.LINE_AA)
+                            overlay = annotated_bgr.copy()
+                            cv2.fillPoly(overlay, [hull], color)
+                            cv2.addWeighted(overlay, 0.12, annotated_bgr, 0.88, 0, annotated_bgr)
+                            cv2.polylines(annotated_bgr, [hull], isClosed=True, color=color, thickness=1, lineType=cv2.LINE_AA)
                     else:
-                        cv2.polylines(annotated_bgr, [sorted_points], isClosed=False, color=color, thickness=2, lineType=cv2.LINE_AA)
+                        cv2.polylines(annotated_bgr, [sorted_points], isClosed=False, color=color, thickness=1, lineType=cv2.LINE_AA)
                 elif 'eye' in issue.region.lower() or 'lip' in issue.region.lower():
                     smooth_points = get_smooth_curve(points)
+                    overlay = annotated_bgr.copy()
+                    cv2.fillPoly(overlay, [smooth_points], color)
+                    cv2.addWeighted(overlay, 0.12, annotated_bgr, 0.88, 0, annotated_bgr)
                     cv2.polylines(annotated_bgr, [smooth_points], isClosed=True, color=color, thickness=1, lineType=cv2.LINE_AA)
                 else:
                     hull = cv2.convexHull(points)
@@ -348,6 +358,9 @@ def annotate_image_with_issues(image_array: np.ndarray, issues: List[SkinIssue])
                          hull = hull.reshape(-1, 2)
                          
                     smooth_points = get_smooth_curve(hull)
+                    overlay = annotated_bgr.copy()
+                    cv2.fillPoly(overlay, [smooth_points], color)
+                    cv2.addWeighted(overlay, 0.12, annotated_bgr, 0.88, 0, annotated_bgr)
                     cv2.polylines(annotated_bgr, [smooth_points], isClosed=True, color=color, thickness=1, lineType=cv2.LINE_AA)
 
     legend_items = []
