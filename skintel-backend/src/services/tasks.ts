@@ -804,17 +804,66 @@ export class TasksService {
   }
 
   static async ensureTasksForPlanType(userId: string, planType: 'WEEKLY' | 'MONTHLY'): Promise<void> {
+    const now = new Date();
 
-    // check if tasks exist
-    const existingTasksCount = await prisma.task.count({
-      where: { userId, isActive: true }
+    const user = await prisma.user.findUnique({
+      where: { userId },
+      select: { subscriptionExpiresAt: true }
     });
 
-    if (existingTasksCount === 0) {
+    const latestAnalysis = await prisma.facialLandmarks.findFirst({
+      where: {
+        userId,
+        status: 'COMPLETED',
+        weeklyPlan: { not: Prisma.DbNull }
+      },
+      orderBy: { createdAt: 'desc' }
+    });
+
+    const wasExpired = user?.subscriptionExpiresAt && user.subscriptionExpiresAt < now;
+    const needsReset = wasExpired || !latestAnalysis?.planStartDate ||
+      (latestAnalysis?.planEndDate && latestAnalysis.planEndDate < now);
+
+    if (needsReset && latestAnalysis) {
+      console.log(`Plan was expired for user ${userId}, resetting tasks and plan dates`);
+
+      const planEndDate = new Date(now);
+      if (planType === 'WEEKLY') {
+        planEndDate.setDate(planEndDate.getDate() + 7);
+      } else {
+        planEndDate.setDate(planEndDate.getDate() + 28);
+      }
+
+      await prisma.facialLandmarks.update({
+        where: { id: latestAnalysis.id },
+        data: {
+          planStartDate: now,
+          planEndDate: planEndDate
+        }
+      });
+
+      await prisma.task.updateMany({
+        where: { userId, isActive: true },
+        data: { isActive: false }
+      });
+
       try {
         await this.generateTasksFromPlan(userId);
+        console.log(`Generated fresh tasks for user ${userId} after plan renewal`);
       } catch (error) {
-        console.log(`Could not generate tasks for user ${userId} (likely no plan yet):`, error);
+        console.log(`Could not generate tasks for user ${userId}:`, error);
+      }
+    } else {
+      const existingTasksCount = await prisma.task.count({
+        where: { userId, isActive: true }
+      });
+
+      if (existingTasksCount === 0) {
+        try {
+          await this.generateTasksFromPlan(userId);
+        } catch (error) {
+          console.log(`Could not generate tasks for user ${userId} (likely no plan yet):`, error);
+        }
       }
     }
 
