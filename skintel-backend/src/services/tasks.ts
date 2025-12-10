@@ -437,7 +437,7 @@ export class TasksService {
 
       const completionDates = taskCompletions
         .map(c => c.completedAt.toISOString().split('T')[0])
-        .filter(date => date !== todayStr && date >= taskWeekStartStr && date <= taskWeekEndStr);
+        .filter(date => date < todayStr && date >= taskWeekStartStr && date <= taskWeekEndStr);
 
       const uniqueCompletionDates = [...new Set(completionDates)];
       const completedDays = uniqueCompletionDates.length;

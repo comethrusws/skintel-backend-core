@@ -216,11 +216,12 @@ export class PaymentService {
 
 
 
-    static async updateUserPlan(userId: string, planType: 'WEEKLY' | 'MONTHLY', originalTransactionId?: string, expiresDate?: string) {
+    static async updateUserPlan(userId: string, planType: 'WEEKLY' | 'MONTHLY', originalTransactionId?: string, expiresDate?: string, isActive: boolean = true) {
         const user = await prisma.user.update({
             where: { userId },
             data: {
                 planType: planType === 'WEEKLY' ? PlanType.WEEKLY : PlanType.MONTHLY,
+                isActive: isActive,
                 ...(originalTransactionId ? { originalTransactionId } : {}),
                 ...(expiresDate ? { subscriptionExpiresAt: new Date(expiresDate) } : {})
             },
@@ -228,7 +229,8 @@ export class PaymentService {
                 userId: true,
                 planType: true,
                 email: true,
-                subscriptionExpiresAt: true
+                subscriptionExpiresAt: true,
+                isActive: true
             }
         });
 
