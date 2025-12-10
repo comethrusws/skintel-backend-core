@@ -475,18 +475,45 @@ export class TasksService {
     const previousTasks: any[] = [];
     const todayStr = today.toISOString().split('T')[0];
 
-    for (let d = 0; d <= daysSinceStart; d++) {
-      const date = new Date(planStartMidnight);
+    const allPlanStartDates = await prisma.facialLandmarks.findMany({
+      where: {
+        userId,
+        planStartDate: { not: null }
+      },
+      select: { planStartDate: true },
+      orderBy: { planStartDate: 'asc' }
+    });
+
+    let earliestDate = planStartMidnight;
+
+    if (allPlanStartDates.length > 0 && allPlanStartDates[0].planStartDate) {
+      const earliestPlanStart = new Date(allPlanStartDates[0].planStartDate.toISOString().split('T')[0] + 'T00:00:00.000Z');
+      if (earliestPlanStart < earliestDate) {
+        earliestDate = earliestPlanStart;
+      }
+    }
+
+    if (allCompletions.length > 0) {
+      const earliestCompletion = allCompletions[allCompletions.length - 1]; // Last in desc order = earliest
+      const earliestCompletionDate = new Date(earliestCompletion.completedAt.toISOString().split('T')[0] + 'T00:00:00.000Z');
+      if (earliestCompletionDate < earliestDate) {
+        earliestDate = earliestCompletionDate;
+      }
+    }
+
+    const totalDaysSinceEarliest = Math.floor((todayMidnight.getTime() - earliestDate.getTime()) / (1000 * 60 * 60 * 24));
+
+    for (let d = 0; d <= totalDaysSinceEarliest; d++) {
+      const date = new Date(earliestDate);
       date.setDate(date.getDate() + d);
       const dateStr = date.toISOString().split('T')[0];
       const dayWeek = Math.min(Math.floor(d / 7) + 1, 4);
 
-      // Use activeTasks to only show tasks from the current plan
-      let weeksTasks = activeTasks.filter(t => t.week === dayWeek);
+      let weeksTasks = tasks.filter(t => t.week === dayWeek);
 
       if (weeksTasks.length === 0) {
         for (let fallbackWeek = dayWeek - 1; fallbackWeek >= 1; fallbackWeek--) {
-          weeksTasks = activeTasks.filter(t => t.week === fallbackWeek);
+          weeksTasks = tasks.filter(t => t.week === fallbackWeek);
           if (weeksTasks.length > 0) break;
         }
       }
@@ -506,6 +533,7 @@ export class TasksService {
           timeOfDay: task.timeOfDay,
           date: dateStr,
           isCompleted,
+          isActive: task.isActive, // Include this so frontend knows if task is from current plan
           status: isCompleted ? 'completed' : (isToday ? 'pending' : 'missed'),
           week: dayWeek,
           priority: task.priority,
