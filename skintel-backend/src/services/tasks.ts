@@ -401,11 +401,15 @@ export class TasksService {
     const today = new Date();
     const planStartDate = activePlan?.planStartDate || today;
 
-    const daysSinceStart = Math.floor((today.getTime() - planStartDate.getTime()) / (1000 * 60 * 60 * 24));
+    const todayMidnight = new Date(today.toISOString().split('T')[0] + 'T00:00:00.000Z');
+    const planStartMidnight = new Date(planStartDate.toISOString().split('T')[0] + 'T00:00:00.000Z');
+
+    const daysSinceStart = Math.floor((todayMidnight.getTime() - planStartMidnight.getTime()) / (1000 * 60 * 60 * 24));
     const currentDay = Math.min(daysSinceStart + 1, 28);
     const currentWeek = Math.min(Math.floor(daysSinceStart / 7) + 1, 4);
 
-    const relevantTasks = tasks.filter(task => task.week <= currentWeek);
+    const activeTasks = tasks.filter(task => task.isActive);
+    const relevantTasks = activeTasks.filter(task => task.week <= currentWeek);
 
     const formattedTasks = relevantTasks.map(task => {
       const taskUserProducts = task.userProducts ?
@@ -472,16 +476,17 @@ export class TasksService {
     const todayStr = today.toISOString().split('T')[0];
 
     for (let d = 0; d <= daysSinceStart; d++) {
-      const date = new Date(planStartDate);
+      const date = new Date(planStartMidnight);
       date.setDate(date.getDate() + d);
       const dateStr = date.toISOString().split('T')[0];
       const dayWeek = Math.min(Math.floor(d / 7) + 1, 4);
 
-      let weeksTasks = tasks.filter(t => t.week === dayWeek);
+      // Use activeTasks to only show tasks from the current plan
+      let weeksTasks = activeTasks.filter(t => t.week === dayWeek);
 
       if (weeksTasks.length === 0) {
         for (let fallbackWeek = dayWeek - 1; fallbackWeek >= 1; fallbackWeek--) {
-          weeksTasks = tasks.filter(t => t.week === fallbackWeek);
+          weeksTasks = activeTasks.filter(t => t.week === fallbackWeek);
           if (weeksTasks.length > 0) break;
         }
       }
@@ -841,6 +846,10 @@ export class TasksService {
     if (needsReset && latestAnalysis) {
       console.log(`Plan was expired for user ${userId}, resetting tasks and plan dates`);
 
+      // Store old values in case we need to rollback
+      const oldPlanStartDate = latestAnalysis.planStartDate;
+      const oldPlanEndDate = latestAnalysis.planEndDate;
+
       const planEndDate = new Date(now);
       if (planType === 'WEEKLY') {
         planEndDate.setDate(planEndDate.getDate() + 7);
@@ -865,7 +874,23 @@ export class TasksService {
         await this.generateTasksFromPlan(userId);
         console.log(`Generated fresh tasks for user ${userId} after plan renewal`);
       } catch (error) {
-        console.log(`Could not generate tasks for user ${userId}:`, error);
+        console.error(`Could not generate tasks for user ${userId}:`, error);
+
+        // Rollback: re-activate old tasks so user isn't left without any tasks
+        console.log(`Rolling back: re-activating old tasks for user ${userId}`);
+        await prisma.task.updateMany({
+          where: { userId, isActive: false },
+          data: { isActive: true }
+        });
+
+        // Restore old plan dates
+        await prisma.facialLandmarks.update({
+          where: { id: latestAnalysis.id },
+          data: {
+            planStartDate: oldPlanStartDate,
+            planEndDate: oldPlanEndDate
+          }
+        });
       }
     } else {
       const existingTasksCount = await prisma.task.count({
