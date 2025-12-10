@@ -469,20 +469,30 @@ export class TasksService {
     const totalExpected = formattedTasks.reduce((sum, t) => sum + t.completionStats.daysExpected, 0);
 
     const previousTasks: any[] = [];
+    const todayStr = today.toISOString().split('T')[0];
 
-    for (let d = 0; d < daysSinceStart; d++) {
+    for (let d = 0; d <= daysSinceStart; d++) {
       const date = new Date(planStartDate);
       date.setDate(date.getDate() + d);
       const dateStr = date.toISOString().split('T')[0];
       const dayWeek = Math.min(Math.floor(d / 7) + 1, 4);
 
-      const weeksTasks = tasks.filter(t => t.week === dayWeek);
+      let weeksTasks = tasks.filter(t => t.week === dayWeek);
+
+      if (weeksTasks.length === 0) {
+        for (let fallbackWeek = dayWeek - 1; fallbackWeek >= 1; fallbackWeek--) {
+          weeksTasks = tasks.filter(t => t.week === fallbackWeek);
+          if (weeksTasks.length > 0) break;
+        }
+      }
 
       for (const task of weeksTasks) {
         const isCompleted = allCompletions.some(c =>
           c.taskId === task.id &&
           c.completedAt.toISOString().split('T')[0] === dateStr
         );
+
+        const isToday = dateStr === todayStr;
 
         previousTasks.push({
           taskId: task.id,
@@ -491,7 +501,7 @@ export class TasksService {
           timeOfDay: task.timeOfDay,
           date: dateStr,
           isCompleted,
-          status: isCompleted ? 'completed' : 'missed',
+          status: isCompleted ? 'completed' : (isToday ? 'pending' : 'missed'),
           week: dayWeek,
           priority: task.priority,
           category: task.category
@@ -499,14 +509,20 @@ export class TasksService {
       }
     }
 
+    // Calculate summary from previousTasks for accuracy (excluding today's pending tasks)
+    const pastTasks = previousTasks.filter(t => t.date < todayStr);
+    const summaryTotalCompleted = pastTasks.filter(t => t.isCompleted).length;
+    const summaryTotalMissed = pastTasks.filter(t => !t.isCompleted).length;
+    const summaryTotalExpected = pastTasks.length;
+
     return {
       tasks: formattedTasks,
       previousTasks,
       summary: {
-        totalCompleted,
-        totalMissed,
-        totalExpected,
-        completionRate: totalExpected > 0 ? Math.round((totalCompleted / totalExpected) * 100) : 0
+        totalCompleted: summaryTotalCompleted,
+        totalMissed: summaryTotalMissed,
+        totalExpected: summaryTotalExpected,
+        completionRate: summaryTotalExpected > 0 ? Math.round((summaryTotalCompleted / summaryTotalExpected) * 100) : 0
       }
     };
   }
