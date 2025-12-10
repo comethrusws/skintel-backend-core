@@ -876,14 +876,12 @@ export class TasksService {
       } catch (error) {
         console.error(`Could not generate tasks for user ${userId}:`, error);
 
-        // Rollback: re-activate old tasks so user isn't left without any tasks
         console.log(`Rolling back: re-activating old tasks for user ${userId}`);
         await prisma.task.updateMany({
           where: { userId, isActive: false },
           data: { isActive: true }
         });
 
-        // Restore old plan dates
         await prisma.facialLandmarks.update({
           where: { id: latestAnalysis.id },
           data: {
