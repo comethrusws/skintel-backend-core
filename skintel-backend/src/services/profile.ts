@@ -290,12 +290,19 @@ export class ProfileService {
 
         const updateData: any = {};
 
-        if (data.name !== undefined) {
+        if (data.name !== undefined && data.name !== null) {
             updateData.name = data.name;
         }
 
-        if (data.phone_number !== undefined) {
+        if (data.phone_number !== undefined && data.phone_number !== null) {
             updateData.phoneNumber = data.phone_number;
+        }
+
+        if (Object.keys(updateData).length === 0) {
+            throw { 
+                status: 400, 
+                message: 'At least one field (name or phone_number) must be provided with a valid value' 
+            };
         }
 
         const updatedUser = await prisma.user.update({
