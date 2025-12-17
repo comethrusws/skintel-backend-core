@@ -68,6 +68,16 @@ async function presignProductData(productData: any) {
  *                   type: string
  *                 product_data:
  *                   type: object
+ *                   description: Analyzed product data including product_name, brand, category, ingredients, expiry_date, usage_instructions, usage_method, usage_location, and other details.
+ *                   example:
+ *                     product_name: "CeraVe Foaming Facial Cleanser"
+ *                     brand: "CeraVe"
+ *                     category: "cleanser"
+ *                     expiry_date: "2025-12-31"
+ *                     ingredients: ["ceramides", "hyaluronic acid"]
+ *                     usage_instructions: "Apply to wet face"
+ *                     usage_method: "Massage gently onto wet skin"
+ *                     usage_location: "Face"
  *       400:
  *         description: Invalid request data
  *       401:
