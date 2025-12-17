@@ -3,7 +3,7 @@ import { Prisma } from '@prisma/client';
 import OpenAI from 'openai';
 import { TaskGenerationRequest, TaskAdaptationResult } from '../types';
 
-const OPENAI_MODEL = process.env.OPENAI_MODEL || 'gpt-4o';
+const OPENAI_MODEL = process.env.OPENAI_MODEL || 'gpt-5-nano';
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 function buildTaskGenerationPrompt(): string {
@@ -17,6 +17,10 @@ Your task:
 4. Set priority (critical, important, optional)
 5. Consider product recommendations
 
+IMPORTANT FORMATTING RULES:
+- Title: MUST be short (2-4 words) and high-level (e.g., "Morning Cleanse", "Vitamin C Serum", "Hydrating Moisturizer"). Do NOT include dosage or detailed instructions in the title.
+- Description: MUST be actionable and include specific product quantity/dosage recommendations (e.g., "Apply a pea-sized amount", "Use 2-3 pumps", "Apply generously").
+
 Example input:
 Week 1: "Start gentle cleansing routine with salicylic acid"
 
@@ -25,7 +29,7 @@ Example output:
   "week_1_tasks": [
     {
       "title": "Gentle Morning Cleanse",
-      "description": "Wash face with gentle cleanser using lukewarm water",
+      "description": "Wash face with a gentle cleanser using lukewarm water. Use about a coin-sized amount.",
       "timeOfDay": "morning",
       "category": "cleansing",
       "priority": "critical",
@@ -33,7 +37,7 @@ Example output:
     },
     {
       "title": "Salicylic Acid Treatment",
-      "description": "Apply salicylic acid treatment to clean skin, start 3x per week",
+      "description": "Apply a pea-sized amount of salicylic acid treatment to clean, dry skin. Start 3x per week.",
       "timeOfDay": "evening",
       "category": "treatment",
       "priority": "important",
