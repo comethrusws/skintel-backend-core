@@ -8,7 +8,7 @@ const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 function buildTaskGenerationPrompt(): string {
   return `You are a skincare routine assistant AI.
-You will receive a 4-week skincare improvement plan and need to generate specific daily tasks.
+You will receive a 4-week or a one week skincare improvement plan and need to generate specific daily tasks.
 
 Your task:
 1. Convert each week's preview into 3-5 actionable daily tasks
