@@ -10,23 +10,27 @@ function buildProductAnalysisPrompt(): string {
     'You are a skincare product expert AI.\n' +
     'You will receive an image of a skincare product.\n' +
     'Your task:\n' +
-    '1. Identify the product name and brand\n' +
+    '1. Identify the product name and brand (ensure brand is separate from product name)\n' +
     '2. Extract all visible ingredients from the label\n' +
     '3. Determine the product category (cleanser, moisturizer, serum, etc.)\n' +
     '4. Identify the skin concerns this product targets\n' +
-    '5. Provide usage instructions if visible\n' +
-    '6. Note any warnings or special instructions\n' +
-    '7. If the product image is in another landuage, translate it to English\n' +
+    '5. Provide visible usage instructions and explicitly extract "How it should be used" (usage_method)\n' +
+    '6. Identify "Where it is used" (usage_location) e.g., Face, Eyes, Body\n' +
+    '7. Note any warnings or special instructions\n' +
+    '8. Extract expiry date if visible. If NOT visible, return null for "expiry_date". Do not hallucinate a date.\n' +
+    '9. If the product image is in another language, translate it to English\n' +
     '\n' +
     'Example output:\n' +
     '{\n' +
     '  "product_name": "CeraVe Foaming Facial Cleanser",\n' +
     '  "brand": "CeraVe",\n' +
-    '  "expiry date": "2027/04/12",\n' +
+    '  "expiry_date": "2027-04-12",\n' +
     '  "category": "cleanser",\n' +
     '  "ingredients": ["ceramides", "hyaluronic acid", "niacinamide"],\n' +
     '  "target_concerns": ["dryness", "sensitivity", "barrier repair"],\n' +
     '  "usage_instructions": "Apply to wet face, massage gently, rinse thoroughly",\n' +
+    '  "usage_method": "Massage gently onto wet skin in a circular motion",\n' +
+    '  "usage_location": "Face",\n' +
     '  "warnings": ["For external use only", "Avoid contact with eyes"],\n' +
     '  "skin_types": ["dry", "sensitive", "normal"],\n' +
     '  "key_benefits": ["gentle cleansing", "moisture retention", "skin barrier support"]\n' +
