@@ -299,9 +299,9 @@ export class ProfileService {
         }
 
         if (Object.keys(updateData).length === 0) {
-            throw { 
-                status: 400, 
-                message: 'At least one field (name or phone_number) must be provided with a valid value' 
+            throw {
+                status: 400,
+                message: 'At least one field (name or phone_number) must be provided with a valid value'
             };
         }
 
@@ -397,6 +397,25 @@ export class ProfileService {
             latitude: updatedUser.latitude,
             longitude: updatedUser.longitude,
             updated_at: updatedUser.locationUpdatedAt?.toISOString() ?? null,
+        };
+    }
+
+    static async updateConsent(userId: string, hasConsented: boolean) {
+        const updatedUser = await prisma.user.update({
+            where: { userId },
+            data: { hasConsented },
+            select: {
+                userId: true,
+                hasConsented: true,
+                updatedAt: true
+            }
+        });
+
+        return {
+            user_id: updatedUser.userId,
+            has_consented: updatedUser.hasConsented,
+            updated_at: updatedUser.updatedAt.toISOString(),
+            updated: true
         };
     }
 
