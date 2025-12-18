@@ -46,6 +46,7 @@ model User {
   originalTransactionId   String?                 @map("original_transaction_id")
   subscriptionExpiresAt   DateTime?               @map("subscription_expires_at")
   isActive                Boolean                 @default(false) @map("is_active")
+  hasConsented            Boolean                 @default(false) @map("has_consented")
   createdAt               DateTime                @default(now()) @map("created_at")
   updatedAt               DateTime                @updatedAt @map("updated_at")
   refreshTokens           RefreshToken[]

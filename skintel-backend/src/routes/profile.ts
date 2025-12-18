@@ -1,6 +1,6 @@
 import { Router, Response } from 'express';
 import { authenticateUser, AuthenticatedRequest } from '../middleware/auth';
-import { profileUpdateRequestSchema, profileQuestionsAnswerRequestSchema, profileLocationUpdateSchema, addProfileQuestionSchema } from '../lib/validation';
+import { profileUpdateRequestSchema, profileQuestionsAnswerRequestSchema, profileLocationUpdateSchema, addProfileQuestionSchema, profileConsentUpdateSchema } from '../lib/validation';
 import { asyncHandler } from '../utils/asyncHandler';
 import { ProfileService } from '../services/profile';
 
@@ -762,6 +762,61 @@ router.put('/location', authenticateUser, asyncHandler(async (req: Authenticated
   }
 
   const response = await ProfileService.updateLocation(req.userId!, validationResult.data);
+  res.json(response);
+}));
+
+/**
+ * @swagger
+ * /v1/profile/consent:
+ *   put:
+ *     summary: Update user consent status
+ *     description: Update the boolean flag indicating if the user has consented to something (e.g. skin analysis disclaimer)
+ *     tags: [Profile]
+ *     security:
+ *       - BearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               hasConsented:
+ *                 type: boolean
+ *     responses:
+ *       200:
+ *         description: Consent status updated successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 user_id:
+ *                   type: string
+ *                 has_consented:
+ *                   type: boolean
+ *                 updated_at:
+ *                   type: string
+ *                   format: date-time
+ *                 updated:
+ *                   type: boolean
+ *       400:
+ *         description: Invalid request data
+ *       401:
+ *         description: Authentication required
+ */
+router.put('/consent', authenticateUser, asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+  const validationResult = profileConsentUpdateSchema.safeParse(req.body);
+
+  if (!validationResult.success) {
+    res.status(400).json({
+      error: 'Invalid request data',
+      details: validationResult.error.errors
+    });
+    return;
+  }
+
+  const response = await ProfileService.updateConsent(req.userId!, validationResult.data.hasConsented);
   res.json(response);
 }));
 

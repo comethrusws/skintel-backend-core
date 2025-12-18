@@ -114,6 +114,10 @@ export const profileUpdateRequestSchema = z.object({
   { message: "At least one field (name or phone_number) must be provided" }
 );
 
+export const profileConsentUpdateSchema = z.object({
+  hasConsented: z.boolean()
+}).strict();
+
 export const profileLocationUpdateSchema = z.object({
   latitude: z.number().min(-90).max(90),
   longitude: z.number().min(-180).max(180),
