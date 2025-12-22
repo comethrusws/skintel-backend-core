@@ -67,8 +67,10 @@ jobs:
             # Stop existing services and start new ones with minimal downtime
             sudo docker compose -f docker-compose.prod.yml down || true
             # added as temp fix
-            sudo docker system prune -f  # Clean up unused images/containers
-            sudo docker compose -f docker-compose.prod.yml up -d --build --force-recreate --no-cache
+            sudo docker system prune -f
+            sudo docker compose -f docker-compose.prod.yml build --no-cache
+            sudo docker compose -f docker-compose.prod.yml up -d --force-recreate  # Clean up unused images/containers
+          # sudo docker compose -f docker-compose.prod.yml up -d --build --force-recreate
           EOF
           
           # Clean up SSH key
