@@ -1,6 +1,6 @@
 setuptools>=80.9.0
 wheel
-numpy
+numpy<2.0.0
 opencv-python
 Pillow
 fastapi
