@@ -1,7 +1,7 @@
 import cron from 'node-cron';
 import { SkinTipService } from './services/skinTip';
 import { NotificationService } from './services/notifications';
-import { QuestionOfTheDayService } from './services/questionOfTheDay';
+import { ProfileService } from './services/profile';
 
 export function initCronJobs() {
     console.log('Initializing cron jobs...');
@@ -43,6 +43,16 @@ export function initCronJobs() {
     // Ingredient recommendations (4:00 PM)
     cron.schedule('0 16 * * *', async () => {
         await NotificationService.sendIngredientRecommendations();
+    });
+
+    // Cleanup deleted users (3:00 AM)
+    cron.schedule('0 3 * * *', async () => {
+        console.log('Running deleted user cleanup cron job...');
+        try {
+            await ProfileService.cleanupDeletedUsers();
+        } catch (error) {
+            console.error('Error in deleted user cleanup cron job:', error);
+        }
     });
 
     // Weekly Question of the Day Generation (Sunday at midnight)

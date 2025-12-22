@@ -428,69 +428,91 @@ export class ProfileService {
             throw { status: 404, message: 'User not found' };
         }
 
-        const imagesToDelete: string[] = [];
-
-        try {
-            const landmarks = await prisma.facialLandmarks.findMany({
-                where: { userId, annotatedImageUrl: { not: null } },
-                select: { annotatedImageUrl: true }
-            });
-            landmarks.forEach(l => {
-                if (l.annotatedImageUrl) imagesToDelete.push(l.annotatedImageUrl);
-            });
-
-            const answers = await prisma.onboardingAnswer.findMany({
-                where: { userId, status: 'answered' },
-                select: { value: true }
-            });
-
-            answers.forEach(ans => {
-                const val = ans.value as any;
-                if (val && typeof val === 'object' && val.image_url && typeof val.image_url === 'string') {
-                    imagesToDelete.push(val.image_url);
-                }
-            });
-
-            const uniqueImages = [...new Set(imagesToDelete)];
-            if (uniqueImages.length > 0) {
-                await Promise.allSettled(uniqueImages.map(async (url) => {
-                    try {
-                        await deleteFileFromUrl(url);
-                    } catch (error) {
-                        console.error(`Failed to delete S3 image: ${url}`, error);
-                    }
-                }));
-            }
-        } catch (error) {
-            console.error('Error identifying/deleting S3 images during profile deletion:', error);
-        }
-
-        await prisma.$transaction([
-            prisma.refreshToken.deleteMany({
-                where: { userId }
-            }),
-            prisma.product.deleteMany({
-                where: { userId }
-            }),
-            prisma.facialLandmarks.deleteMany({
-                where: { userId }
-            }),
-            prisma.onboardingAnswer.deleteMany({
-                where: { userId }
-            }),
-            prisma.onboardingSession.deleteMany({
-                where: { userId }
-            }),
-            prisma.user.delete({
-                where: { userId }
-            })
-        ]);
+        // Soft delete: just set deletedAt
+        await prisma.user.update({
+            where: { userId },
+            data: { deletedAt: new Date() }
+        });
 
         return {
             user_id: userId,
             deleted: true,
+            soft_deletion: true,
             deleted_at: new Date().toISOString()
         };
+    }
+
+    static async cleanupDeletedUsers() {
+        const sixtyDaysAgo = new Date();
+        sixtyDaysAgo.setDate(sixtyDaysAgo.getDate() - 60);
+
+        const usersToDelete = await prisma.user.findMany({
+            where: {
+                deletedAt: {
+                    lt: sixtyDaysAgo
+                }
+            },
+            select: { userId: true }
+        });
+
+        console.log(`Found ${usersToDelete.length} users ensuring hard deletion.`);
+
+        for (const user of usersToDelete) {
+            const userId = user.userId;
+            console.log(`Processing hard deletion for user: ${userId}`);
+
+            const imagesToDelete: string[] = [];
+
+            try {
+                const landmarks = await prisma.facialLandmarks.findMany({
+                    where: { userId, annotatedImageUrl: { not: null } },
+                    select: { annotatedImageUrl: true }
+                });
+                landmarks.forEach(l => {
+                    if (l.annotatedImageUrl) imagesToDelete.push(l.annotatedImageUrl);
+                });
+
+                const answers = await prisma.onboardingAnswer.findMany({
+                    where: { userId, status: 'answered' },
+                    select: { value: true }
+                });
+
+                answers.forEach(ans => {
+                    const val = ans.value as any;
+                    if (val && typeof val === 'object' && val.image_url && typeof val.image_url === 'string') {
+                        imagesToDelete.push(val.image_url);
+                    }
+                });
+
+                const uniqueImages = [...new Set(imagesToDelete)];
+                if (uniqueImages.length > 0) {
+                    await Promise.allSettled(uniqueImages.map(async (url) => {
+                        try {
+                            await deleteFileFromUrl(url);
+                        } catch (error) {
+                            console.error(`Failed to delete S3 image: ${url}`, error);
+                        }
+                    }));
+                }
+            } catch (error) {
+                console.error(`Error identifying/deleting S3 images for user ${userId}:`, error);
+            }
+
+            // Hard delete from DB
+            try {
+                await prisma.$transaction([
+                    prisma.refreshToken.deleteMany({ where: { userId } }),
+                    prisma.product.deleteMany({ where: { userId } }),
+                    prisma.facialLandmarks.deleteMany({ where: { userId } }),
+                    prisma.onboardingAnswer.deleteMany({ where: { userId } }),
+                    prisma.onboardingSession.deleteMany({ where: { userId } }),
+                    prisma.user.delete({ where: { userId } })
+                ]);
+                console.log(`Hard deleted user: ${userId}`);
+            } catch (error) {
+                console.error(`Failed to hard delete user ${userId} from DB:`, error);
+            }
+        }
     }
 
     static async getOnboardingStatus(userId: string) {
