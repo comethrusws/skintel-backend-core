@@ -1,7 +1,7 @@
 import { prisma } from '../lib/prisma';
 import { Prisma } from '@prisma/client';
 import { getTaskProgress } from './tasks';
-import { maybePresignUrl } from '../lib/s3';
+import { maybePresignUrl, deleteFileFromUrl } from '../lib/s3';
 import { PROFILE_QUESTIONS, PROFILE_SCREEN_ID, getProfileQuestion, validateProfileQuestionValue, mapOptionsWithLabels, formatOptionLabel } from '../lib/profileQuestions';
 import { VALID_QUESTION_IDS, getExpectedType, getValidValues, formatLabel, getQuestionText } from '../utils/validation';
 
@@ -426,6 +426,43 @@ export class ProfileService {
 
         if (!user) {
             throw { status: 404, message: 'User not found' };
+        }
+
+        const imagesToDelete: string[] = [];
+
+        try {
+            const landmarks = await prisma.facialLandmarks.findMany({
+                where: { userId, annotatedImageUrl: { not: null } },
+                select: { annotatedImageUrl: true }
+            });
+            landmarks.forEach(l => {
+                if (l.annotatedImageUrl) imagesToDelete.push(l.annotatedImageUrl);
+            });
+
+            const answers = await prisma.onboardingAnswer.findMany({
+                where: { userId, status: 'answered' },
+                select: { value: true }
+            });
+
+            answers.forEach(ans => {
+                const val = ans.value as any;
+                if (val && typeof val === 'object' && val.image_url && typeof val.image_url === 'string') {
+                    imagesToDelete.push(val.image_url);
+                }
+            });
+
+            const uniqueImages = [...new Set(imagesToDelete)];
+            if (uniqueImages.length > 0) {
+                await Promise.allSettled(uniqueImages.map(async (url) => {
+                    try {
+                        await deleteFileFromUrl(url);
+                    } catch (error) {
+                        console.error(`Failed to delete S3 image: ${url}`, error);
+                    }
+                }));
+            }
+        } catch (error) {
+            console.error('Error identifying/deleting S3 images during profile deletion:', error);
         }
 
         await prisma.$transaction([

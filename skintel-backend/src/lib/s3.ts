@@ -1,10 +1,10 @@
-import { S3Client, PutObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3';
+import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import crypto from 'crypto';
 
 const AWS_REGION = process.env.AWS_REGION;
 const S3_BUCKET_NAME = process.env.S3_BUCKET_NAME || '';
-const S3_PUBLIC_BASE_URL = process.env.S3_PUBLIC_BASE_URL; 
+const S3_PUBLIC_BASE_URL = process.env.S3_PUBLIC_BASE_URL;
 
 export const s3 = new S3Client({
   region: AWS_REGION,
@@ -129,4 +129,24 @@ export async function maybePresignUrl(url: string, expiresInSeconds = 300): Prom
   if (!key) return url;
   return await getPresignedGetUrl(key, expiresInSeconds);
 }
+
+
+export async function deleteFromS3(key: string): Promise<void> {
+  if (!S3_BUCKET_NAME) throw new Error('S3_BUCKET_NAME is not configured');
+
+  const command = new DeleteObjectCommand({
+    Bucket: S3_BUCKET_NAME,
+    Key: key,
+  });
+
+  await s3.send(command);
+}
+
+export async function deleteFileFromUrl(url: string): Promise<void> {
+  const key = extractKeyFromS3Url(url);
+  if (key) {
+    await deleteFromS3(key);
+  }
+}
+
 
