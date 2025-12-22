@@ -81,6 +81,14 @@ export class AuthService {
             throw new Error('Invalid credentials');
         }
 
+        // Reactivate user if soft deleted
+        if (user.deletedAt) {
+            await prisma.user.update({
+                where: { userId: user.userId },
+                data: { deletedAt: null }
+            });
+        }
+
         const session = await prisma.anonymousSession.findUnique({
             where: { sessionId: session_id },
         });
@@ -197,6 +205,14 @@ export class AuthService {
                         .join(' ')
                         .trim() || undefined,
                 },
+            });
+        }
+
+        // Reactivate user if soft deleted
+        if (user.deletedAt) {
+            await prisma.user.update({
+                where: { userId: user.userId },
+                data: { deletedAt: null }
             });
         }
 
