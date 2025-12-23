@@ -26,6 +26,7 @@ function buildProductAnalysisPrompt(): string {
     '   - If you find a date, convert to YYYY-MM-DD format. If only month/year, use first day of month\n' +
     '   - If NO date is visible anywhere, return null for "expiry_date"\n' +
     '   - DO NOT hallucinate or guess dates\n' +
+    '   - Make sure the usage location is always in an array even if it can be used in one location as mentioned in the mentioned output example format.\n' +
     '9. If the product image is in another language, translate it to English\n' +
     '\n' +
     'Example output:\n' +
@@ -38,7 +39,7 @@ function buildProductAnalysisPrompt(): string {
     '  "target_concerns": ["dryness", "sensitivity", "barrier repair"],\n' +
     '  "usage_instructions": "Apply to wet face, massage gently, rinse thoroughly",\n' +
     '  "usage_method": "Massage gently onto wet skin in a circular motion",\n' +
-    '  "usage_location": "Face",\n' +
+    '  "usage_location": ["Face", "Eyes", "Body"],\n' +
     '  "warnings": ["For external use only", "Avoid contact with eyes"],\n' +
     '  "skin_types": ["dry", "sensitive", "normal"],\n' +
     '  "key_benefits": ["gentle cleansing", "moisture retention", "skin barrier support"]\n' +
