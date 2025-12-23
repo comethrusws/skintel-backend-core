@@ -77,7 +77,7 @@ async function presignProductData(productData: any) {
  *                     ingredients: ["ceramides", "hyaluronic acid"]
  *                     usage_instructions: "Apply to wet face"
  *                     usage_method: "Massage gently onto wet skin"
- *                     usage_location: "Face"
+ *                     usage_location: ["Face"]
  *       400:
  *         description: Invalid request data
  *       401:

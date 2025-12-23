@@ -144,6 +144,11 @@ export async function analyzeProduct(imageUrl: string): Promise<object> {
     }
   }
 
+  // Ensure usage_location is an array
+  if (productData.usage_location && !Array.isArray(productData.usage_location)) {
+    productData.usage_location = [productData.usage_location];
+  }
+
   return productData;
 }
 
