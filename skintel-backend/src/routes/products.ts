@@ -27,6 +27,11 @@ async function presignProductData(productData: any) {
   if (Array.isArray(newData.images)) {
     newData.images = await Promise.all(newData.images.map((url: string) => maybePresignUrl(url, 86400)));
   }
+
+  if (newData.usage_location && typeof newData.usage_location === 'string') {
+    newData.usage_location = [newData.usage_location];
+  }
+
   return newData;
 }
 
