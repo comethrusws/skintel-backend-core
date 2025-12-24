@@ -507,7 +507,7 @@ export class TasksService {
 
     const totalDaysSinceEarliest = Math.floor((todayMidnight.getTime() - earliestDate.getTime()) / (1000 * 60 * 60 * 24));
 
-    for (let d = 0; d <= totalDaysSinceEarliest; d++) {
+    for (let d = 0; d < totalDaysSinceEarliest; d++) {
       const date = new Date(earliestDate);
       date.setDate(date.getDate() + d);
       const dateStr = date.toISOString().split('T')[0];
