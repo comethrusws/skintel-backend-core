@@ -2,34 +2,45 @@ import { prisma } from '../lib/prisma';
 import { Prisma } from '@prisma/client';
 import OpenAI from 'openai';
 import { TaskGenerationRequest, TaskAdaptationResult } from '../types';
+import { getUserOnboardingProfile, formatProfileContext } from './analysis';
 
 const OPENAI_MODEL = process.env.OPENAI_MODEL || 'gpt-5-nano';
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 function buildTaskGenerationPrompt(): string {
-  return `You are a skincare routine assistant AI.
-You will receive a 4-week or a one week skincare improvement plan and need to generate specific daily tasks.
+  return `You are a skincare routine assistant AI specializing in personalized task generation.
+You will receive a 4-week or a one week skincare improvement plan, user products, and the user's profile information.
+
+IMPORTANT: Use the user profile to generate HYPER-PERSONALIZED daily tasks:
+- ETHNICITY: Tailor products and techniques for their skin tone and ethnicity-specific needs
+- AGE: Adjust product application and routine complexity based on age
+- CLIMATE/WEATHER: Recommend climate-appropriate products and timings (e.g., heavier moisturizers in cold/dry climates)
+- SKIN TYPE & SENSITIVITY: Adjust product quantities, frequency, and gentleness
+- MEDICAL CONDITIONS: Avoid contraindicated ingredients and suggest appropriate alternatives
+- SUN EXPOSURE: Emphasize sun protection based on outdoor time
 
 Your task:
 1. Convert each week's preview into 3-5 actionable daily tasks
 2. Assign appropriate timing (morning/evening/anytime)
 3. Categorize tasks (cleansing, treatment, moisturizing, protection, lifestyle)
 4. Set priority (critical, important, optional)
-5. Consider product recommendations
+5. Consider product recommendations tailored to user's profile
+6. Make descriptions SPECIFIC to the user's ethnicity, climate, and skin profile
 
 IMPORTANT FORMATTING RULES:
 - Title: MUST be short (2-4 words) and high-level (e.g., "Morning Cleanse", "Vitamin C Serum", "Hydrating Moisturizer"). Do NOT include dosage or detailed instructions in the title.
-- Description: MUST be actionable and include specific product quantity/dosage recommendations (e.g., "Apply a pea-sized amount", "Use 2-3 pumps", "Apply generously").
+- Description: MUST be actionable and include specific product quantity/dosage recommendations (e.g., "Apply a pea-sized amount", "Use 2-3 pumps", "Apply generously"). Reference user's profile when relevant (e.g., "Given your dry climate, apply extra moisturizer").
 
 Example input:
-Week 1: "Start gentle cleansing routine with salicylic acid"
+Week 1: "Start gentle cleansing routine with salicylic acid suitable for combination skin"
+User Profile: Ethnicity: South Asian, Climate: Hot, Skin Type: Combination
 
 Example output:
 {
   "week_1_tasks": [
     {
       "title": "Gentle Morning Cleanse",
-      "description": "Wash face with a gentle cleanser using lukewarm water. Use about a coin-sized amount.",
+      "description": "Wash face with a gentle cleanser using lukewarm water. Use about a coin-sized amount. For your combination skin in hot climate, focus on T-zone.",
       "timeOfDay": "morning",
       "category": "cleansing",
       "priority": "critical",
@@ -37,7 +48,7 @@ Example output:
     },
     {
       "title": "Salicylic Acid Treatment",
-      "description": "Apply a pea-sized amount of salicylic acid treatment to clean, dry skin. Start 3x per week.",
+      "description": "Apply a pea-sized amount of salicylic acid treatment to clean, dry skin. Start 3x per week. For your skin tone, use targeted application to avoid irritation.",
       "timeOfDay": "evening",
       "category": "treatment",
       "priority": "important",
@@ -81,13 +92,17 @@ export class TasksService {
       ? `User's available products: ${userProducts.map(p => `${p.name} (${p.category})`).join(', ')}`
       : 'No user products available';
 
+    // Fetch user profile for personalized task generation
+    const userProfile = await getUserOnboardingProfile(userId, null);
+    const profileContext = formatProfileContext(userProfile);
+
     const completion = await openai.chat.completions.create({
       model: OPENAI_MODEL,
       messages: [
         { role: 'system', content: prompt },
         {
           role: 'user',
-          content: `Generate daily tasks for this skincare plan:\n\n${planText}\n\n${userProductsText}\n\nReturn valid JSON only.`
+          content: `Generate daily tasks for this skincare plan:\n\n${planText}\n\n${userProductsText}${profileContext}\n\nReturn valid JSON only.`
         }
       ],
       response_format: { type: 'json_object' }

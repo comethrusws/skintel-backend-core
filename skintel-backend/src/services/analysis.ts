@@ -13,21 +13,161 @@ function getImageUrl(imageId: string): string {
   return `http://localhost:3000/images/${imageId}`;
 }
 
+interface UserOnboardingProfile {
+  ethnicity?: string;
+  age?: number;
+  gender?: string;
+  skinType?: string;
+  skinConcerns?: string[];
+  skinSensitivity?: string;
+  goals?: string[];
+  sunExposure?: string;
+  weatherConditions?: string;
+  medicalConditions?: string[];
+  hormoneFactors?: string[];
+}
+
+async function getUserOnboardingProfile(userId: string | null, sessionId: string | null): Promise<UserOnboardingProfile> {
+  const relevantQuestions = [
+    'q_profile_ethnicity',
+    'q_age',
+    'q_profile_gender',
+    'q_skin_type',
+    'q_skin_concerns',
+    'q_skin_sensitivity',
+    'q_goal',
+    'q_profile_sun_exposure',
+    'q_profile_weather_conditions',
+    'q_medical_conditions',
+    'q_hormone_factors'
+  ];
+
+  const answers = await prisma.onboardingAnswer.findMany({
+    where: {
+      OR: [
+        { userId: userId },
+        { sessionId: sessionId }
+      ],
+      questionId: { in: relevantQuestions },
+      status: 'answered'
+    }
+  });
+
+  const profile: UserOnboardingProfile = {};
+
+  for (const answer of answers) {
+    const value = answer.value;
+
+    switch (answer.questionId) {
+      case 'q_profile_ethnicity':
+        profile.ethnicity = typeof value === 'string' ? value : undefined;
+        break;
+      case 'q_age':
+        profile.age = typeof value === 'number' ? value : undefined;
+        break;
+      case 'q_profile_gender':
+        profile.gender = typeof value === 'string' ? value : undefined;
+        break;
+      case 'q_skin_type':
+        profile.skinType = typeof value === 'string' ? value : undefined;
+        break;
+      case 'q_skin_concerns':
+        profile.skinConcerns = Array.isArray(value) ? value.filter((v): v is string => typeof v === 'string') : undefined;
+        break;
+      case 'q_skin_sensitivity':
+        profile.skinSensitivity = typeof value === 'string' ? value : undefined;
+        break;
+      case 'q_goal':
+        profile.goals = Array.isArray(value) ? value.filter((v): v is string => typeof v === 'string') : undefined;
+        break;
+      case 'q_profile_sun_exposure':
+        profile.sunExposure = typeof value === 'string' ? value : undefined;
+        break;
+      case 'q_profile_weather_conditions':
+        profile.weatherConditions = typeof value === 'string' ? value : undefined;
+        break;
+      case 'q_medical_conditions':
+        profile.medicalConditions = Array.isArray(value) ? value.filter((v): v is string => typeof v === 'string') : undefined;
+        break;
+      case 'q_hormone_factors':
+        profile.hormoneFactors = Array.isArray(value) ? value.filter((v): v is string => typeof v === 'string') : undefined;
+        break;
+    }
+  }
+
+  return profile;
+}
+
+function formatProfileContext(profile: UserOnboardingProfile): string {
+  const parts: string[] = [];
+
+  if (profile.ethnicity) {
+    parts.push(`Ethnicity: ${profile.ethnicity.replace(/_/g, ' ')}`);
+  }
+  if (profile.age) {
+    parts.push(`Age: ${profile.age}`);
+  }
+  if (profile.gender) {
+    parts.push(`Gender: ${profile.gender.replace(/_/g, ' ')}`);
+  }
+  if (profile.skinType) {
+    parts.push(`Skin Type: ${profile.skinType.replace(/_/g, ' ')}`);
+  }
+  if (profile.skinSensitivity) {
+    parts.push(`Skin Sensitivity: ${profile.skinSensitivity.replace(/_/g, ' ')}`);
+  }
+  if (profile.skinConcerns && profile.skinConcerns.length > 0) {
+    parts.push(`Primary Skin Concerns: ${profile.skinConcerns.map(c => c.replace(/_/g, ' ')).join(', ')}`);
+  }
+  if (profile.goals && profile.goals.length > 0) {
+    parts.push(`Skincare Goals: ${profile.goals.map(g => g.replace(/_/g, ' ')).join(', ')}`);
+  }
+  if (profile.sunExposure) {
+    parts.push(`Sun Exposure: ${profile.sunExposure.replace(/_/g, ' ')}`);
+  }
+  if (profile.weatherConditions) {
+    parts.push(`Climate/Weather: ${profile.weatherConditions.replace(/_/g, ' ')}`);
+  }
+  if (profile.medicalConditions && profile.medicalConditions.length > 0) {
+    const conditions = profile.medicalConditions.filter(c => c !== 'none');
+    if (conditions.length > 0) {
+      parts.push(`Medical Conditions: ${conditions.map(c => c.replace(/_/g, ' ')).join(', ')}`);
+    }
+  }
+  if (profile.hormoneFactors && profile.hormoneFactors.length > 0) {
+    const factors = profile.hormoneFactors.filter(f => f !== 'none');
+    if (factors.length > 0) {
+      parts.push(`Hormone Factors: ${factors.map(f => f.replace(/_/g, ' ')).join(', ')}`);
+    }
+  }
+
+  return parts.length > 0 ? `\n\nUSER PROFILE:\n${parts.join('\n')}` : '';
+}
+
 function buildPrompt(): string {
   return (
-    'You are a dermatologist assistant AI.\n' +
-    'You will receive 1-3 face images (front, left profile, right profile) and facial landmarks data from the front image.\n' +
+    'You are a dermatologist assistant AI specializing in personalized skin analysis.\n' +
+    'You will receive 1-3 face images (front, left profile, right profile), facial landmarks data, and the user\'s profile information.\n' +
+    '\n' +
+    'IMPORTANT: Use the user profile to provide HYPER-PERSONALIZED analysis:\n' +
+    '- ETHNICITY: Consider skin tone, melanin levels, and region-specific concerns (e.g., hyperpigmentation in darker skin, sun damage patterns in lighter skin)\n' +
+    '- AGE: Provide age-appropriate recommendations and identify age-related concerns\n' +
+    '- CLIMATE/WEATHER: Tailor recommendations to their environment (humidity, sun protection needs, temperature)\n' +
+    '- SKIN TYPE & SENSITIVITY: Adjust ingredient recommendations and treatment intensity\n' +
+    '- MEDICAL CONDITIONS: Avoid contraindicated ingredients, suggest gentle alternatives\n' +
+    '- SUN EXPOSURE: Adjust protection recommendations based on outdoor time\n' +
+    '\n' +
     'Your task:\n' +
-    '1. Analyze skin across all provided images\n' +
+    '1. Analyze skin across all provided images with special attention to ethnicity-specific patterns\n' +
     '2. Identify SPECIFIC, LOCALIZED skin issues - not large general areas\n' +
     '3. For dark circles: use left_under_eye or right_under_eye (small crescent under the eye)\n' +
     '4. For pigmentation/acne: specify exact location (left_cheek, right_cheek, forehead, nose, etc.)\n' +
     '5. Keep marked regions SMALL and PRECISE - only mark the visible problem area\n' +
     '6. Provide an overall skin health score out of 100\n' +
-    '7. Create a 4-week improvement plan with weekly previews and expected improvement percentages\n' +
+    '7. Create a 4-week improvement plan tailored to their ethnicity, climate, and skin profile\n' +
     '8. Return the facial issues in 68 face landmark data format in JSON\n' +
-    '9. make sure to also analyse for any lip related issues like pigmentation'+
-
+    '9. Make sure to also analyse for any lip related issues like pigmentation\n' +
+    '10. Reference their profile in recommendations (e.g., "Given your [ethnicity] and [climate], I recommend...")\n' +
     '\n' +
     'Example JSON output (clearly highlight the issues visible in the images) and respond strictly in the following json format! DO NOT ADD ANYTHING ELSE:\n' +
     '{\n' +
@@ -45,14 +185,14 @@ function buildPrompt(): string {
     '      {"x": 57, "y": 67}\n' +
     '    ]}\n' +
     '  ],\n' +
-    '  "important_notes": "1. Use SMALL, PRECISE regions. 2. For dark circles: left_under_eye or right_under_eye (NOT eye). 3. For pigmentation: specify exact small area like left_cheek, right_cheek. 4. Avoid marking large areas - be specific and localized. 5. Only mark the visible problem area, not the entire face region."\n' +
-    '  "overall_assessment": "Combination skin with mild acne and moderate dark circles",\n' +
+    '  "important_notes": "1. Use SMALL, PRECISE regions. 2. For dark circles: left_under_eye or right_under_eye (NOT eye). 3. For pigmentation: specify exact small area like left_cheek, right_cheek. 4. Avoid marking large areas - be specific and localized. 5. Only mark the visible problem area, not the entire face region.",\n' +
+    '  "overall_assessment": "Combination skin with mild acne and moderate dark circles. Analysis tailored for [user ethnicity/profile]",\n' +
     '  "score": 72,\n' +
     '  "estimated_improvement_score": 85,\n' +
     '  "care_plan_4_weeks": [\n' +
-    '    {"week": 1, "preview": "Start gentle cleansing routine with salicylic acid", "improvement_expected": "15%", "weekly_improvement_score": 75},\n' +
-    '    {"week": 2, "preview": "Add eye cream for dark circles and maintain cleansing", "improvement_expected": "30%", "weekly_improvement_score": 78},\n' +
-    '    {"week": 3, "preview": "Introduce retinol treatment and sun protection", "improvement_expected": "50%", "weekly_improvement_score": 82},\n' +
+    '    {"week": 1, "preview": "Start gentle cleansing routine with salicylic acid suitable for [skin type]", "improvement_expected": "15%", "weekly_improvement_score": 75},\n' +
+    '    {"week": 2, "preview": "Add eye cream for dark circles and maintain cleansing. Consider [climate]-appropriate moisturizer", "improvement_expected": "30%", "weekly_improvement_score": 78},\n' +
+    '    {"week": 3, "preview": "Introduce retinol treatment and enhanced sun protection for [sun exposure level]", "improvement_expected": "50%", "weekly_improvement_score": 82},\n' +
     '    {"week": 4, "preview": "Maintain routine and assess overall progress", "improvement_expected": "70%", "weekly_improvement_score": 85}\n' +
     '  ],\n' +
     '  "estimated_weekly_scores": {"week_1": 75, "week_2": 78, "week_3": 82, "week_4": 85},\n' +
@@ -63,19 +203,27 @@ function buildPrompt(): string {
 
 function buildProgressPrompt(): string {
   return (
-    'You are a dermatologist assistant AI specializing in progress tracking.\n' +
+    'You are a dermatologist assistant AI specializing in personalized progress tracking.\n' +
     'You will receive:\n' +
     '1. Current face images (front, left profile, right profile) with landmarks\n' +
     '2. Initial analysis data with weekly plan and baseline score\n' +
     '3. Time elapsed since initial analysis\n' +
+    '4. User profile information (ethnicity, age, climate, skin type, etc.)\n' +
+    '\n' +
+    'IMPORTANT: Maintain consistency with the user\'s profile throughout tracking: \n' +
+    '- Reference their ETHNICITY when discussing skin changes and concerns\n' +
+    '- Consider their CLIMATE/WEATHER in recommendations\n' +
+    '- Adjust expectations based on AGE and SKIN TYPE\n' +
+    '- Account for MEDICAL CONDITIONS and SENSITIVITY in suggestions\n' +
     '\n' +
     'Your task:\n' +
     '1. Compare current skin condition to initial analysis\n' +
     '2. Evaluate progress on specific issues identified initially\n' +
     '3. Assess adherence to the 4-week improvement plan\n' +
-    '4. Provide progress score and updated recommendations\n' +
+    '4. Provide progress score and updated recommendations tailored to their profile\n' +
     '5. Identify visual improvements and areas needing attention\n' +
-    '6. make sure to also analyse for any lip related issues like pigmentation'+
+    '6. Make sure to also analyse for any lip related issues like pigmentation\n' +
+    '7. Ensure recommendations remain appropriate for their ethnicity, climate, and skin profile\n' +
     '\n' +
     'Respond strictly in this JSON format:\n' +
     '{\n' +
@@ -92,8 +240,8 @@ function buildProgressPrompt(): string {
     '  },\n' +
     '  "visual_improvements": ["reduced under-eye puffiness", "clearer T-zone"],\n' +
     '  "areas_needing_attention": ["forehead texture", "jawline breakouts"],\n' +
-    '  "updated_recommendations": ["increase retinol frequency", "add exfoliation"],\n' +
-    '  "next_week_focus": "Focus on consistency with evening routine and add gentle exfoliation twice weekly",\n' +
+    '  "updated_recommendations": ["increase retinol frequency suitable for [skin type]", "add exfoliation appropriate for [ethnicity/skin tone]"],\n' +
+    '  "next_week_focus": "Focus on consistency with evening routine and add gentle exfoliation twice weekly. Given your [climate], ensure adequate moisturization.",\n' +
     '  "updated_weekly_scores": {"week_1": 85, "week_2": 88, "week_3": 90, "week_4": 92},\n' +
     '  "remaining_issues": [\n' +
     '    {"type": "dark_circles", "region": "under_eye_left", "severity": "mild", "visible_in": ["front"], "dlib_68_facial_landmarks": [\n' +
@@ -270,6 +418,10 @@ export async function analyzeSkin(answerId: string) {
     throw error;
   }
 
+  // Fetch user profile for personalized analysis
+  const userProfile = await getUserOnboardingProfile(record.answer?.userId, record.answer?.sessionId);
+  const profileContext = formatProfileContext(userProfile);
+
   let completion;
   try {
     completion = await openai.chat.completions.create({
@@ -281,7 +433,7 @@ export async function analyzeSkin(answerId: string) {
           content: [
             {
               type: 'text',
-              text: `Analyze these face images (${availableImages.join(', ')}) with facial landmarks. Provide comprehensive skin analysis with score and 4-week plan.`
+              text: `Analyze these face images (${availableImages.join(', ')}) with facial landmarks. Provide comprehensive skin analysis with score and 4-week plan.${profileContext}`
             },
             ...imageContent,
             { type: 'text', text: `Landmarks: ${JSON.stringify(landmarks)}` }
@@ -338,7 +490,9 @@ export async function analyzeProgress(
   initialAnalysis: any,
   initialScore: number,
   weeklyPlan: any[],
-  daysElapsed: number
+  daysElapsed: number,
+  userId?: string | null,
+  sessionId?: string | null
 ): Promise<any> {
   if (!process.env.OPENAI_API_KEY) {
     throw new Error('OPENAI_API_KEY is not set');
@@ -380,6 +534,10 @@ export async function analyzeProgress(
   const weeksElapsed = Math.floor(daysElapsed / 7);
   const currentWeekPlan = weeklyPlan[Math.min(weeksElapsed, weeklyPlan.length - 1)];
 
+  // Fetch user profile for personalized progress tracking
+  const userProfile = await getUserOnboardingProfile(userId ?? null, sessionId ?? null);
+  const profileContext = formatProfileContext(userProfile);
+
   const completion = await openai.chat.completions.create({
     model: OPENAI_MODEL,
     messages: [
@@ -389,7 +547,7 @@ export async function analyzeProgress(
         content: [
           {
             type: 'text',
-            text: `Analyze progress in these current images (${availableImages.join(', ')}) compared to initial analysis and return your response in JSON.`
+            text: `Analyze progress in these current images (${availableImages.join(', ')}) compared to initial analysis and return your response in JSON.${profileContext}`
           },
           ...imageContent,
           {
@@ -435,7 +593,7 @@ export async function analyzeProgress(
           prefix: 'annotated-issues-progress'
         });
         annotatedImageUrl = uploadResult.url;
-        
+
         // Use the updated issues with correct MediaPipe landmarks
         if (annotationResponse.data.issues) {
           parsed.remaining_issues = annotationResponse.data.issues;
@@ -488,6 +646,15 @@ export async function analyzeWithLandmarks(frontImageUrl: string, landmarks: obj
 
   await Promise.all(imagePromises);
 
+  // Fetch user profile for personalized analysis
+  const answerRecord = await prisma.onboardingAnswer.findUnique({
+    where: { answerId },
+    select: { userId: true, sessionId: true }
+  });
+
+  const userProfile = await getUserOnboardingProfile(answerRecord?.userId ?? null, answerRecord?.sessionId ?? null);
+  const profileContext = formatProfileContext(userProfile);
+
   const completion = await openai.chat.completions.create({
     model: OPENAI_MODEL,
     messages: [
@@ -497,7 +664,7 @@ export async function analyzeWithLandmarks(frontImageUrl: string, landmarks: obj
         content: [
           {
             type: 'text',
-            text: `Analyze these face images (${availableImages.join(', ')}) with facial landmarks for comprehensive skin analysis.`
+            text: `Analyze these face images (${availableImages.join(', ')}) with facial landmarks for comprehensive skin analysis.${profileContext}`
           },
           ...imageContent,
           { type: 'text', text: `Landmarks: ${JSON.stringify(landmarks)}` }
@@ -565,4 +732,4 @@ async function generateAnnotatedImageBackground(
 }
 
 // Export these for the optimized functions
-export { buildPrompt, buildProgressPrompt, openai, OPENAI_MODEL };
+export { buildPrompt, buildProgressPrompt, openai, OPENAI_MODEL, getUserOnboardingProfile, formatProfileContext };

@@ -2,7 +2,7 @@ import { prisma } from '../lib/prisma';
 import { processLandmarks } from './landmarks';
 import { maybePresignUrl, uploadImageToS3 } from '../lib/s3';
 import { generateTasksForUser } from './tasks';
-import { buildPrompt, buildProgressPrompt, openai, OPENAI_MODEL } from './analysis';
+import { buildPrompt, buildProgressPrompt, openai, OPENAI_MODEL, getUserOnboardingProfile, formatProfileContext } from './analysis';
 import axios from 'axios';
 
 export class VanalyseService {
@@ -104,7 +104,8 @@ export class VanalyseService {
                 presignedUrls.front,
                 landmarkResult.data,
                 presignedUrls.left,
-                presignedUrls.right
+                presignedUrls.right,
+                userId
             ),
 
             this.analyzeProgressOptimized(
@@ -202,7 +203,9 @@ export class VanalyseService {
         frontPresignedUrl: string,
         landmarks: object,
         leftPresignedUrl?: string | null,
-        rightPresignedUrl?: string | null
+        rightPresignedUrl?: string | null,
+        userId?: string,
+        sessionId?: string | null
     ) {
         const imageContent: any[] = [];
         const availableImages: string[] = [];
@@ -220,6 +223,10 @@ export class VanalyseService {
             availableImages.push('right');
         }
 
+        // Fetch user profile for personalized analysis
+        const userProfile = await getUserOnboardingProfile(userId ?? null, sessionId ?? null);
+        const profileContext = formatProfileContext(userProfile);
+
         const completion = await openai.chat.completions.create({
             model: OPENAI_MODEL,
             messages: [
@@ -229,7 +236,7 @@ export class VanalyseService {
                     content: [
                         {
                             type: 'text',
-                            text: `Analyze these face images (${availableImages.join(', ')}) with facial landmarks for comprehensive skin analysis.`
+                            text: `Analyze these face images (${availableImages.join(', ')}) with facial landmarks for comprehensive skin analysis.${profileContext}`
                         },
                         ...imageContent,
                         { type: 'text', text: `Landmarks: ${JSON.stringify(landmarks)}` }
@@ -278,6 +285,10 @@ export class VanalyseService {
         const weeksElapsed = Math.floor(daysElapsed / 7);
         const currentWeekPlan = weeklyPlan[Math.min(weeksElapsed, weeklyPlan.length - 1)];
 
+        // Fetch user profile for personalized progress tracking
+        const userProfile = await getUserOnboardingProfile(userId, null);
+        const profileContext = formatProfileContext(userProfile);
+
         const completion = await openai.chat.completions.create({
             model: OPENAI_MODEL,
             messages: [
@@ -287,7 +298,7 @@ export class VanalyseService {
                     content: [
                         {
                             type: 'text',
-                            text: `Analyze progress in these current images (${availableImages.join(', ')}) compared to initial analysis and return your response in JSON.`
+                            text: `Analyze progress in these current images (${availableImages.join(', ')}) compared to initial analysis and return your response in JSON.${profileContext}`
                         },
                         ...imageContent,
                         {
