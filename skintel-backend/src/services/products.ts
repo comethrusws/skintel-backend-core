@@ -8,7 +8,7 @@ const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 function buildProductAnalysisPrompt(): string {
   return (
     'You are a skincare product expert AI.\n' +
-    'You will receive an image of a skincare product.\n' +
+    'You will receive images of a skincare product.\n' +
     'Your task:\n' +
     '1. Identify the product name and brand (ensure brand is separate from product name)\n' +
     '2. Extract all visible ingredients from the label\n' +
