@@ -160,14 +160,29 @@ function buildPrompt(): string {
     'Your task:\n' +
     '1. Analyze skin across all provided images with special attention to ethnicity-specific patterns\n' +
     '2. Identify SPECIFIC, LOCALIZED skin issues - not large general areas\n' +
-    '3. For dark circles: use left_under_eye or right_under_eye (small crescent under the eye)\n' +
-    '4. For pigmentation/acne: specify exact location (left_cheek, right_cheek, forehead, nose, etc.)\n' +
-    '5. Keep marked regions SMALL and PRECISE - only mark the visible problem area\n' +
-    '6. Provide an overall skin health score out of 100\n' +
-    '7. Create a 4-week improvement plan tailored to their ethnicity, climate, and skin profile\n' +
-    '8. Return the facial issues in 68 face landmark data format in JSON\n' +
-    '9. Make sure to also analyse for any lip related issues like pigmentation\n' +
-    '10. Reference their profile in recommendations (e.g., "Given your [ethnicity] and [climate], I recommend...")\n' +
+    '3. Each marked issue should be TINY - use only 2-4 facial landmark points maximum per issue\n' +
+    '4. For dark circles: use left_under_eye or right_under_eye (small crescent under the eye)\n' +
+    '5. For acne/blemishes: ONLY mark if you see RAISED bumps, pustules, papules, or visible inflammation - NOT flat freckles\n' +
+    '6. Keep marked regions EXTREMELY SMALL and PRECISE - a single acne spot should be 2-3 landmark points, not an entire cheek\n' +
+    '7. Provide an overall skin health score out of 100\n' +
+    '8. Create a 4-week improvement plan tailored to their ethnicity, climate, and skin profile\n' +
+    '9. Return the facial issues in 68 face landmark data format in JSON\n' +
+    '10. Make sure to also analyse for any lip related issues like pigmentation\n' +
+    '11. Reference their profile in recommendations (e.g., "Given your [ethnicity] and [climate], I recommend...")\n' +
+    '12. CRITICAL - Distinguish between natural features vs actual issues:\n' +
+    '    NEVER MARK AS ISSUES:\n' +
+    '    - Freckles: FLAT, brown/tan spots scattered across skin (NOT raised, NOT inflamed)\n' +
+    '    - Moles: Small, dark, FLAT or slightly raised natural marks\n' +
+    '    - Cold-weather spots: Temporary marks in colder regions\n' +
+    '    - Birthmarks, age spots, natural skin variations\n' +
+    '\n' +
+    '    ONLY MARK AS ACNE IF YOU SEE:\n' +
+    '    - RAISED bumps/pustules with visible inflammation (red, swollen)\n' +
+    '    - Active pimples, comedones, or cystic acne\n' +
+    '    - Clear signs of infection or inflammation\n' +
+    '    DO NOT confuse flat freckles with acne - they are completely different!\n' +
+    '\n' +
+    '    REGION SIZE RULE: If you mark "acne", it should be a SINGLE SPOT (2-3 landmark points), NEVER an entire cheek or large area!\n' +
     '\n' +
     'Example JSON output (clearly highlight the issues visible in the images) and respond strictly in the following json format! DO NOT ADD ANYTHING ELSE:\n' +
     '{\n' +
@@ -224,6 +239,11 @@ function buildProgressPrompt(): string {
     '5. Identify visual improvements and areas needing attention\n' +
     '6. Make sure to also analyse for any lip related issues like pigmentation\n' +
     '7. Ensure recommendations remain appropriate for their ethnicity, climate, and skin profile\n' +
+    '8. DO NOT mark natural skin features as issues (CRITICAL):\n' +
+    '    - Moles, freckles, birthmarks, or age spots\n' +
+    '    - Cold-weather induced spots/marks (common in North American/colder regions)\n' +
+    '    - Natural skin texture variations that are not pathological\n' +
+    '    Only track ACTUAL skin concerns like active acne, inflammation, dermatitis, etc.\n' +
     '\n' +
     'Respond strictly in this JSON format:\n' +
     '{\n' +

@@ -8,7 +8,8 @@ const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 function buildProductAnalysisPrompt(): string {
   return (
     'You are a skincare product expert AI.\n' +
-    'You will receive images of a skincare product.\n' +
+    'You will receive one or more images of a skincare product (e.g., front and back of packaging).\n' +
+    'Analyze ALL provided images together to extract complete information.\n' +
     'Your task:\n' +
     '1. Identify the product name and brand (ensure brand is separate from product name)\n' +
     '2. Extract all visible ingredients from the label\n' +
@@ -17,7 +18,8 @@ function buildProductAnalysisPrompt(): string {
     '5. Provide visible usage instructions and explicitly extract "How it should be used" (usage_method)\n' +
     '6. Identify "Where it is used" (usage_location) e.g., Face, Eyes, Body\n' +
     '7. Note any warnings or special instructions\n' +
-    '8. CAREFULLY SCAN FOR EXPIRY DATE:\n' +
+    '8. Make sure you can differentiate between the product name and brand\n' +
+    '9. CAREFULLY SCAN FOR EXPIRY DATE:\n' +
     '   - Look for: MFG/EXP dates, "Best Before", "Use By", "Expiry", "EXP", batch codes with dates\n' +
     '   - Check ALL text on packaging: front, back, bottom, crimps, seals, embossed text, small print\n' +
     '   - Common locations: near barcode, bottom of container, on crimp/seal, printed on tube end\n' +
@@ -94,13 +96,27 @@ async function generateUsageInstructions(productData: any): Promise<{ usage_inst
   }
 }
 
-export async function analyzeProduct(imageUrl: string): Promise<object> {
+export async function analyzeProduct(imageUrls: string[]): Promise<object> {
   if (!process.env.OPENAI_API_KEY) {
     throw new Error('OPENAI_API_KEY is not set');
   }
 
   const prompt = buildProductAnalysisPrompt();
-  const urlForOpenAI = await maybePresignUrl(imageUrl, 300);
+
+  const presignedUrls = await Promise.all(
+    imageUrls.map(url => maybePresignUrl(url, 300))
+  );
+
+  const contentArray: Array<{ type: 'text'; text: string } | { type: 'image_url'; image_url: { url: string } }> = [
+    {
+      type: 'text' as const,
+      text: `Please analyze these ${presignedUrls.length} skincare product image(s) (front and back if multiple) and extract all relevant information. Pay special attention to ALL visible text on both images for expiry dates. Return your response as valid JSON.`
+    },
+    ...presignedUrls.map(url => ({
+      type: 'image_url' as const,
+      image_url: { url }
+    }))
+  ];
 
   const completion = await openai.chat.completions.create({
     model: OPENAI_MODEL,
@@ -108,10 +124,7 @@ export async function analyzeProduct(imageUrl: string): Promise<object> {
       { role: 'system', content: prompt },
       {
         role: 'user',
-        content: [
-          { type: 'text', text: 'Please analyze this skincare product image and extract all relevant information. Return your response as valid JSON.' },
-          { type: 'image_url', image_url: { url: urlForOpenAI } }
-        ]
+        content: contentArray
       }
     ],
     response_format: { type: 'json_object' }
@@ -172,7 +185,7 @@ export async function createProduct(userId: string, imageUrls: string[]): Promis
     };
   }
 
-  const productData = await analyzeProduct(primaryImageUrl);
+  const productData = await analyzeProduct(imageUrls);
 
   const product = await prisma.product.create({
     data: {
