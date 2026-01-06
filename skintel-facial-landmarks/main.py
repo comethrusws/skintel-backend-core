@@ -234,240 +234,219 @@ def get_smooth_curve(points: np.ndarray, num_points: int = 100) -> np.ndarray:
         logger.warning(f"Spline interpolation failed: {e}")
         return points[:-1]
 
+def fill_region_with_dots(polygon: np.ndarray, num_dots: int, seed: int = 42) -> np.ndarray:
+    """
+    Generate random points inside a polygon using rejection sampling.
+    """
+    if len(polygon) < 3:
+        return polygon
+
+    x, y, w, h = cv2.boundingRect(polygon)
+    dots = []
+    
+    rng = np.random.RandomState(seed)
+    
+    attempts = 0
+    max_attempts = num_dots * 20  # Prevent infinite loop
+    
+    while len(dots) < num_dots and attempts < max_attempts:
+        rand_x = rng.randint(x, x + w)
+        rand_y = rng.randint(y, y + h)
+        
+        # Check if point is inside polygon (measureDist=False)
+        # Returns +1 if inside, -1 if outside, 0 on edge
+        if cv2.pointPolygonTest(polygon, (rand_x, rand_y), False) > 0:
+            dots.append([rand_x, rand_y])
+            
+        attempts += 1
+        
+    return np.array(dots, dtype=np.int32)
+
 def annotate_image_with_issues(image_array: np.ndarray, issues: List[SkinIssue]) -> str:
+    """
+    Annotate image with Lovi-style markers:
+    - Translucent white lines for wrinkles/fine lines (alpha blended)
+    - Translucent white SCATTERED dots for spots (region filling)
+    - Legend matching reference style
+    """
     results = face_mesh.process(image_array)
     
     annotated = image_array.copy()
     annotated_bgr = cv2.cvtColor(annotated, cv2.COLOR_RGB2BGR)
+    h, w, _ = annotated_bgr.shape
+    
+    # Create a separate overlay for drawing to enable alpha blending
+    overlay = annotated_bgr.copy()
+    
+    # Lovi visual style parameters
+    ANNOTATION_ALPHA = 0.75 
+    
+    DOT_RADIUS = 3
+    DOT_COLOR = (255, 255, 255)
+    LINE_COLOR = (255, 255, 255)
+    LINE_THICKNESS = 2
+    
+    # Issues drawn as lines
+    LINE_ISSUE_TYPES = [
+        'wrinkles', 'wrinkle', 'fine_lines', 'fine lines', 
+        'crow_feet', 'nasolabial_folds', 'lines'
+    ]
+    
+    # Issues drawn as dots
+    DOT_ISSUE_TYPES = [
+        'acne', 'pimple', 'moles', 'freckles', 'pores', 
+        'blackheads', 'spots', 'blemishes', 'redness'
+    ]
     
     if not results.multi_face_landmarks:
-        logger.warning("No face detected by MediaPipe for annotation")
-        pass
+        logger.warning("No face detected by MediaPipe")
     else:
         face_landmarks = results.multi_face_landmarks[0]
-        h, w, _ = annotated_bgr.shape
         
-        severity_colors = {
-            'mild': (0, 255, 255),
-            'moderate': (0, 165, 255),
-            'severe': (0, 0, 255),
-            'critical': (128, 0, 128)
-        }
-        
-        for idx, issue in enumerate(issues, start=1):
-            color = severity_colors.get(issue.severity.lower(), (255, 255, 255))
+        for idx, issue in enumerate(issues):
+            issue_type_lower = issue.type.lower().replace(' ', '_')
+            region_lower = issue.region.lower()
             
-            is_dark_circle = issue.type.lower() in [
-                'dark_circles', 'dark circles', 'eye_bags', 
-                'puffy_eyes', 'under_eye_circles', 'under-eye circles',
-                'dark_circle', 'eye bags', 'puffy eyes', 'under eye'
-            ]
+            # 1. SPECIAL CASE: Dark Circles -> Smooth Crescent
+            is_dark_circle = issue_type_lower in ['dark_circles', 'eye_bags', 'puffy_eyes', 'under_eye_circles']
             
             if is_dark_circle:
-                if 'left' in issue.region.lower():
-                    indices = LANDMARK_INDICES['left_tear_trough']
-                elif 'right' in issue.region.lower():
-                    indices = LANDMARK_INDICES['right_tear_trough']
+                # Use simplified tear trough landmarks
+                if 'left' in region_lower:
+                    indices = [362, 382, 381, 380, 374, 373, 390, 249, 263]
+                elif 'right' in region_lower:
+                    indices = [33, 7, 163, 144, 145, 153, 154, 155, 133]
                 else:
-                    indices = LANDMARK_INDICES['left_tear_trough'] + LANDMARK_INDICES['right_tear_trough']
-            elif issue.type.lower() in ['uneven_skin_tone', 'uneven skin tone', 'hyperpigmentation', 'post_inflammatory_hyperpigmentation']:
-                if 'cheek' in issue.region.lower():
-                    if 'left' in issue.region.lower():
-                        indices = LANDMARK_INDICES['left_cheek']
-                    elif 'right' in issue.region.lower():
-                        indices = LANDMARK_INDICES['right_cheek']
-                    else:
-                        indices = get_region_landmarks(issue.region, is_dark_circle=False)
-                elif 't' in issue.region.lower() and 'zone' in issue.region.lower():
-                    indices = LANDMARK_INDICES['t_zone']
-                else:
-                    indices = get_region_landmarks(issue.region, is_dark_circle=False)
-            else:
-                indices = get_region_landmarks(issue.region, is_dark_circle=False)
+                    indices = [362, 382, 381, 380, 374, 373, 390, 249, 263]
             
+            # 2. STANDARD MAPPING
+            elif issue_type_lower in ['uneven_skin_tone', 'hyperpigmentation']:
+                if 'cheek' in region_lower:
+                    indices = LANDMARK_INDICES['left_cheek'] if 'left' in region_lower else LANDMARK_INDICES['right_cheek']
+                else:
+                    indices = get_region_landmarks(issue.region)
+            else:
+                indices = get_region_landmarks(issue.region)
+            
+            # Extract boundary points
             points = []
             for index in indices:
                 lm = face_landmarks.landmark[index]
                 x, y = int(lm.x * w), int(lm.y * h)
                 points.append([x, y])
-            
             points = np.array(points, dtype=np.int32)
             
-            issue.dlib_68_facial_landmarks = [IssuePoint(x=int(p[0]), y=int(p[1])) for p in points]
+            if len(points) == 0: continue
             
-            if len(points) > 0:
-                if is_dark_circle or 'under' in issue.region.lower():
-                    sorted_points = points[np.argsort(points[:, 0])]
+            # Determine drawing style
+            is_dot_issue = any(t in issue_type_lower for t in DOT_ISSUE_TYPES)
+            is_line_issue = any(t in issue_type_lower for t in LINE_ISSUE_TYPES) or is_dark_circle
+            
+            # --- DRAWING LOGIC ---
+            
+            if is_dark_circle:
+                # Force a smooth downward curve (crescent)
+                sorted_pts = points[np.argsort(points[:, 0])]
+                offset_y = int(h * 0.015)
+                sorted_pts[:, 1] += offset_y
+                
+                try:
+                    tck, u = splprep(sorted_pts.T, u=None, s=30.0, per=0)
+                    u_new = np.linspace(0, 1, 40)
+                    x_new, y_new = splev(u_new, tck, der=0)
+                    curve_pts = np.column_stack((x_new, y_new)).astype(np.int32)
+                    cv2.polylines(overlay, [curve_pts], False, LINE_COLOR, LINE_THICKNESS, cv2.LINE_AA)
+                except:
+                    cv2.polylines(overlay, [sorted_pts], False, LINE_COLOR, LINE_THICKNESS, cv2.LINE_AA)
+            
+            elif is_line_issue and len(points) > 3:
+                # Wrinkles: Smooth lines
+                sorted_pts = points[np.argsort(points[:, 0])]
+                try:
+                    tck, u = splprep(sorted_pts.T, u=None, s=15.0, per=0)
+                    u_new = np.linspace(0, 1, 40)
+                    x_new, y_new = splev(u_new, tck, der=0)
+                    curve_pts = np.column_stack((x_new, y_new)).astype(np.int32)
+                    cv2.polylines(overlay, [curve_pts], False, LINE_COLOR, LINE_THICKNESS, cv2.LINE_AA)
+                except:
+                    cv2.polylines(overlay, [sorted_pts], False, LINE_COLOR, LINE_THICKNESS, cv2.LINE_AA)
+            
+            elif is_dot_issue:
+                # Region Filling: Scatter dots inside the polygon
+                # Determine density based on severity
+                severity_map = {'mild': 12, 'moderate': 25, 'severe': 45}
+                num_dots = severity_map.get(issue.severity.lower(), 15)
+                
+                # Generate points inside the region polygon
+                scatter_points = fill_region_with_dots(points, num_dots, seed=42 + idx)
+                
+                # Draw the scattered dots
+                for pt in scatter_points:
+                    cv2.circle(overlay, (pt[0], pt[1]), DOT_RADIUS, DOT_COLOR, -1, cv2.LINE_AA)
                     
-                    if len(sorted_points) >= 3:
-                        try:
-                            x_min, y_min = sorted_points.min(axis=0)
-                            x_max, y_max = sorted_points.max(axis=0)
-                            
-                            center_x = int((x_min + x_max) / 2)
-                            center_y = int(y_min)
-                            
-                            axis_x = int((x_max - x_min) / 2)
-                            outer_axis_y = int(h * 0.05) 
-                            inner_axis_y = int(h * 0.015)
-                            
-                            num_points = 50
-                            angles = np.linspace(0, np.pi, num_points)
-                            outer_arc_x = center_x + axis_x * np.cos(angles)
-                            outer_arc_y = center_y + outer_axis_y * np.sin(angles)
-                            outer_arc = np.column_stack((outer_arc_x, outer_arc_y))
-                            
-                            inner_arc_x = center_x + axis_x * np.cos(angles[::-1])
-                            inner_arc_y = center_y + inner_axis_y * np.sin(angles[::-1])
-                            inner_arc = np.column_stack((inner_arc_x, inner_arc_y))
-                            
-                            crescent_raw = np.vstack([outer_arc, inner_arc])
-                            
-                            try:
-                                tck, u = splprep(crescent_raw.T, u=None, s=20.0, per=1)
-                                u_new = np.linspace(0, 1, 150)
-                                x_smooth, y_smooth = splev(u_new, tck, der=0)
-                                crescent_shape = np.column_stack((x_smooth, y_smooth)).astype(np.int32)
-                            except:
-                                crescent_shape = crescent_raw.astype(np.int32)
-                            
-                            overlay = annotated_bgr.copy()
-                            cv2.fillPoly(overlay, [crescent_shape], color)
-                            cv2.addWeighted(overlay, 0.12, annotated_bgr, 0.88, 0, annotated_bgr)
-                            
-                            cv2.polylines(annotated_bgr, [crescent_shape], isClosed=True, color=color, thickness=1, lineType=cv2.LINE_AA)
-                        except Exception as e:
-                            logger.warning(f"Crescent drawing failed for dark circle: {e}")
-                            hull = cv2.convexHull(sorted_points)
-                            overlay = annotated_bgr.copy()
-                            cv2.fillPoly(overlay, [hull], color)
-                            cv2.addWeighted(overlay, 0.12, annotated_bgr, 0.88, 0, annotated_bgr)
-                            cv2.polylines(annotated_bgr, [hull], isClosed=True, color=color, thickness=1, lineType=cv2.LINE_AA)
-                    else:
-                        cv2.polylines(annotated_bgr, [sorted_points], isClosed=False, color=color, thickness=1, lineType=cv2.LINE_AA)
-                elif 'eye' in issue.region.lower() or 'lip' in issue.region.lower():
-                    smooth_points = get_smooth_curve(points)
-                    overlay = annotated_bgr.copy()
-                    cv2.fillPoly(overlay, [smooth_points], color)
-                    cv2.addWeighted(overlay, 0.12, annotated_bgr, 0.88, 0, annotated_bgr)
-                    cv2.polylines(annotated_bgr, [smooth_points], isClosed=True, color=color, thickness=1, lineType=cv2.LINE_AA)
-                else:
-                    hull = cv2.convexHull(points)
-                    hull = np.squeeze(hull)
-                    if len(hull.shape) == 1:
-                         hull = hull.reshape(-1, 2)
-                         
-                    smooth_points = get_smooth_curve(hull)
-                    overlay = annotated_bgr.copy()
-                    cv2.fillPoly(overlay, [smooth_points], color)
-                    cv2.addWeighted(overlay, 0.12, annotated_bgr, 0.88, 0, annotated_bgr)
-                    cv2.polylines(annotated_bgr, [smooth_points], isClosed=True, color=color, thickness=1, lineType=cv2.LINE_AA)
+                # Store these scattered points for the response metadata
+                issue.dlib_68_facial_landmarks = [IssuePoint(x=int(p[0]), y=int(p[1])) for p in scatter_points]
 
-    legend_items = []
-    severity_colors = {
-        'mild': (0, 255, 255),
-        'moderate': (0, 165, 255),
-        'severe': (0, 0, 255),
-        'critical': (128, 0, 128)
-    }
-    
-    for idx, issue in enumerate(issues, start=1):
-        color = severity_colors.get(issue.severity.lower(), (255, 255, 255))
-        issue_label = issue.type.replace('_', ' ').title()
-        legend_items.append({
-            'number': idx,
-            'label': issue_label,
-            'severity': issue.severity,
-            'color': color
-        })
-    
-    if legend_items:
-        legend_padding = 15
-        legend_x = legend_padding
-        legend_y = annotated_bgr.shape[0] - legend_padding
-        line_height = 28
+            else:
+                # Fallback: Single center dot
+                center = np.mean(points, axis=0).astype(int)
+                cv2.circle(overlay, (center[0], center[1]), DOT_RADIUS + 1, DOT_COLOR, -1, cv2.LINE_AA)
+                issue.dlib_68_facial_landmarks = [IssuePoint(x=int(center[0]), y=int(center[1]))]
+
+    # Apply alpha blending for drawing
+    cv2.addWeighted(overlay, ANNOTATION_ALPHA, annotated_bgr, 1 - ANNOTATION_ALPHA, 0, annotated_bgr)
+
+    # --- LEGEND ---
+    if issues:
+        legend_height = min(len(issues) * 25 + 40, 150)
+        legend_margin = 15
+        
+        # Dark overlay
+        legend_overlay = annotated_bgr.copy()
+        cv2.rectangle(legend_overlay, 
+                     (legend_margin, h - legend_height - legend_margin),
+                     (w - legend_margin, h - legend_margin),
+                     (20, 20, 20), -1)
+        cv2.addWeighted(legend_overlay, 0.85, annotated_bgr, 0.15, 0, annotated_bgr)
+        
+        # White border
+        cv2.rectangle(annotated_bgr,
+                     (legend_margin, h - legend_height - legend_margin),
+                     (w - legend_margin, h - legend_margin),
+                     (255, 255, 255), 1)
+        
+        # Text settings
         font = cv2.FONT_HERSHEY_SIMPLEX
-        font_scale = 0.35
-        thickness = 1
+        base_y = h - legend_height - legend_margin + 25
         
-        max_text_width = 0
-        for item in legend_items:
-            text = f"{item['number']}. {item['label']} ({item['severity']})"
-            (text_width, _), _ = cv2.getTextSize(text, font, font_scale, thickness)
-            max_text_width = max(max_text_width, text_width)
+        cv2.putText(annotated_bgr, "Skin Analysis", (legend_margin + 15, base_y), 
+                   font, 0.6, (255, 255, 255), 1, cv2.LINE_AA)
         
-        legend_width = max_text_width + 50
-        legend_height = len(legend_items) * line_height + 25
+        base_y += 10
         
-        legend_bg_x1 = legend_x - 8
-        legend_bg_y1 = legend_y - legend_height
-        legend_bg_x2 = legend_x + legend_width
-        legend_bg_y2 = legend_y + 8
-        
-        overlay = annotated_bgr.copy()
-        cv2.rectangle(overlay, (legend_bg_x1, legend_bg_y1), (legend_bg_x2, legend_bg_y2), 
-                      (0, 0, 0), -1)
-        cv2.addWeighted(overlay, 0.7, annotated_bgr, 0.3, 0, annotated_bgr)
-        
-        cv2.rectangle(annotated_bgr, (legend_bg_x1, legend_bg_y1), (legend_bg_x2, legend_bg_y2), 
-                      (255, 255, 255), 2)
-        
-        title_y = legend_bg_y1 + 20
-        cv2.putText(
-            annotated_bgr,
-            "Detected Issues:",
-            (legend_x, title_y),
-            font,
-            font_scale + 0.05,
-            (255, 255, 255),
-            thickness + 1,
-            cv2.LINE_AA
-        )
-        
-        current_y = title_y + 12
-        for item in legend_items:
-            current_y += line_height
+        for i, issue in enumerate(issues[:4]):
+            base_y += 22
+            region_name = issue.region.replace('_', ' ').title()
+            issue_name = issue.type.replace('_', ' ').title()
+            severity = issue.severity.lower()
             
-            circle_x = legend_x + 10
-            circle_y = current_y - 8
-            cv2.circle(annotated_bgr, (circle_x, circle_y), 10, item['color'], -1)
-            cv2.circle(annotated_bgr, (circle_x, circle_y), 10, (255, 255, 255), 1)
-            
-            num_text = str(item['number'])
-            (num_width, num_height), _ = cv2.getTextSize(num_text, font, 0.3, 1)
-            cv2.putText(
-                annotated_bgr,
-                num_text,
-                (circle_x - num_width // 2, circle_y + num_height // 2),
-                font,
-                0.3,
-                (255, 255, 255),
-                1,
-                cv2.LINE_AA
-            )
-            
-            text = f"{item['label']} ({item['severity']})"
-            cv2.putText(
-                annotated_bgr,
-                text,
-                (legend_x + 30, current_y),
-                font,
-                font_scale,
-                (255, 255, 255),
-                thickness,
-                cv2.LINE_AA
-            )
-    
+            text = f"??? {region_name}: {issue_name} ({severity})"
+            if len(text) > 55: text = text[:52] + "..."
+            cv2.putText(annotated_bgr, text, (legend_margin + 15, base_y), 
+                       font, 0.45, (220, 220, 220), 1, cv2.LINE_AA)
+        
+        if len(issues) > 4:
+            base_y += 22
+            cv2.putText(annotated_bgr, f"... (+{len(issues)-4} more)", 
+                       (legend_margin + 15, base_y), font, 0.45, (180, 180, 180), 1, cv2.LINE_AA)
+
+    # Convert to base64
     annotated_rgb = cv2.cvtColor(annotated_bgr, cv2.COLOR_BGR2RGB)
-    
     pil_image = Image.fromarray(annotated_rgb)
-    
     img_buffer = io.BytesIO()
     pil_image.save(img_buffer, format='PNG')
     img_buffer.seek(0)
-    
-    img_base64 = base64.b64encode(img_buffer.read()).decode('utf-8')
-    return f"data:image/png;base64,{img_base64}"
+    return f"data:image/png;base64,{base64.b64encode(img_buffer.read()).decode('utf-8')}"
 
 @app.get("/", response_model=Dict[str, str])
 async def get_api_info():
