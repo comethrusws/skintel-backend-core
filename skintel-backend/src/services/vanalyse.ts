@@ -158,15 +158,25 @@ export class VanalyseService {
                 };
             });
 
-            await generateTasksForUser({
-                userId,
-                weeklyPlan: currentAnalysis.care_plan_4_weeks,
-                userProducts: formattedProducts,
-                force: true
-            });
+            const newPlan = currentAnalysis.care_plan_4_weeks || [];
+            const oldPlan = initialWeeklyPlan || [];
+
+            const planChangedSignificantly = this.hasSignificantPlanChange(oldPlan, newPlan);
+
+            if (planChangedSignificantly) {
+                console.log(`Plan changed significantly for user ${userId}, regenerating tasks`);
+                await generateTasksForUser({
+                    userId,
+                    weeklyPlan: newPlan,
+                    userProducts: formattedProducts,
+                    force: true
+                });
+            } else {
+                console.log(`Plan unchanged for user ${userId}, skipping task regeneration`);
+            }
 
         } catch (taskError) {
-            console.error('Failed to regenerate tasks after progress analysis:', taskError);
+            console.error('Failed to check/regenerate tasks after progress analysis:', taskError);
         }
 
         const imagesAnalyzed = ['front'];
@@ -367,5 +377,53 @@ export class VanalyseService {
         } catch (annotationError) {
             console.error('Failed to generate annotated image in background:', annotationError);
         }
+    }
+
+    /**
+     * Compare two weekly plans to determine if they've changed significantly.
+     * Returns true if the plans are meaningfully different.
+     */
+    private static hasSignificantPlanChange(oldPlan: any[], newPlan: any[]): boolean {
+        // If lengths are different, it's a significant change
+        if (oldPlan.length !== newPlan.length) {
+            return true;
+        }
+
+        // If either plan is empty, no significant change
+        if (oldPlan.length === 0 || newPlan.length === 0) {
+            return false;
+        }
+
+        // Compare week-by-week previews using simple text similarity
+        let matchingWeeks = 0;
+        for (let i = 0; i < oldPlan.length; i++) {
+            const oldPreview = (oldPlan[i]?.preview || '').toLowerCase().trim();
+            const newPreview = (newPlan[i]?.preview || '').toLowerCase().trim();
+
+            // Calculate simple word overlap similarity
+            const oldWords = new Set(oldPreview.split(/\s+/).filter((w: string) => w.length > 3));
+            const newWords = new Set(newPreview.split(/\s+/).filter((w: string) => w.length > 3));
+
+            if (oldWords.size === 0 && newWords.size === 0) {
+                matchingWeeks++;
+                continue;
+            }
+
+            let overlap = 0;
+            oldWords.forEach(word => {
+                if (newWords.has(word)) overlap++;
+            });
+
+            const similarity = overlap / Math.max(oldWords.size, newWords.size, 1);
+
+            // 70% word overlap = similar enough
+            if (similarity >= 0.7) {
+                matchingWeeks++;
+            }
+        }
+
+        // If less than 75% of weeks match, it's a significant change
+        const matchRatio = matchingWeeks / oldPlan.length;
+        return matchRatio < 0.75;
     }
 }
