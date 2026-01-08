@@ -95,6 +95,9 @@ router.post('/verify-ios', authenticateUser, asyncHandler(async (req: Authentica
         return;
     }
 
+    // Record the transaction
+    await PaymentService.recordTransaction(userId, verificationResult, jws_transaction);
+
     const updatedUser = await PaymentService.updateUserPlan(
         userId,
         planType,
@@ -196,6 +199,9 @@ router.post('/verify-transaction', authenticateUser, asyncHandler(async (req: Au
         res.status(400).json({ error: 'Unknown product ID for plan mapping' });
         return;
     }
+
+    // Record the transaction
+    await PaymentService.recordTransaction(userId, verificationResult);
 
     // Update user plan
     const updatedUser = await PaymentService.updateUserPlan(
@@ -356,6 +362,49 @@ router.get('/status', authenticateUser, asyncHandler(async (req: AuthenticatedRe
         planType: user.planType,
         expiresDate: user.subscriptionExpiresAt ? user.subscriptionExpiresAt.toISOString() : null
     });
+}));
+
+/**
+ * @swagger
+ * /v1/payment/transactions:
+ *   get:
+ *     summary: Get transaction history
+ *     description: Retrieve a list of all past transactions.
+ *     tags: [Subscription]
+ *     security:
+ *       - BearerAuth: []
+ *     responses:
+ *       200:
+ *         description: List of transactions retrieved
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 transactions:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       id:
+ *                         type: string
+ *                       transactionId:
+ *                         type: string
+ *                       productId:
+ *                         type: string
+ *                       planType:
+ *                         type: string
+ *                       purchaseDate:
+ *                         type: string
+ *                       environment:
+ *                         type: string
+ *       401:
+ *         description: Authentication required
+ */
+router.get('/transactions', authenticateUser, asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
+    const userId = req.userId!;
+    const transactions = await PaymentService.getTransactions(userId);
+    res.json({ transactions });
 }));
 
 export { router as paymentRouter };

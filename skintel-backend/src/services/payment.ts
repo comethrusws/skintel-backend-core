@@ -214,7 +214,58 @@ export class PaymentService {
         }
     }
 
+    /**
+     * Records the transaction validation result in the database.
+     */
+    static async recordTransaction(userId: string, verificationResult: IAPVerificationResult, jwsTransaction?: string) {
+        try {
+            if (!verificationResult.productId || !verificationResult.transactionId) {
+                console.warn('Skipping transaction recording: Missing productId or transactionId');
+                return;
+            }
 
+            let planType: PlanType = PlanType.MONTHLY;
+            if (verificationResult.productId.toLowerCase().includes('weekly')) {
+                planType = PlanType.WEEKLY;
+            }
+
+            await prisma.transaction.create({
+                data: {
+                    userId,
+                    transactionId: verificationResult.transactionId,
+                    originalTransactionId: verificationResult.originalTransactionId || verificationResult.transactionId,
+                    productId: verificationResult.productId,
+                    planType,
+                    purchaseDate: verificationResult.purchaseDate ? new Date(verificationResult.purchaseDate) : new Date(),
+                    expiresDate: verificationResult.expiresDate ? new Date(verificationResult.expiresDate) : null,
+                    environment: verificationResult.environment || 'Production',
+                    jwsRepresentation: jwsTransaction
+                }
+            });
+
+            console.log(`Transaction recorded for user ${userId}: ${verificationResult.transactionId}`);
+        } catch (error) {
+            console.error('Failed to record transaction:', error);
+        }
+    }
+
+    static async getTransactions(userId: string) {
+        return await prisma.transaction.findMany({
+            where: { userId },
+            orderBy: { purchaseDate: 'desc' },
+            select: {
+                id: true,
+                transactionId: true,
+                originalTransactionId: true,
+                productId: true,
+                planType: true,
+                purchaseDate: true,
+                expiresDate: true,
+                environment: true,
+                createdAt: true
+            }
+        });
+    }
 
     static async updateUserPlan(userId: string, planType: 'WEEKLY' | 'MONTHLY', originalTransactionId?: string, expiresDate?: string, isActive: boolean = true) {
         const user = await prisma.user.update({

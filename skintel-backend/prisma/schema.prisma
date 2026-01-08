@@ -62,6 +62,7 @@ model User {
   notificationPreferences NotificationPreference?
   deviceTokens            DeviceToken[]
   waterIntakeLogs         WaterIntakeLog[]
+  transactions            Transaction[]
 
   @@unique([ssoProvider, ssoId])
   @@map("users")
@@ -324,4 +325,24 @@ enum SkinFeelValue {
   feeling_good
   feeling_fresh
   glowing
+}
+
+model Transaction {
+  id                    String    @id @default(cuid())
+  userId                String    @map("user_id")
+  transactionId         String    @unique @map("transaction_id")
+  originalTransactionId String    @map("original_transaction_id")
+  productId             String    @map("product_id")
+  planType              PlanType  @map("plan_type")
+  purchaseDate          DateTime  @map("purchase_date")
+  expiresDate           DateTime? @map("expires_date")
+  environment           String    @map("environment") // Sandbox or Production
+  jwsRepresentation     String?   @map("jws_representation") @db.Text // Store the full JWS for verification
+  createdAt             DateTime  @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [userId], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([originalTransactionId])
+  @@map("transactions")
 }
