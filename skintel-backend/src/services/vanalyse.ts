@@ -336,8 +336,8 @@ export class VanalyseService {
             parsed = { raw: content };
         }
 
-        if (parsed.remaining_issues && parsed.remaining_issues.length > 0 && presignedUrls.front) {
-            this.generateAnnotatedImageBackground(presignedUrls.front, parsed.remaining_issues, userId, answerId).catch(err => {
+        if (parsed.current_issues && parsed.current_issues.length > 0 && presignedUrls.front) {
+            this.generateAnnotatedImageBackground(presignedUrls.front, parsed.current_issues, userId, answerId).catch(err => {
                 console.error('Background annotation failed:', err);
             });
         }
