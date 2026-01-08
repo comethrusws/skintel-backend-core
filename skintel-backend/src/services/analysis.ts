@@ -263,10 +263,14 @@ function buildProgressPrompt(): string {
     '  "updated_recommendations": ["increase retinol frequency suitable for [skin type]", "add exfoliation appropriate for [ethnicity/skin tone]"],\n' +
     '  "next_week_focus": "Focus on consistency with evening routine and add gentle exfoliation twice weekly. Given your [climate], ensure adequate moisturization.",\n' +
     '  "updated_weekly_scores": {"week_1": 85, "week_2": 88, "week_3": 90, "week_4": 92},\n' +
-    '  "remaining_issues": [\n' +
-    '    {"type": "dark_circles", "region": "under_eye_left", "severity": "mild", "visible_in": ["front"], "dlib_68_facial_landmarks": [\n' +
+    '  "current_issues": [\n' +
+    '    {"type": "dark_circles", "region": "left_under_eye", "severity": "mild", "visible_in": ["front"], "dlib_68_facial_landmarks": [\n' +
     '      {"x": 30, "y": 40},\n' +
     '      {"x": 32, "y": 42}\n' +
+    '    ]},\n' +
+    '    {"type": "acne", "region": "forehead", "severity": "moderate", "visible_in": ["front"], "dlib_68_facial_landmarks": [\n' +
+    '      {"x": 50, "y": 30},\n' +
+    '      {"x": 52, "y": 32}\n' +
     '    ]}\n' +
     '  ]\n' +
     '}'
@@ -597,14 +601,14 @@ export async function analyzeProgress(
   // generation of annotated image
   let annotatedImageUrl: string | null = null;
   try {
-    if (parsed.remaining_issues && parsed.remaining_issues.length > 0 && currentImages.front) {
+    if (parsed.current_issues && parsed.current_issues.length > 0 && currentImages.front) {
       const frontImagePresigned = await maybePresignUrl(currentImages.front, 86400);
 
       const microserviceUrl = process.env.LANDMARK_URL || process.env.FACIAL_LANDMARKS_API_URL || 'http://localhost:8000';
 
       const annotationResponse = await axios.post(`${microserviceUrl}/api/v1/annotate-issues-from-url`, {
         image_url: frontImagePresigned,
-        issues: parsed.remaining_issues
+        issues: parsed.current_issues
       });
 
       if (annotationResponse.data.status === 'success' && annotationResponse.data.annotated_image) {
@@ -616,7 +620,7 @@ export async function analyzeProgress(
 
         // Use the updated issues with correct MediaPipe landmarks
         if (annotationResponse.data.issues) {
-          parsed.remaining_issues = annotationResponse.data.issues;
+          parsed.current_issues = annotationResponse.data.issues;
         }
       }
     }

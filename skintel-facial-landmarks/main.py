@@ -419,8 +419,6 @@ def annotate_image_with_issues(image_array: np.ndarray, issues: List[SkinIssue])
         font = cv2.FONT_HERSHEY_SIMPLEX
         base_y = h - legend_height - legend_margin + 25
         
-        cv2.putText(annotated_bgr, "Skin Analysis", (legend_margin + 15, base_y), 
-                   font, 0.6, (255, 255, 255), 1, cv2.LINE_AA)
         
         base_y += 10
         
@@ -430,7 +428,7 @@ def annotate_image_with_issues(image_array: np.ndarray, issues: List[SkinIssue])
             issue_name = issue.type.replace('_', ' ').title()
             severity = issue.severity.lower()
             
-            text = f"??? {region_name}: {issue_name} ({severity})"
+            text = f"{region_name}: {issue_name} ({severity})"
             if len(text) > 55: text = text[:52] + "..."
             cv2.putText(annotated_bgr, text, (legend_margin + 15, base_y), 
                        font, 0.45, (220, 220, 220), 1, cv2.LINE_AA)
