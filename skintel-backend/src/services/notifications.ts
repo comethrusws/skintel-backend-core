@@ -1,6 +1,7 @@
 import { firebaseAdmin } from '../lib/firebase';
 import { prisma } from '../lib/prisma';
 import { describeUVRisk, fetchUVIndex } from '../lib/uv';
+import { RoutineMessageService } from './routineMessage';
 
 export class NotificationService {
     /**
@@ -99,15 +100,48 @@ export class NotificationService {
                 select: { token: true },
             });
 
+            const message = await RoutineMessageService.getMessageForToday('morning');
+
             const tokenStrings = tokens.map((t) => t.token);
             await this.sendMulticastNotification(
                 tokenStrings,
-                'Good Morning! ☀️',
-                'Time for your morning skincare routine. Let\'s start the day glowing!',
+                message.title,
+                message.body,
                 { type: 'routine', time: 'morning' }
             );
         } catch (error) {
             console.error('Error sending morning reminders:', error);
+        }
+    }
+
+    /**
+     * Send afternoon routine reminders (progress logging)
+     */
+    static async sendAfternoonReminders() {
+        try {
+            console.log('Sending afternoon reminders...');
+            const tokens = await prisma.deviceToken.findMany({
+                where: {
+                    user: {
+                        notificationPreferences: {
+                            dailyRoutineReminders: true,
+                        },
+                    },
+                },
+                select: { token: true },
+            });
+
+            const message = await RoutineMessageService.getMessageForToday('afternoon');
+
+            const tokenStrings = tokens.map((t) => t.token);
+            await this.sendMulticastNotification(
+                tokenStrings,
+                message.title,
+                message.body,
+                { type: 'routine', time: 'afternoon' }
+            );
+        } catch (error) {
+            console.error('Error sending afternoon reminders:', error);
         }
     }
 
@@ -128,11 +162,13 @@ export class NotificationService {
                 select: { token: true },
             });
 
+            const message = await RoutineMessageService.getMessageForToday('evening');
+
             const tokenStrings = tokens.map((t) => t.token);
             await this.sendMulticastNotification(
                 tokenStrings,
-                'Time to Unwind 🌙',
-                'Don\'t forget your evening skincare routine before bed.',
+                message.title,
+                message.body,
                 { type: 'routine', time: 'evening' }
             );
         } catch (error) {

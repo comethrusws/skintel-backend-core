@@ -271,6 +271,18 @@ model SkinFeel {
   @@map("skin_feels")
 }
 
+model RoutineMessage {
+  id        String   @id @default(cuid())
+  date      DateTime @db.Date
+  timeSlot  String   @map("time_slot")
+  title     String
+  body      String
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@unique([date, timeSlot])
+  @@map("routine_messages")
+}
+
 model Transaction {
   id                    String    @id @default(cuid())
   userId                String    @map("user_id")

@@ -2,6 +2,7 @@ import cron from 'node-cron';
 import { SkinTipService } from './services/skinTip';
 import { NotificationService } from './services/notifications';
 import { ProfileService } from './services/profile';
+import { RoutineMessageService } from './services/routineMessage';
 
 export function initCronJobs() {
     console.log('Initializing cron jobs...');
@@ -15,9 +16,24 @@ export function initCronJobs() {
         }
     });
 
+    // Weekly routine message generation (Sunday at midnight)
+    cron.schedule('0 0 * * 0', async () => {
+        console.log('Running weekly routine message generation cron job...');
+        try {
+            await RoutineMessageService.generateWeeklyMessages();
+        } catch (error) {
+            console.error('Error in weekly routine message generation cron job:', error);
+        }
+    });
+
     // Morning Routine Reminder (8:00 AM)
     cron.schedule('0 8 * * *', async () => {
         await NotificationService.sendMorningReminders();
+    });
+
+    // Afternoon Routine Reminder (2:00 PM)
+    cron.schedule('0 14 * * *', async () => {
+        await NotificationService.sendAfternoonReminders();
     });
 
     // Evening Routine Reminder (9:00 PM)
