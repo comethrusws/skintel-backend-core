@@ -1,9 +1,3 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -32,37 +26,37 @@ model AnonymousSession {
 model User {
   id                      String                  @id @default(cuid())
   userId                  String                  @unique @map("user_id")
-  name                    String?
-  phoneNumber             String?                 @map("phone_number")
-  dateOfBirth             DateTime?               @map("date_of_birth")
   email                   String?                 @unique
   passwordHash            String?                 @map("password_hash")
   ssoProvider             String?                 @map("sso_provider")
   ssoId                   String?                 @map("sso_id")
-  latitude                Float?                  @map("latitude")
-  longitude               Float?                  @map("longitude")
-  locationUpdatedAt       DateTime?               @map("location_updated_at")
+  createdAt               DateTime                @default(now()) @map("created_at")
+  updatedAt               DateTime                @updatedAt @map("updated_at")
+  dateOfBirth             DateTime?               @map("date_of_birth")
+  name                    String?
+  phoneNumber             String?                 @map("phone_number")
   planType                PlanType                @default(MONTHLY) @map("plan_type")
+  latitude                Float?                  @map("latitude")
+  locationUpdatedAt       DateTime?               @map("location_updated_at")
+  longitude               Float?                  @map("longitude")
   originalTransactionId   String?                 @map("original_transaction_id")
   subscriptionExpiresAt   DateTime?               @map("subscription_expires_at")
   isActive                Boolean                 @default(false) @map("is_active")
   hasConsented            Boolean                 @default(false) @map("has_consented")
   deletedAt               DateTime?               @map("deleted_at")
-  createdAt               DateTime                @default(now()) @map("created_at")
-  updatedAt               DateTime                @updatedAt @map("updated_at")
-  refreshTokens           RefreshToken[]
-  answers                 OnboardingAnswer[]
-  onboardingSession       OnboardingSession?
-  facialLandmarks         FacialLandmarks[]
-  products                Product[]
-  passwordResetTokens     PasswordResetToken[]
   Task                    Task[]
   TaskCompletion          TaskCompletion[]
-  skinFeels               SkinFeel[]
-  notificationPreferences NotificationPreference?
   deviceTokens            DeviceToken[]
-  waterIntakeLogs         WaterIntakeLog[]
+  facialLandmarks         FacialLandmarks[]
+  notificationPreferences NotificationPreference?
+  answers                 OnboardingAnswer[]
+  onboardingSession       OnboardingSession?
+  passwordResetTokens     PasswordResetToken[]
+  products                Product[]
+  refreshTokens           RefreshToken[]
+  skinFeels               SkinFeel[]
   transactions            Transaction[]
+  waterIntakeLogs         WaterIntakeLog[]
 
   @@unique([ssoProvider, ssoId])
   @@map("users")
@@ -71,6 +65,7 @@ model User {
 model NotificationPreference {
   id                        String   @id @default(cuid())
   userId                    String   @unique @map("user_id")
+  notificationSound         Boolean  @default(true) @map("notification_sound")
   dailyRoutineReminders     Boolean  @default(false) @map("daily_routine_reminders")
   hydrationAlerts           Boolean  @default(true) @map("hydration_alerts")
   uvIndexAlerts             Boolean  @default(false) @map("uv_index_alerts")
@@ -78,11 +73,9 @@ model NotificationPreference {
   questionsOfTheDay         Boolean  @default(true) @map("questions_of_the_day")
   smartInsights             Boolean  @default(false) @map("smart_insights")
   ingredientRecommendations Boolean  @default(true) @map("ingredient_recommendations")
-  notificationSound         Boolean  @default(true) @map("notification_sound")
   createdAt                 DateTime @default(now()) @map("created_at")
   updatedAt                 DateTime @updatedAt @map("updated_at")
-
-  user User @relation(fields: [userId], references: [userId], onDelete: Cascade)
+  user                      User     @relation(fields: [userId], references: [userId], onDelete: Cascade)
 
   @@map("notification_preferences")
 }
@@ -91,11 +84,10 @@ model DeviceToken {
   id        String   @id @default(cuid())
   userId    String   @map("user_id")
   token     String   @unique
-  platform  String   @default("unknown") // android, ios, web
+  platform  String   @default("unknown")
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
-
-  user User @relation(fields: [userId], references: [userId], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [userId], onDelete: Cascade)
 
   @@map("device_tokens")
 }
@@ -104,46 +96,42 @@ model RefreshToken {
   id        String   @id @default(cuid())
   token     String   @unique
   userId    String   @map("user_id")
-  user      User     @relation(fields: [userId], references: [userId], onDelete: Cascade)
   createdAt DateTime @default(now()) @map("created_at")
   expiresAt DateTime @map("expires_at")
+  user      User     @relation(fields: [userId], references: [userId], onDelete: Cascade)
 
   @@map("refresh_tokens")
 }
 
 model OnboardingAnswer {
-  id         String       @id @default(cuid())
-  answerId   String       @unique @map("answer_id")
-  sessionId  String?      @map("session_id")
-  userId     String?      @map("user_id")
-  screenId   String       @map("screen_id")
-  questionId String       @map("question_id")
-  type       AnswerType
-  value      Json
-  status     AnswerStatus
-  savedAt    DateTime     @default(now()) @map("saved_at")
-
+  id              String            @id @default(cuid())
+  answerId        String            @unique @map("answer_id")
+  sessionId       String?           @map("session_id")
+  userId          String?           @map("user_id")
+  screenId        String            @map("screen_id")
+  questionId      String            @map("question_id")
+  type            AnswerType
+  value           Json
+  status          AnswerStatus
+  savedAt         DateTime          @default(now()) @map("saved_at")
+  FacialLandmarks FacialLandmarks?
   session         AnonymousSession? @relation(fields: [sessionId], references: [sessionId], onDelete: Cascade)
   user            User?             @relation(fields: [userId], references: [userId], onDelete: Cascade)
-  FacialLandmarks FacialLandmarks?
 
   @@map("onboarding_answers")
 }
 
 model OnboardingSession {
-  id         String   @id @default(cuid())
-  sessionId  String?  @map("session_id")
-  userId     String?  @map("user_id")
-  allAnswers Json     @map("all_answers") // Combined JSON of all answers
-  status     String   @default("in_progress") // in_progress, completed, skipped
-  createdAt  DateTime @default(now()) @map("created_at")
-  updatedAt  DateTime @updatedAt @map("updated_at")
+  id         String            @id @default(cuid())
+  sessionId  String?           @unique @map("session_id")
+  userId     String?           @unique @map("user_id")
+  allAnswers Json              @map("all_answers")
+  status     String            @default("in_progress")
+  createdAt  DateTime          @default(now()) @map("created_at")
+  updatedAt  DateTime          @updatedAt @map("updated_at")
+  session    AnonymousSession? @relation(fields: [sessionId], references: [sessionId], onDelete: Cascade)
+  user       User?             @relation(fields: [userId], references: [userId], onDelete: Cascade)
 
-  session AnonymousSession? @relation(fields: [sessionId], references: [sessionId], onDelete: Cascade)
-  user    User?             @relation(fields: [userId], references: [userId], onDelete: Cascade)
-
-  @@unique([sessionId])
-  @@unique([userId])
   @@map("onboarding_sessions")
 }
 
@@ -158,26 +146,25 @@ model IdempotencyKey {
 }
 
 model FacialLandmarks {
-  id                    String         @id @default(cuid())
-  answerId              String         @unique @map("answer_id")
-  userId                String?        @map("user_id")
+  id                    String           @id @default(cuid())
+  answerId              String           @unique @map("answer_id")
+  userId                String?          @map("user_id")
   landmarks             Json
   analysis              Json?
-  progressUpdate        Json?          @map("progress_update")
-  status                LandmarkStatus @default(PROCESSING)
-  processedAt           DateTime?      @map("processed_at")
+  status                LandmarkStatus   @default(PROCESSING)
+  processedAt           DateTime?        @map("processed_at")
   error                 String?
-  createdAt             DateTime       @default(now()) @map("created_at")
+  createdAt             DateTime         @default(now()) @map("created_at")
+  analysisType          AnalysisType?
+  planEndDate           DateTime?
+  planStartDate         DateTime?
   score                 Int?
   weeklyPlan            Json?
-  analysisType          AnalysisType?
-  planStartDate         DateTime?
-  planEndDate           DateTime?
-  waterIntakeSuggestion Json?          @map("water_intake_suggestion")
-  annotatedImageUrl     String?        @map("annotated_image_url")
-
-  answer OnboardingAnswer @relation(fields: [answerId], references: [answerId], onDelete: Cascade)
-  user   User?            @relation(fields: [userId], references: [userId], onDelete: Cascade)
+  progressUpdate        Json?            @map("progress_update")
+  waterIntakeSuggestion Json?            @map("water_intake_suggestion")
+  annotatedImageUrl     String?          @map("annotated_image_url")
+  answer                OnboardingAnswer @relation(fields: [answerId], references: [answerId], onDelete: Cascade)
+  user                  User?            @relation(fields: [userId], references: [userId], onDelete: Cascade)
 
   @@map("facial_landmarks")
 }
@@ -189,8 +176,7 @@ model WaterIntakeLog {
   amountMl  Int      @map("amount_ml")
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
-
-  user User @relation(fields: [userId], references: [userId], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [userId], onDelete: Cascade)
 
   @@unique([userId, date])
   @@map("water_intake_logs")
@@ -203,8 +189,7 @@ model Product {
   productData Json     @map("product_data")
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
-
-  user User @relation(fields: [userId], references: [userId], onDelete: Cascade)
+  user        User     @relation(fields: [userId], references: [userId], onDelete: Cascade)
 
   @@map("products")
 }
@@ -212,31 +197,30 @@ model Product {
 model PasswordResetToken {
   token     String   @id
   userId    String
-  user      User     @relation(fields: [userId], references: [userId], onDelete: Cascade)
   expiresAt DateTime
   createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [userId], onDelete: Cascade)
 
   @@map("password_reset_tokens")
 }
 
 model Task {
-  id                  String   @id @default(cuid())
+  id                  String           @id @default(cuid())
   userId              String
-  week                Int // 1-4
+  week                Int
   title               String
   description         String
-  timeOfDay           String // 'morning' | 'evening' | 'anytime'
-  category            String // 'cleansing' | 'treatment' | 'moisturizing' | 'protection' | 'lifestyle'
-  priority            String // 'critical' | 'important' | 'optional'
-  recommendedProducts Json? // array of product categories
-  userProducts        Json? // array of user product IDs
-  adaptations         Json? // adaptation metadata
-  isActive            Boolean  @default(true)
-  createdAt           DateTime @default(now())
-  updatedAt           DateTime @updatedAt
-
-  user        User             @relation(fields: [userId], references: [userId], onDelete: Cascade)
-  completions TaskCompletion[]
+  timeOfDay           String
+  recommendedProducts Json?
+  userProducts        Json?
+  isActive            Boolean          @default(true)
+  createdAt           DateTime         @default(now())
+  updatedAt           DateTime         @updatedAt
+  adaptations         Json?
+  category            String
+  priority            String
+  user                User             @relation(fields: [userId], references: [userId], onDelete: Cascade)
+  completions         TaskCompletion[]
 
   @@index([userId, week])
   @@index([userId, isActive])
@@ -248,13 +232,62 @@ model TaskCompletion {
   taskId      String
   userId      String
   completedAt DateTime
-  timestamp   DateTime @default(now()) // exact time when marked complete
+  timestamp   DateTime @default(now())
+  task        Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  user        User     @relation(fields: [userId], references: [userId], onDelete: Cascade)
 
-  task Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
-  user User @relation(fields: [userId], references: [userId], onDelete: Cascade)
-
-  @@unique([taskId, userId, completedAt]) // prevent duplicate completions per day
+  @@unique([taskId, userId, completedAt])
   @@index([userId, completedAt])
+}
+
+model SkinTip {
+  id        String   @id @default(cuid())
+  date      DateTime @unique @db.Date
+  content   String
+  category  String?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("skin_tips")
+}
+
+model QuestionOfTheDay {
+  id        String   @id @default(cuid())
+  date      DateTime @unique @db.Date
+  question  String
+  options   Json?
+  category  String?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("questions_of_the_day")
+}
+
+model SkinFeel {
+  id        String        @id @default(cuid())
+  userId    String        @map("user_id")
+  value     SkinFeelValue
+  createdAt DateTime      @default(now()) @map("created_at")
+  user      User          @relation(fields: [userId], references: [userId], onDelete: Cascade)
+
+  @@map("skin_feels")
+}
+
+model Transaction {
+  id                    String    @id @default(cuid())
+  userId                String    @map("user_id")
+  transactionId         String    @unique @map("transaction_id")
+  originalTransactionId String    @map("original_transaction_id")
+  productId             String    @map("product_id")
+  planType              PlanType  @map("plan_type")
+  purchaseDate          DateTime  @map("purchase_date")
+  expiresDate           DateTime? @map("expires_date")
+  environment           String    @map("environment")
+  jwsRepresentation     String?   @map("jws_representation")
+  createdAt             DateTime  @default(now()) @map("created_at")
+  user                  User      @relation(fields: [userId], references: [userId], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([originalTransactionId])
+  @@map("transactions")
 }
 
 enum AnswerType {
@@ -287,62 +320,10 @@ enum PlanType {
   MONTHLY
 }
 
-model SkinTip {
-  id        String   @id @default(cuid())
-  date      DateTime @unique @db.Date // Store date only
-  content   String
-  category  String? // Optional category (e.g., "Hydration", "Sun Protection")
-  createdAt DateTime @default(now()) @map("created_at")
-
-  @@map("skin_tips")
-}
-
-model QuestionOfTheDay {
-  id        String   @id @default(cuid())
-  date      DateTime @unique @db.Date // Store date only
-  question  String
-  options   Json? // Optional array of strings for multiple choice
-  category  String? // Optional category
-  createdAt DateTime @default(now()) @map("created_at")
-
-  @@map("questions_of_the_day")
-}
-
-model SkinFeel {
-  id        String        @id @default(cuid())
-  userId    String        @map("user_id")
-  value     SkinFeelValue
-  createdAt DateTime      @default(now()) @map("created_at")
-
-  user User @relation(fields: [userId], references: [userId], onDelete: Cascade)
-
-  @@map("skin_feels")
-}
-
 enum SkinFeelValue {
   feeling_rough
   not_great
   feeling_good
   feeling_fresh
   glowing
-}
-
-model Transaction {
-  id                    String    @id @default(cuid())
-  userId                String    @map("user_id")
-  transactionId         String    @unique @map("transaction_id")
-  originalTransactionId String    @map("original_transaction_id")
-  productId             String    @map("product_id")
-  planType              PlanType  @map("plan_type")
-  purchaseDate          DateTime  @map("purchase_date")
-  expiresDate           DateTime? @map("expires_date")
-  environment           String    @map("environment") // Sandbox or Production
-  jwsRepresentation     String?   @map("jws_representation") @db.Text // Store the full JWS for verification
-  createdAt             DateTime  @default(now()) @map("created_at")
-
-  user User @relation(fields: [userId], references: [userId], onDelete: Cascade)
-
-  @@index([userId])
-  @@index([originalTransactionId])
-  @@map("transactions")
 }
