@@ -87,11 +87,10 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
 
       const appInfo = data.results[0];
       const latestVersion = appInfo.version;
-      const updateAvailable = compareVersions(current_version, latestVersion) < 0;
-      const updateRequired = isUpdateRequired(current_version, latestVersion);
+      const updateRequired = compareVersions(current_version, latestVersion) < 0;
 
       const responseData = {
-        minimum_version: current_version,
+        minimum_version: latestVersion,
         latest_version: latestVersion,
         force_update: updateRequired,
         update_url: appInfo.trackViewUrl,
@@ -123,13 +122,6 @@ function compareVersions(current: string, latest: string): number {
   }
 
   return 0;
-}
-
-function isUpdateRequired(current: string, latest: string): boolean {
-  const minRequiredVersion = process.env.MIN_REQUIRED_VERSION;
-  if (!minRequiredVersion) return false;
-
-  return compareVersions(current, minRequiredVersion) < 0;
 }
 
 export { router as versionRouter };
