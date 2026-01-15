@@ -48,11 +48,11 @@ interface iTunesResponse {
 router.post('/', async (req: Request, res: Response): Promise<void> => {
   try {
     const validationResult = versionCheckRequestSchema.safeParse(req.body);
-    
+
     if (!validationResult.success) {
-      res.status(400).json({ 
+      res.status(400).json({
         error: 'Invalid request data',
-        details: validationResult.error.errors 
+        details: validationResult.error.errors
       });
       return;
     }
@@ -73,13 +73,13 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
     try {
       const itunesUrl = `https://itunes.apple.com/lookup?bundleId=${bundleId}`;
       const response = await fetch(itunesUrl);
-      
+
       if (!response.ok) {
         throw new Error(`iTunes API error: ${response.status}`);
       }
 
       const data: iTunesResponse = await response.json();
-      
+
       if (data.resultCount === 0) {
         res.status(404).json({ error: 'App not found in App Store' });
         return;
@@ -91,12 +91,10 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
       const updateRequired = isUpdateRequired(current_version, latestVersion);
 
       const responseData = {
-        current_version,
+        minimum_version: current_version,
         latest_version: latestVersion,
-        update_available: updateAvailable,
-        update_required: updateRequired,
-        download_url: appInfo.trackViewUrl,
-        platform: 'ios'
+        force_update: updateRequired,
+        update_url: appInfo.trackViewUrl,
       };
 
       res.json(responseData);
@@ -113,24 +111,24 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
 function compareVersions(current: string, latest: string): number {
   const currentParts = current.split('.').map(Number);
   const latestParts = latest.split('.').map(Number);
-  
+
   const maxLength = Math.max(currentParts.length, latestParts.length);
-  
+
   for (let i = 0; i < maxLength; i++) {
     const currentPart = currentParts[i] || 0;
     const latestPart = latestParts[i] || 0;
-    
+
     if (currentPart < latestPart) return -1;
     if (currentPart > latestPart) return 1;
   }
-  
+
   return 0;
 }
 
 function isUpdateRequired(current: string, latest: string): boolean {
   const minRequiredVersion = process.env.MIN_REQUIRED_VERSION;
   if (!minRequiredVersion) return false;
-  
+
   return compareVersions(current, minRequiredVersion) < 0;
 }
 

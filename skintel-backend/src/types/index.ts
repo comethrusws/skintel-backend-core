@@ -267,12 +267,10 @@ export interface VersionCheckRequest {
 }
 
 export interface VersionCheckResponse {
-  current_version: string;
+  minimum_version: string;
   latest_version: string;
-  update_available: boolean;
-  update_required: boolean;
-  download_url: string;
-  platform: 'ios';
+  force_update: boolean;
+  update_url: string;
 }
 
 export interface ProgressAnalysisItem {
