@@ -262,6 +262,92 @@ def fill_region_with_dots(polygon: np.ndarray, num_dots: int, seed: int = 42) ->
         
     return np.array(dots, dtype=np.int32)
 
+def draw_dashed_lines(img, points: np.ndarray, color: tuple, thickness: int, segment_length: int = 5, gap_length: int = 5):
+    """
+    Draw a dashed connected path along the given points.
+    """
+    if len(points) < 2:
+        return
+
+    # Calculate total distance to normalize segments
+    total_dist = 0
+    dists = []
+    for i in range(len(points) - 1):
+        d = np.linalg.norm(points[i+1] - points[i])
+        dists.append(d)
+        total_dist += d
+    
+    current_dist = 0
+    draw = True
+    
+    # Iterate through points and draw segments
+    for i in range(len(points) - 1):
+        p1 = points[i]
+        p2 = points[i+1]
+        
+        segment_dist = dists[i]
+        if segment_dist == 0: continue
+        
+        # We walk along the segment
+        # Vector from p1 to p2
+        v = p2 - p1
+        v_norm = v / segment_dist
+        
+        # Start drawing from p1
+        curr_pos = p1.astype(float)
+        remaining_seg_dist = segment_dist
+        
+        while remaining_seg_dist > 0:
+            # Determine how much to draw/skip in this step based on segment_length/gap_length state
+            target_len = segment_length if draw else gap_length
+            
+            # Distance we can cover in this line segment
+            step = min(target_len, remaining_seg_dist)
+            
+            next_pos = curr_pos + v_norm * step
+            
+            if draw:
+                cv2.line(img, (int(curr_pos[0]), int(curr_pos[1])), (int(next_pos[0]), int(next_pos[1])), color, thickness, cv2.LINE_AA)
+            
+            # Update state
+            curr_pos = next_pos
+            remaining_seg_dist -= step
+            
+            pass
+                
+    dist_traveled = 0
+    curr_pt = points[0]
+    
+    for i in range(len(points) - 1):
+        next_pt = points[i+1]
+        seg_len = np.linalg.norm(next_pt - curr_pt)
+        if seg_len == 0: continue
+        
+        vec = (next_pt - curr_pt) / seg_len
+        
+        # Walk along this segment
+        processed = 0
+        while processed < seg_len:
+            cycle_pos = (dist_traveled + processed) % (segment_length + gap_length)
+            
+            if cycle_pos < segment_length:
+                dash_left = segment_length - cycle_pos
+                step = min(dash_left, seg_len - processed)
+                
+                start = curr_pt + vec * processed
+                end = curr_pt + vec * (processed + step)
+                
+                cv2.line(img, (int(start[0]), int(start[1])), (int(end[0]), int(end[1])), color, thickness, cv2.LINE_AA)
+            else:
+                # We are in a gap
+                gap_left = (segment_length + gap_length) - cycle_pos
+                step = min(gap_left, seg_len - processed)
+            
+            processed += step
+            
+        dist_traveled += seg_len
+        curr_pt = next_pt
+
 def annotate_image_with_issues(image_array: np.ndarray, issues: List[SkinIssue]) -> str:
     """
     Annotate image with Lovi-style markers:
@@ -341,10 +427,36 @@ def annotate_image_with_issues(image_array: np.ndarray, issues: List[SkinIssue])
             # Determine drawing style
             is_dot_issue = any(t in issue_type_lower for t in DOT_ISSUE_TYPES)
             is_line_issue = any(t in issue_type_lower for t in LINE_ISSUE_TYPES) or is_dark_circle
-            
+            is_lip_issue = 'lip' in region_lower or 'mouth' in region_lower
+
             # --- DRAWING LOGIC ---
             
-            if is_dark_circle:
+            if is_lip_issue:
+                # Dotted/Dashed line around the lips
+                # 1. Smooth the points
+                points_to_smooth = points
+                if len(points) > 2:
+                    # Close the loop for lips if it's the full lip contour
+                    if len(points) >= 12: # Full lip usually has many points
+                         points_to_smooth = np.vstack((points, points[0]))
+                    
+                    try:
+                        tck, u = splprep(points_to_smooth.T, u=None, s=5.0, per=1 if len(points) >= 12 else 0)
+                        u_new = np.linspace(0, 1, len(points) * 5)
+                        x_new, y_new = splev(u_new, tck, der=0)
+                        curve_pts = np.column_stack((x_new, y_new)).astype(np.int32)
+                    except:
+                        curve_pts = points
+                else:
+                    curve_pts = points
+
+                # 2. Draw dashed lines
+                draw_dashed_lines(overlay, curve_pts, LINE_COLOR, LINE_THICKNESS, segment_length=4, gap_length=4)
+                
+                # Store points for metadata
+                issue.dlib_68_facial_landmarks = [IssuePoint(x=int(p[0]), y=int(p[1])) for p in curve_pts]
+
+            elif is_dark_circle:
                 # Force a smooth downward curve (crescent)
                 sorted_pts = points[np.argsort(points[:, 0])]
                 offset_y = int(h * 0.015)
