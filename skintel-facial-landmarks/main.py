@@ -370,7 +370,7 @@ def annotate_image_with_issues(image_array: np.ndarray, issues: List[SkinIssue])
     DOT_RADIUS = 3
     DOT_COLOR = (255, 255, 255)
     LINE_COLOR = (255, 255, 255)
-    LINE_THICKNESS = 2
+    LINE_THICKNESS = 1
     
     # Issues drawn as lines
     LINE_ISSUE_TYPES = [
@@ -451,7 +451,7 @@ def annotate_image_with_issues(image_array: np.ndarray, issues: List[SkinIssue])
                     curve_pts = points
 
                 # 2. Draw dashed lines
-                draw_dashed_lines(overlay, curve_pts, LINE_COLOR, LINE_THICKNESS, segment_length=4, gap_length=4)
+                draw_dashed_lines(overlay, curve_pts, LINE_COLOR, LINE_THICKNESS, segment_length=10, gap_length=10)
                 
                 # Store points for metadata
                 issue.dlib_68_facial_landmarks = [IssuePoint(x=int(p[0]), y=int(p[1])) for p in curve_pts]
