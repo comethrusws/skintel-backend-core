@@ -9,13 +9,23 @@ export class QuestionOfTheDayService {
       Generate 7 distinct, engaging, and skincare-related "Questions of the Day" for the upcoming week.
       These questions should encourage users to reflect on their skin health, habits, or product usage.
       
+      Requirements:
+      - 4 options per question.
+      - One correct option marked as correct.
+      - Educational and fun.
+      
       Respond strictly in the following JSON format:
       {
         "questions": [
           { 
-            "question": "How much water did you drink today?", 
-            "options": ["Less than 4 glasses", "4-6 glasses", "8+ glasses"],
-            "category": "Hydration"
+            "question": "Which ingredient is best for hydration?", 
+            "options": [
+              { "text": "Hyaluronic Acid", "isCorrect": true },
+              { "text": "Salicylic Acid", "isCorrect": false },
+              { "text": "Retinol", "isCorrect": false },
+              { "text": "Benzoyl Peroxide", "isCorrect": false }
+            ],
+            "category": "Ingredients"
           },
           ...
         ]
@@ -33,7 +43,7 @@ export class QuestionOfTheDayService {
             });
 
             const content = completion.choices?.[0]?.message?.content || '{}';
-            const parsed = JSON.parse(content) as { questions: { question: string; options?: string[]; category?: string }[] };
+            const parsed = JSON.parse(content) as { questions: { question: string; options: { text: string; isCorrect: boolean }[]; category?: string }[] };
 
             if (!parsed.questions || parsed.questions.length !== 7) {
                 console.error('Invalid response from OpenAI:', content);
@@ -53,13 +63,13 @@ export class QuestionOfTheDayService {
                     where: { date: questionDate },
                     update: {
                         question: q.question,
-                        options: q.options || [],
+                        options: q.options, // Prisma stores JSON automatically
                         category: q.category
                     },
                     create: {
                         date: questionDate,
                         question: q.question,
-                        options: q.options || [],
+                        options: q.options,
                         category: q.category
                     }
                 });
@@ -72,7 +82,7 @@ export class QuestionOfTheDayService {
         }
     }
 
-    static async getQuestionForToday(): Promise<{ question: string; options: string[]; category: string | null } | null> {
+    static async getQuestionForToday(): Promise<{ question: string; options: { text: string; isCorrect: boolean }[]; category: string | null } | null> {
         const today = new Date();
         today.setHours(0, 0, 0, 0);
 
@@ -95,14 +105,18 @@ export class QuestionOfTheDayService {
         if (!q) {
             return {
                 question: "How is your skin feeling today?",
-                options: ["Great", "Okay", "Needs attention"],
+                options: [
+                    { text: "Great", isCorrect: true },
+                    { text: "Okay", isCorrect: false },
+                    { text: "Needs attention", isCorrect: false }
+                ],
                 category: "General"
             };
         }
 
         return {
             question: q.question,
-            options: (q.options as string[]) || [],
+            options: (q.options as unknown as { text: string; isCorrect: boolean }[]) || [],
             category: q.category
         };
     }

@@ -3,6 +3,8 @@ import { SkinTipService } from './services/skinTip';
 import { NotificationService } from './services/notifications';
 import { ProfileService } from './services/profile';
 import { RoutineMessageService } from './services/routineMessage';
+import { QuestionOfTheDayService } from './services/questionOfTheDay';
+import { CheckInService } from './services/checkIn';
 
 export function initCronJobs() {
     console.log('Initializing cron jobs...');
@@ -23,6 +25,26 @@ export function initCronJobs() {
             await RoutineMessageService.generateWeeklyMessages();
         } catch (error) {
             console.error('Error in weekly routine message generation cron job:', error);
+        }
+    });
+
+    // Weekly Question of the Day Generation (Sunday at midnight)
+    cron.schedule('0 0 * * 0', async () => {
+        console.log('Running weekly question generation cron job...');
+        try {
+            await QuestionOfTheDayService.generateWeeklyQuestions();
+        } catch (error) {
+            console.error('Error in weekly question generation cron job:', error);
+        }
+    });
+
+    // Weekly Daily Check-in Generation (Sunday at midnight)
+    cron.schedule('0 0 * * 0', async () => {
+        console.log('Running weekly check-in generation cron job...');
+        try {
+            await CheckInService.generateWeeklyCheckIns();
+        } catch (error) {
+            console.error('Error in weekly check-in generation cron job:', error);
         }
     });
 
@@ -71,23 +93,9 @@ export function initCronJobs() {
         }
     });
 
-    // Weekly Question of the Day Generation (Sunday at midnight)
-    /*
-    cron.schedule('0 0 * * 0', async () => {
-        console.log('Running weekly question generation cron job...');
-        try {
-            await QuestionOfTheDayService.generateWeeklyQuestions();
-        } catch (error) {
-            console.error('Error in weekly question generation cron job:', error);
-        }
-    });
-    */
-
     // Question of the Day Notification (11:00 AM)
-    /*
     cron.schedule('0 11 * * *', async () => {
         await NotificationService.sendQuestionOfTheDay();
     });
-    */
     console.log('Cron jobs initialized.');
 }

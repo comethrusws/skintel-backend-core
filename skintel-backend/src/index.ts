@@ -40,6 +40,8 @@ import { reportRouter } from './routes/report';
 import { notificationsRouter } from './routes/notifications';
 import { clerk } from './lib/clerk';
 import { paymentRouter } from './routes/payment';
+import { questionsRouter } from './routes/questions';
+import { CheckInService } from './services/checkIn';
 import { errorHandler, notFoundHandler } from './middleware/error';
 
 const app: Express = express();
@@ -85,6 +87,7 @@ app.use('/v1/skin-feel', skinFeelRouter);
 app.use('/v1/report', reportRouter);
 app.use('/v1/notifications', notificationsRouter);
 app.use('/v1/payment', paymentRouter);
+app.use('/v1/questions', questionsRouter);
 
 // Swagger documentation
 app.use('/docs', swaggerUi.serve, swaggerUi.setup(specs, {
@@ -134,4 +137,5 @@ app.listen(port, async () => {
   initCronJobs();
   await SkinTipService.ensureTipsForWeek();
   await QuestionOfTheDayService.ensureQuestionsForWeek();
+  await CheckInService.ensureCheckInsForWeek();
 });
