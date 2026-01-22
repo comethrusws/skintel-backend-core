@@ -726,7 +726,6 @@ export async function analyzeWithLandmarks(frontImageUrl: string, landmarks: obj
       console.error('Background annotation failed for analyzeWithLandmarks:', err);
     });
   }
-
   // Track Scan Completed Event
   MetaConversionService.sendEvent(
     'scan_completed',
@@ -762,21 +761,37 @@ async function generateAnnotatedImageBackground(
         prefix: 'annotated-issues'
       });
 
+      // Get the current analysis to preserve existing data
+      const currentRecord = await prisma.facialLandmarks.findUnique({
+        where: { answerId },
+        select: { analysis: true }
+      });
+
+      let currentAnalysis = currentRecord?.analysis ?
+        (typeof currentRecord.analysis === 'string' ? JSON.parse(currentRecord.analysis) : currentRecord.analysis)
+        : {};
+
+      // Add SVG overlays to the analysis JSON so they're available in responses
+      currentAnalysis.svg_overlays = annotationResponse.data.svg_overlays || [];
+
+      // Update issues with corrected MediaPipe landmarks if provided
+      if (annotationResponse.data.issues) {
+        currentAnalysis.issues = annotationResponse.data.issues;
+      }
+
       await prisma.facialLandmarks.update({
         where: { answerId },
         data: {
-          annotatedImageUrl: uploadResult.url
+          annotatedImageUrl: uploadResult.url,
+          analysis: currentAnalysis as any
         }
       });
 
-      console.log(`[Background] Annotated image updated for answer ${answerId}`);
+      console.log(`[Background] Annotated image and SVG overlays updated for answer ${answerId}`);
     }
   } catch (annotationError) {
     console.error('Failed to generate annotated image in background:', annotationError);
   }
-
-
-
 }
 
 // Export these for the optimized functions

@@ -2,6 +2,7 @@ import { prisma } from '../lib/prisma';
 import { Prisma } from '@prisma/client';
 import { getTaskProgress } from './tasks';
 import { maybePresignUrl, deleteFileFromUrl } from '../lib/s3';
+import axios from 'axios';
 import { PROFILE_QUESTIONS, PROFILE_SCREEN_ID, getProfileQuestion, validateProfileQuestionValue, mapOptionsWithLabels, formatOptionLabel } from '../lib/profileQuestions';
 import { VALID_QUESTION_IDS, getExpectedType, getValidValues, formatLabel, getQuestionText } from '../utils/validation';
 
@@ -180,7 +181,7 @@ export class ProfileService {
 
         return {
             user_id: userId,
-            analysis: facialLandmarks.map(landmark => {
+            analysis: await Promise.all(facialLandmarks.map(async (landmark) => {
                 let weeklyPlan = landmark.weeklyPlan ?
                     (typeof landmark.weeklyPlan === 'string' ? JSON.parse(landmark.weeklyPlan) : landmark.weeklyPlan)
                     : null;
@@ -209,6 +210,60 @@ export class ProfileService {
                     analysisData = restAnalysis;
                 }
 
+                // Always return a viewable front image URL (presigned) for the frontend.
+                let frontProfileUrl: string | null = null;
+                try {
+                    const frontFaceAnswer = await prisma.onboardingAnswer.findUnique({
+                        where: { answerId: landmark.answerId },
+                        select: { value: true }
+                    });
+                    const value = frontFaceAnswer?.value as any;
+                    if (value?.image_url) {
+                        frontProfileUrl = await maybePresignUrl(value.image_url, 86400);
+                    }
+                } catch {
+                    // ignore
+                }
+
+                // svg overlays:
+                // - PROGRESS: can be returned/stored elsewhere; if present in analysis JSON, surface it.
+                // - INITIAL: DO NOT store svg overlays; compute on-demand here when asked.
+                let svgOverlays: any[] | null = (analysisData as any)?.svg_overlays ?? null;
+                if (landmark.analysisType === 'INITIAL') {
+                    svgOverlays = null; // ensure we don't rely on persisted svg overlays for INITIAL
+                    const issues = (analysisData as any)?.issues;
+                    if (frontProfileUrl && Array.isArray(issues) && issues.length > 0) {
+                        try {
+                            const microserviceUrl =
+                                process.env.LANDMARK_URL ||
+                                process.env.FACIAL_LANDMARKS_API_URL ||
+                                'http://localhost:8000';
+
+                            const annotationResponse = await axios.post(`${microserviceUrl}/api/v1/annotate-issues-from-url`, {
+                                image_url: frontProfileUrl,
+                                issues
+                            });
+
+                            if (annotationResponse.data?.status === 'success') {
+                                svgOverlays = annotationResponse.data.svg_overlays || [];
+                                // Use updated issues (microservice may adjust landmarks)
+                                if (annotationResponse.data.issues) {
+                                    (analysisData as any).issues = annotationResponse.data.issues;
+                                }
+                            }
+                        } catch (e) {
+                            // if this fails, keep svgOverlays null
+                        }
+                    }
+                }
+
+                // Remove any embedded svg_overlays from analysis payload to avoid duplication,
+                // while still returning svg_overlays at top-level.
+                if (analysisData && (analysisData as any).svg_overlays) {
+                    const { svg_overlays, ...rest } = analysisData as any;
+                    analysisData = rest;
+                }
+
                 return {
                     answer_id: landmark.answerId,
                     question_id: landmark.answer.questionId,
@@ -222,9 +277,12 @@ export class ProfileService {
                     status: landmark.status,
                     processed_at: landmark.processedAt?.toISOString(),
                     created_at: landmark.createdAt.toISOString(),
-                    error: landmark.error
+                    error: landmark.error,
+                    annotated_image_url: landmark.annotatedImageUrl ? await maybePresignUrl(landmark.annotatedImageUrl, 86400) : null,
+                    svg_overlays: svgOverlays,
+                    front_profile_url: frontProfileUrl
                 };
-            })
+            }))
         };
     }
 
