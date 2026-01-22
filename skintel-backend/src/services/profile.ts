@@ -226,11 +226,12 @@ export class ProfileService {
                 }
 
                 // svg overlays:
+                // - INITIAL: Try to use stored svg_overlays from analysis; if not available, compute on-demand
                 // - PROGRESS: can be returned/stored elsewhere; if present in analysis JSON, surface it.
-                // - INITIAL: DO NOT store svg overlays; compute on-demand here when asked.
                 let svgOverlays: any[] | null = (analysisData as any)?.svg_overlays ?? null;
-                if (landmark.analysisType === 'INITIAL') {
-                    svgOverlays = null; // ensure we don't rely on persisted svg overlays for INITIAL
+                
+                // For INITIAL analysis, if SVG overlays aren't in the stored analysis, compute them on-demand
+                if (landmark.analysisType === 'INITIAL' && (!svgOverlays || svgOverlays.length === 0)) {
                     const issues = (analysisData as any)?.issues;
                     if (frontProfileUrl && Array.isArray(issues) && issues.length > 0) {
                         try {
@@ -252,7 +253,7 @@ export class ProfileService {
                                 }
                             }
                         } catch (e) {
-                            // if this fails, keep svgOverlays null
+                            // if this fails, keep svgOverlays as is
                         }
                     }
                 }

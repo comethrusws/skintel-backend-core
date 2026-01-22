@@ -482,23 +482,51 @@ export async function analyzeSkin(answerId: string, clientIp?: string, clientUse
     parsed = { raw: content } as any;
   }
 
+  // Generate annotated image and SVG overlays
+  let annotatedImageUrl: string | null = null;
+  let analysisWithOverlays = parsed as any;
+
   if (parsed.issues && parsed.issues.length > 0 && faceImages.front) {
-    generateAnnotatedImageBackground(faceImages.front, parsed.issues, answerId).catch(err => {
-      console.error('Background annotation failed for analyzeSkin:', err);
-    });
+    try {
+      const presignedUrl = await maybePresignUrl(faceImages.front, 300);
+      const microserviceUrl = process.env.LANDMARK_URL || process.env.FACIAL_LANDMARKS_API_URL || 'http://localhost:8000';
+
+      const annotationResponse = await axios.post(`${microserviceUrl}/api/v1/annotate-issues-from-url`, {
+        image_url: presignedUrl,
+        issues: parsed.issues
+      });
+
+      if (annotationResponse.data.status === 'success' && annotationResponse.data.annotated_image) {
+        const uploadResult = await uploadImageToS3({
+          imageBase64: annotationResponse.data.annotated_image,
+          prefix: 'annotated-issues'
+        });
+        annotatedImageUrl = uploadResult.url;
+
+        // Add SVG overlays to the analysis
+        analysisWithOverlays.svg_overlays = annotationResponse.data.svg_overlays || [];
+
+        // Use updated issues (microservice may adjust landmarks)
+        if (annotationResponse.data.issues) {
+          analysisWithOverlays.issues = annotationResponse.data.issues;
+        }
+      }
+    } catch (annotationError) {
+      console.error('Failed to generate annotated image in analyzeSkin:', annotationError);
+    }
   }
 
   try {
     await prisma.facialLandmarks.update({
       where: { answerId },
       data: {
-        analysis: parsed as any,
+        analysis: analysisWithOverlays,
         score: parsed.score || null,
         weeklyPlan: parsed.care_plan_4_weeks as any,
         analysisType: analysisTypeInfo.type,
         planStartDate: analysisTypeInfo.planStartDate,
         planEndDate: analysisTypeInfo.planEndDate,
-        annotatedImageUrl: null
+        annotatedImageUrl: annotatedImageUrl
       }
     });
   } catch (dbError) {
@@ -720,11 +748,38 @@ export async function analyzeWithLandmarks(frontImageUrl: string, landmarks: obj
     return { raw: content } as any;
   }
 
-  // generation of annotated image in background
-  if (parsed.issues && parsed.issues.length > 0) {
-    generateAnnotatedImageBackground(frontImageUrl, parsed.issues, answerId).catch(err => {
-      console.error('Background annotation failed for analyzeWithLandmarks:', err);
-    });
+  // Generate annotated image and SVG overlays
+  let annotatedImageUrl: string | null = null;
+  let analysisWithOverlays = parsed as any;
+
+  if (parsed.issues && parsed.issues.length > 0 && frontImageUrl) {
+    try {
+      const presignedUrl = await maybePresignUrl(frontImageUrl, 300);
+      const microserviceUrl = process.env.LANDMARK_URL || process.env.FACIAL_LANDMARKS_API_URL || 'http://localhost:8000';
+
+      const annotationResponse = await axios.post(`${microserviceUrl}/api/v1/annotate-issues-from-url`, {
+        image_url: presignedUrl,
+        issues: parsed.issues
+      });
+
+      if (annotationResponse.data.status === 'success' && annotationResponse.data.annotated_image) {
+        const uploadResult = await uploadImageToS3({
+          imageBase64: annotationResponse.data.annotated_image,
+          prefix: 'annotated-issues'
+        });
+        annotatedImageUrl = uploadResult.url;
+
+        // Add SVG overlays to the analysis
+        analysisWithOverlays.svg_overlays = annotationResponse.data.svg_overlays || [];
+
+        // Use updated issues (microservice may adjust landmarks)
+        if (annotationResponse.data.issues) {
+          analysisWithOverlays.issues = annotationResponse.data.issues;
+        }
+      }
+    } catch (annotationError) {
+      console.error('Failed to generate annotated image in analyzeWithLandmarks:', annotationError);
+    }
   }
   // Track Scan Completed Event
   MetaConversionService.sendEvent(
@@ -738,7 +793,7 @@ export async function analyzeWithLandmarks(frontImageUrl: string, landmarks: obj
     'analysis/complete_url'
   ).catch(e => console.error('Meta event failed', e));
 
-  return { ...parsed, annotatedImageUrl: null };
+  return { ...analysisWithOverlays, annotatedImageUrl };
 }
 
 async function generateAnnotatedImageBackground(
