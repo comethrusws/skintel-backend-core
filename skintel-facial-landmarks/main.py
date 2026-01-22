@@ -36,6 +36,33 @@ LANDMARK_INDICES = {
     't_zone': [10, 151, 9, 8, 168, 6, 197, 195, 5, 4, 1, 19, 94, 2]
 }
 
+ISSUE_TYPE_COLORS = {
+    'wrinkles': '#FFFFFF',
+    'wrinkle': '#FFFFFF',
+    'fine_lines': '#F5F5DC',
+    'fine lines': '#F5F5DC',
+    'crow_feet': '#FFFACD',
+    'nasolabial_folds': '#FFF8DC',
+    'lines': '#FFFFF0',
+    'freckles': '#FFB380',
+    'moles': '#D2691E',
+    'pores': '#40E0D0',
+    'visible_pores': '#48D1CC',
+    'acne': '#FF69B4',
+    'pimple': '#FF85C1',
+    'blackheads': '#9370DB',
+    'spots': '#FFA07A',
+    'blemishes': '#F08080',
+    'redness': '#FF6B6B',
+    'dark_circles': '#E6E6FA',
+    'eye_bags': '#DDA0DD',
+    'puffy_eyes': '#D8BFD8',
+    'under_eye_circles': '#E0B0FF',
+    'uneven_skin_tone': '#FFE4B5',
+    'hyperpigmentation': '#FFDAB9',
+    'default': '#FFFFFF'
+}
+
 def get_region_landmarks(region_name: str, is_dark_circle: bool = False) -> List[int]:
     region_name = region_name.lower()
     
@@ -126,9 +153,16 @@ class SkinIssue(BaseModel):
     recommendations: Optional[List[str]] = None
     dlib_68_facial_landmarks: List[IssuePoint]
 
+class SvgOverlay(BaseModel):
+    issue_type: str
+    color: str
+    svg_content: str
+    issue_count: int
+
 class IssueAnnotationResponse(BaseModel):
     status: str
     annotated_image: str
+    svg_overlays: List[SvgOverlay]
     total_issues: int
     issues: List[SkinIssue]
     image_info: ImageInfo
@@ -347,6 +381,178 @@ def draw_dashed_lines(img, points: np.ndarray, color: tuple, thickness: int, seg
             
         dist_traveled += seg_len
         curr_pt = next_pt
+
+def get_issue_color(issue_type: str) -> str:
+    issue_key = issue_type.lower().replace(' ', '_')
+    return ISSUE_TYPE_COLORS.get(issue_key, ISSUE_TYPE_COLORS['default'])
+
+def create_svg_circles_for_dots(points: np.ndarray, color: str, radius: int = 3) -> str:
+    svg_elements = []
+    for pt in points:
+        svg_elements.append(f'<circle cx="{pt[0]}" cy="{pt[1]}" r="{radius}" fill="{color}" fill-opacity="0.75"/>')
+    return '\\n'.join(svg_elements)
+
+def create_svg_polyline(points: np.ndarray, color: str, stroke_width: int = 1) -> str:
+    points_str = ' '.join([f"{int(pt[0])},{int(pt[1])}" for pt in points])
+    return f'<polyline points="{points_str}" stroke="{color}" stroke-width="{stroke_width}" fill="none" stroke-opacity="0.75" stroke-linecap="round"/>'
+
+def create_svg_dashed_polyline(points: np.ndarray, color: str, stroke_width: int = 1, dash_array: str = "10,10") -> str:
+    points_str = ' '.join([f"{int(pt[0])},{int(pt[1])}" for pt in points])
+    return f'<polyline points="{points_str}" stroke="{color}" stroke-width="{stroke_width}" fill="none" stroke-opacity="0.75" stroke-dasharray="{dash_array}" stroke-linecap="round"/>'
+
+def generate_svg_overlay_for_issue(
+    issue: SkinIssue, 
+    face_landmarks, 
+    image_width: int, 
+    image_height: int
+) -> str:
+    issue_type_lower = issue.type.lower().replace(' ', '_')
+    region_lower = issue.region.lower()
+    color = get_issue_color(issue.type)
+    
+    LINE_ISSUE_TYPES = [
+        'wrinkles', 'wrinkle', 'fine_lines', 'fine lines', 
+        'crow_feet', 'nasolabial_folds', 'lines'
+    ]
+    
+    DOT_ISSUE_TYPES = [
+        'acne', 'pimple', 'moles', 'freckles', 'pores', 
+        'blackheads', 'spots', 'blemishes', 'redness'
+    ]
+    
+    is_dark_circle = issue_type_lower in ['dark_circles', 'eye_bags', 'puffy_eyes', 'under_eye_circles']
+    
+    if is_dark_circle:
+        if 'left' in region_lower:
+            indices = [362, 382, 381, 380, 374, 373, 390, 249, 263]
+        elif 'right' in region_lower:
+            indices = [33, 7, 163, 144, 145, 153, 154, 155, 133]
+        else:
+            indices = [362, 382, 381, 380, 374, 373, 390, 249, 263]
+    elif issue_type_lower in ['uneven_skin_tone', 'hyperpigmentation']:
+        if 'cheek' in region_lower:
+            indices = LANDMARK_INDICES['left_cheek'] if 'left' in region_lower else LANDMARK_INDICES['right_cheek']
+        else:
+            indices = get_region_landmarks(issue.region)
+    else:
+        indices = get_region_landmarks(issue.region)
+    
+    points = []
+    for index in indices:
+        lm = face_landmarks.landmark[index]
+        x, y = int(lm.x * image_width), int(lm.y * image_height)
+        points.append([x, y])
+    points = np.array(points, dtype=np.int32)
+    
+    if len(points) == 0:
+        return ''
+    
+    is_dot_issue = any(t in issue_type_lower for t in DOT_ISSUE_TYPES)
+    is_line_issue = any(t in issue_type_lower for t in LINE_ISSUE_TYPES) or is_dark_circle
+    is_lip_issue = 'lip' in region_lower or 'mouth' in region_lower
+    
+    svg_content = ''
+    
+    if is_lip_issue:
+        points_to_smooth = points
+        if len(points) > 2:
+            if len(points) >= 12:
+                points_to_smooth = np.vstack((points, points[0]))
+            
+            try:
+                tck, u = splprep(points_to_smooth.T, u=None, s=5.0, per=1 if len(points) >= 12 else 0)
+                u_new = np.linspace(0, 1, len(points) * 5)
+                x_new, y_new = splev(u_new, tck, der=0)
+                curve_pts = np.column_stack((x_new, y_new)).astype(np.int32)
+            except:
+                curve_pts = points
+        else:
+            curve_pts = points
+        
+        svg_content = create_svg_dashed_polyline(curve_pts, color)
+        issue.dlib_68_facial_landmarks = [IssuePoint(x=int(p[0]), y=int(p[1])) for p in curve_pts]
+    
+    elif is_dark_circle:
+        sorted_pts = points[np.argsort(points[:, 0])]
+        offset_y = int(image_height * 0.015)
+        sorted_pts[:, 1] += offset_y
+        
+        try:
+            tck, u = splprep(sorted_pts.T, u=None, s=30.0, per=0)
+            u_new = np.linspace(0, 1, 40)
+            x_new, y_new = splev(u_new, tck, der=0)
+            curve_pts = np.column_stack((x_new, y_new)).astype(np.int32)
+            svg_content = create_svg_polyline(curve_pts, color)
+        except:
+            svg_content = create_svg_polyline(sorted_pts, color)
+    
+    elif is_line_issue and len(points) > 3:
+        sorted_pts = points[np.argsort(points[:, 0])]
+        try:
+            tck, u = splprep(sorted_pts.T, u=None, s=15.0, per=0)
+            u_new = np.linspace(0, 1, 40)
+            x_new, y_new = splev(u_new, tck, der=0)
+            curve_pts = np.column_stack((x_new, y_new)).astype(np.int32)
+            svg_content = create_svg_polyline(curve_pts, color)
+        except:
+            svg_content = create_svg_polyline(sorted_pts, color)
+    
+    elif is_dot_issue:
+        severity_map = {'mild': 12, 'moderate': 25, 'severe': 45}
+        num_dots = severity_map.get(issue.severity.lower(), 15)
+        
+        scatter_points = fill_region_with_dots(points, num_dots, seed=42)
+        svg_content = create_svg_circles_for_dots(scatter_points, color)
+        issue.dlib_68_facial_landmarks = [IssuePoint(x=int(p[0]), y=int(p[1])) for p in scatter_points]
+    
+    else:
+        center = np.mean(points, axis=0).astype(int)
+        svg_content = create_svg_circles_for_dots(np.array([center]), color, radius=4)
+        issue.dlib_68_facial_landmarks = [IssuePoint(x=int(center[0]), y=int(center[1]))]
+    
+    return svg_content
+
+def generate_svg_overlays(image_array: np.ndarray, issues: List[SkinIssue]) -> List[SvgOverlay]:
+    results = face_mesh.process(image_array)
+    
+    if not results.multi_face_landmarks:
+        logger.warning("No face detected by MediaPipe for SVG generation")
+        return []
+    
+    face_landmarks = results.multi_face_landmarks[0]
+    h, w, _ = image_array.shape
+    
+    issue_type_groups = {}
+    for issue in issues:
+        issue_type = issue.type.lower().replace(' ', '_')
+        if issue_type not in issue_type_groups:
+            issue_type_groups[issue_type] = []
+        issue_type_groups[issue_type].append(issue)
+    
+    svg_overlays = []
+    
+    for issue_type, type_issues in issue_type_groups.items():
+        color = get_issue_color(issue_type)
+        svg_elements = []
+        
+        for issue in type_issues:
+            svg_element = generate_svg_overlay_for_issue(issue, face_landmarks, w, h)
+            if svg_element:
+                svg_elements.append(svg_element)
+        
+        if svg_elements:
+            svg_content = f'<svg xmlns="http://www.w3.org/2000/svg" width="{w}" height="{h}" viewBox="0 0 {w} {h}">\n'
+            svg_content += '\n'.join(svg_elements)
+            svg_content += '\n</svg>'
+            
+            svg_overlays.append(SvgOverlay(
+                issue_type=issue_type,
+                color=color,
+                svg_content=svg_content,
+                issue_count=len(type_issues)
+            ))
+    
+    return svg_overlays
 
 def annotate_image_with_issues(image_array: np.ndarray, issues: List[SkinIssue]) -> str:
     """
@@ -696,11 +902,14 @@ async def annotate_skin_issues_from_url(request: AnnotationRequest):
         
         annotated_image_data = annotate_image_with_issues(image_array, issues)
         
+        svg_overlays = generate_svg_overlays(image_array, issues)
+        
         filename = parsed_url.path.split('/')[-1] or "image_from_url"
         
         return IssueAnnotationResponse(
             status="success",
             annotated_image=annotated_image_data,
+            svg_overlays=svg_overlays,
             total_issues=len(issues),
             issues=issues,
             image_info=ImageInfo(
