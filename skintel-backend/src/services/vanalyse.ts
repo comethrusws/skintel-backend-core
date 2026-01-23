@@ -187,6 +187,23 @@ export class VanalyseService {
         const estimatedWeeklyScores = initialAnalysisData?.estimated_weekly_scores || null;
         const updatedWeeklyScores = currentAnalysis?.updated_weekly_scores || null;
 
+        // Get annotated image URL and SVG overlays from progress update
+        const annotatedImageUrl = progressUpdate?.annotatedImageUrl || null;
+        const svgOverlays = progressUpdate?.svgOverlays || [];
+        
+        // Get presigned URL for front profile image
+        const frontProfileUrl = await maybePresignUrl(front_image_url, 86400);
+        
+        // Get presigned URL for annotated image if available
+        let presignedAnnotatedImageUrl = null;
+        if (annotatedImageUrl) {
+            try {
+                presignedAnnotatedImageUrl = await maybePresignUrl(annotatedImageUrl, 86400);
+            } catch (err) {
+                console.error('Failed to presign annotated image URL:', err);
+            }
+        }
+
         return {
             answer_id: answerId,
             current_analysis: currentAnalysis,
@@ -205,7 +222,10 @@ export class VanalyseService {
             initial_analysis: {
                 issues: initialAnalysisData?.issues || [],
                 overall_assessment: initialAnalysisData?.overall_assessment || null
-            }
+            },
+            annotated_image_url: presignedAnnotatedImageUrl,
+            svg_overlays: svgOverlays,
+            front_profile_url: frontProfileUrl
         };
     }
 
@@ -336,13 +356,31 @@ export class VanalyseService {
             parsed = { raw: content };
         }
 
+        let annotatedImageUrl: string | null = null;
+        let svgOverlays: any[] = [];
+
         if (parsed.current_issues && parsed.current_issues.length > 0 && presignedUrls.front) {
-            this.generateAnnotatedImageBackground(presignedUrls.front, parsed.current_issues, userId, answerId).catch(err => {
-                console.error('Background annotation failed:', err);
-            });
+            try {
+                const annotationResult = await this.generateAnnotatedImageBackground(
+                    presignedUrls.front,
+                    parsed.current_issues,
+                    userId,
+                    answerId
+                );
+                if (annotationResult) {
+                    annotatedImageUrl = annotationResult.annotatedImageUrl;
+                    svgOverlays = annotationResult.svgOverlays || [];
+                    // Update issues with correct MediaPipe landmarks if provided
+                    if (annotationResult.issues) {
+                        parsed.current_issues = annotationResult.issues;
+                    }
+                }
+            } catch (err) {
+                console.error('Annotation failed:', err);
+            }
         }
 
-        return { ...parsed, annotatedImageUrl: null };
+        return { ...parsed, annotatedImageUrl, svgOverlays };
     }
 
     private static async generateAnnotatedImageBackground(
@@ -350,9 +388,9 @@ export class VanalyseService {
         issues: any[],
         userId: string,
         answerId: string
-    ) {
+    ): Promise<{ annotatedImageUrl: string | null; svgOverlays: any[]; issues?: any[] } | null> {
         try {
-            const microserviceUrl = process.env.LANDMARK_URL || 'http://localhost:8000';
+            const microserviceUrl = process.env.LANDMARK_URL || process.env.FACIAL_LANDMARKS_API_URL || 'http://localhost:8000';
 
             const annotationResponse = await axios.post(`${microserviceUrl}/api/v1/annotate-issues-from-url`, {
                 image_url: imageUrl,
@@ -373,9 +411,17 @@ export class VanalyseService {
                 });
 
                 console.log(`[Background] Annotated image updated for answer ${answerId}`);
+
+                return {
+                    annotatedImageUrl: uploadResult.url,
+                    svgOverlays: annotationResponse.data.svg_overlays || [],
+                    issues: annotationResponse.data.issues
+                };
             }
+            return null;
         } catch (annotationError) {
             console.error('Failed to generate annotated image in background:', annotationError);
+            return null;
         }
     }
 

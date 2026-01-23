@@ -112,6 +112,33 @@ const progressAnalysisSchema = z.object({
  *                   type: string
  *                 plan_end_date:
  *                   type: string
+ *                 annotated_image_url:
+ *                   type: string
+ *                   format: uri
+ *                   description: Presigned URL to the annotated front profile image with issue overlays
+ *                   nullable: true
+ *                 svg_overlays:
+ *                   type: array
+ *                   description: SVG overlays for each issue type, returned from facial landmarks service
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       issue_type:
+ *                         type: string
+ *                         description: Type of skin issue (e.g., wrinkles, acne, dark_circles)
+ *                       color:
+ *                         type: string
+ *                         description: Color code for the issue type overlay
+ *                       svg_content:
+ *                         type: string
+ *                         description: SVG markup for rendering the overlay
+ *                       issue_count:
+ *                         type: number
+ *                         description: Number of issues of this type
+ *                 front_profile_url:
+ *                   type: string
+ *                   format: uri
+ *                   description: Presigned URL to the original front profile image
  *       400:
  *         description: Missing required data or no active plan
  *       401:
