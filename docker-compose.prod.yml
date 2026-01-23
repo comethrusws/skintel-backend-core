@@ -41,6 +41,8 @@ services:
       - APPLE_BUNDLE_ID=${APPLE_BUNDLE_ID}
       - APPLE_API_URL_PRODUCTION=${APPLE_API_URL_PRODUCTION}
       - APPLE_API_URL_SANDBOX=${APPLE_API_URL_SANDBOX}
+      - META_ACCESS_TOKEN=${META_ACCESS_TOKEN}
+      - META_PIXEL_ID=${META_PIXEL_ID}
     depends_on:
       migrate:
         condition: service_completed_successfully
