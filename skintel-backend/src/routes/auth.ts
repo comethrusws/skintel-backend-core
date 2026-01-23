@@ -218,7 +218,9 @@ router.post('/signup', asyncHandler(async (req: Request, res: Response) => {
     return;
   }
 
-  const response = await AuthService.signup(validationResult.data);
+  const clientIp = (req.headers['x-forwarded-for'] as string) || req.ip;
+  const clientUserAgent = req.headers['user-agent'];
+  const response = await AuthService.signup(validationResult.data, clientIp, clientUserAgent);
   res.status(201).json(response);
 }));
 
@@ -248,7 +250,9 @@ router.post('/sso', asyncHandler(async (req: Request, res: Response) => {
     return;
   }
 
-  const response = await AuthService.sso(validationResult.data);
+  const clientIp = (req.headers['x-forwarded-for'] as string) || req.ip;
+  const clientUserAgent = req.headers['user-agent'];
+  const response = await AuthService.sso(validationResult.data, clientIp, clientUserAgent);
   res.json(response);
 }));
 

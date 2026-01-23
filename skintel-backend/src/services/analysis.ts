@@ -3,6 +3,7 @@ import OpenAI from 'openai';
 import { maybePresignUrl, uploadImageToS3 } from '../lib/s3';
 import axios from 'axios';
 import { EnhancedAnalysisResult } from '../types';
+import { MetaConversionService } from './meta';
 
 const OPENAI_MODEL = process.env.OPENAI_MODEL || 'gpt-5-mini';
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
@@ -363,7 +364,7 @@ async function determineAnalysisType(userId: string | null, sessionId: string | 
   }
 }
 
-export async function analyzeSkin(answerId: string) {
+export async function analyzeSkin(answerId: string, clientIp?: string, clientUserAgent?: string) {
   if (!process.env.OPENAI_API_KEY) {
     console.error('OPENAI_API_KEY is not set');
     throw new Error('OPENAI_API_KEY is not set');
@@ -505,6 +506,18 @@ export async function analyzeSkin(answerId: string) {
     throw dbError;
   }
 
+  // Track Scan Completed Event
+  MetaConversionService.sendEvent(
+    'scan_completed',
+    { externalId: record.answer?.sessionId || record.answer?.userId || undefined, clientIp, clientUserAgent },
+    {
+      contentName: 'skin_analysis',
+      status: 'completed',
+      predictedLtv: parsed.score // Using skin score as a value proxy or custom metric if needed
+    },
+    'analysis/complete'
+  ).catch(e => console.error('Meta event failed', e));
+
   return parsed;
 }
 
@@ -631,7 +644,7 @@ export async function analyzeProgress(
   return { ...parsed, annotatedImageUrl };
 }
 
-export async function analyzeWithLandmarks(frontImageUrl: string, landmarks: object, answerId: string, leftImageUrl?: string, rightImageUrl?: string) {
+export async function analyzeWithLandmarks(frontImageUrl: string, landmarks: object, answerId: string, leftImageUrl?: string, rightImageUrl?: string, clientIp?: string, clientUserAgent?: string) {
   if (!process.env.OPENAI_API_KEY) {
     throw new Error('OPENAI_API_KEY is not set');
   }
@@ -714,6 +727,17 @@ export async function analyzeWithLandmarks(frontImageUrl: string, landmarks: obj
     });
   }
 
+  // Track Scan Completed Event
+  MetaConversionService.sendEvent(
+    'scan_completed',
+    { externalId: answerRecord?.sessionId || answerRecord?.userId || undefined, clientIp, clientUserAgent },
+    {
+      contentName: 'skin_analysis',
+      status: 'completed',
+      predictedLtv: parsed.score
+    },
+    'analysis/complete_url'
+  ).catch(e => console.error('Meta event failed', e));
 
   return { ...parsed, annotatedImageUrl: null };
 }

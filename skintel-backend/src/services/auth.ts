@@ -11,9 +11,10 @@ import {
 import { generateTasksForUser } from './tasks';
 import { verifyClerkSessionToken } from '../lib/clerk';
 import { AuthResponse, RefreshTokenResponse, LogoutResponse } from '../types';
+import { MetaConversionService } from './meta';
 
 export class AuthService {
-    static async signup(data: { session_id: string; email: string; password: string }): Promise<AuthResponse> {
+    static async signup(data: { session_id: string; email: string; password: string }, clientIp?: string, clientUserAgent?: string): Promise<AuthResponse> {
         const { session_id, email, password } = data;
 
         const existingUser = await prisma.user.findUnique({
@@ -55,6 +56,14 @@ export class AuthService {
         });
 
         const sessionMerged = await this.mergeSessionToUser(session_id, userId);
+
+        // Track Signup Event
+        MetaConversionService.sendEvent(
+            'CompleteRegistration',
+            { email: email, externalId: userId, clientIp, clientUserAgent },
+            { status: 'completed' },
+            'auth/signup'
+        ).catch(e => console.error('Meta event failed', e));
 
         return {
             user_id: userId,
@@ -119,7 +128,7 @@ export class AuthService {
         };
     }
 
-    static async sso(data: { session_id: string; provider: string; clerk_token: string; clerk_session_id: string }): Promise<AuthResponse> {
+    static async sso(data: { session_id: string; provider: string; clerk_token: string; clerk_session_id: string }, clientIp?: string, clientUserAgent?: string): Promise<AuthResponse> {
         const { session_id, provider, clerk_token, clerk_session_id } = data;
 
         const session = await prisma.anonymousSession.findUnique({
@@ -206,6 +215,21 @@ export class AuthService {
                         .trim() || undefined,
                 },
             });
+
+            // Track Signup Event (SSO)
+            MetaConversionService.sendEvent(
+                'CompleteRegistration',
+                {
+                    email: verifiedSession.email || undefined,
+                    firstName: verifiedSession.firstName || undefined,
+                    lastName: verifiedSession.lastName || undefined,
+                    externalId: userId,
+                    clientIp,
+                    clientUserAgent
+                },
+                { status: 'completed', method: 'sso', provider: detectedProvider },
+                'auth/sso'
+            ).catch(e => console.error('Meta event failed', e));
         }
 
         // Reactivate user if soft deleted

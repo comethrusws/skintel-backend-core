@@ -5,6 +5,7 @@ import { idempotencyMiddleware } from '../middleware/idempotency';
 import { onboardingRequestSchema } from '../lib/validation';
 import { prisma } from '../lib/prisma';
 import { processLandmarksAsync, processLandmarksForAnswerWithUrl } from '../services/landmarks';
+import { MetaConversionService } from '../services/meta';
 
 const router = Router();
 
@@ -117,6 +118,8 @@ router.put('/', idempotencyMiddleware, authenticateSession, async (req: Authenti
 
     const responseAnswers = [];
     const now = new Date();
+    const clientIp = (req.headers['x-forwarded-for'] as string) || req.ip;
+    const clientUserAgent = req.headers['user-agent'];
 
     // Process each answer
     for (const answer of answers) {
@@ -161,13 +164,13 @@ router.put('/', idempotencyMiddleware, authenticateSession, async (req: Authenti
           if ('image_id' in (answer.value as any)) {
             const imageValue = answer.value as { image_id: string };
             console.log(`Triggering landmark processing for front face: ${imageValue.image_id}`);
-            processLandmarksAsync(answer.answer_id, imageValue.image_id).catch(error => {
+            processLandmarksAsync(answer.answer_id, imageValue.image_id, clientIp, clientUserAgent).catch(error => {
               console.error('Async landmark processing error:', error);
             });
           } else if ('image_url' in (answer.value as any)) {
             const urlValue = answer.value as { image_url: string };
             console.log(`Triggering URL-based landmark processing for front face: ${urlValue.image_url}`);
-            processLandmarksForAnswerWithUrl(answer.answer_id, urlValue.image_url).catch(error => {
+            processLandmarksForAnswerWithUrl(answer.answer_id, urlValue.image_url, clientIp, clientUserAgent).catch(error => {
               console.error('Async url landmark processing error:', error);
             });
           }
@@ -181,6 +184,38 @@ router.put('/', idempotencyMiddleware, authenticateSession, async (req: Authenti
         saved: true,
         saved_at: now.toISOString(),
       });
+
+      // Track Photo Upload Event
+      if (answer.type === 'image' && answer.status === 'answered') {
+        MetaConversionService.sendEvent(
+          'photo_uploaded',
+          { externalId: sessionId, clientIp, clientUserAgent }, // Using sessionId as externalId for anonymous tracking
+          { contentName: answer.question_id, status: 'uploaded' },
+          'onboarding/upload'
+        ).catch(e => console.error('Meta event failed', e));
+      }
+    }
+
+    // Track Onboarding Step Event (batch)
+    MetaConversionService.sendEvent(
+      'onboarding_step',
+      { externalId: sessionId, clientIp, clientUserAgent },
+      {
+        contentName: 'onboarding_save',
+        contentIds: answers.map(a => a.question_id),
+        details: `Saved ${answers.length} answers`
+      },
+      'onboarding/save'
+    ).catch(e => console.error('Meta event failed', e));
+
+    if (screen_completed) {
+      // Track Onboarding Completed Event
+      MetaConversionService.sendEvent(
+        'onboarding_completed',
+        { externalId: sessionId, clientIp, clientUserAgent },
+        { status: 'completed' },
+        'onboarding/complete'
+      ).catch(e => console.error('Meta event failed', e));
     }
 
     await updateOnboardingSession(sessionId, null, screen_completed);

@@ -2,6 +2,7 @@ import express, { Request, Response } from 'express';
 import { authenticateUser, AuthenticatedRequest } from '../middleware/auth';
 import { sendSlackNotification } from '../services/slack';
 import { prisma } from '../lib/prisma';
+import { MetaConversionService } from '../services/meta';
 
 const router = express.Router();
 
@@ -62,6 +63,16 @@ router.post('/email', authenticateUser, async (req: Request, res: Response) => {
         await sendSlackNotification(message);
 
         res.status(200).json({ message: 'Email report sent successfully' });
+
+        // Track Report Viewed/Sent Event
+        const clientIp = (req.headers['x-forwarded-for'] as string) || req.ip;
+        const clientUserAgent = req.headers['user-agent'];
+        MetaConversionService.sendEvent(
+            'report_viewed',
+            { email: userEmail, externalId: userId, clientIp, clientUserAgent },
+            { contentName: 'email_report', status: 'sent', details: subject },
+            'report/email'
+        ).catch(e => console.error('Meta event failed', e));
     } catch (error) {
         console.error('Error sending email report:', error);
         res.status(500).json({ error: 'Internal server error' });

@@ -3,6 +3,7 @@ import { prisma } from '../lib/prisma';
 import { PlanType } from '@prisma/client';
 import { TasksService } from './tasks';
 import jwt from 'jsonwebtoken';
+import { MetaConversionService } from './meta';
 
 const APPLE_SHARED_SECRET = process.env.APPLE_SHARED_SECRET;
 const APPLE_PRIVATE_KEY_RAW = process.env.APPLE_PRIVATE_KEY;
@@ -217,7 +218,7 @@ export class PaymentService {
     /**
      * Records the transaction validation result in the database.
      */
-    static async recordTransaction(userId: string, verificationResult: IAPVerificationResult, jwsTransaction?: string) {
+    static async recordTransaction(userId: string, verificationResult: IAPVerificationResult, jwsTransaction?: string, clientIp?: string, clientUserAgent?: string) {
         try {
             if (!verificationResult.productId || !verificationResult.transactionId) {
                 console.warn('Skipping transaction recording: Missing productId or transactionId');
@@ -243,7 +244,84 @@ export class PaymentService {
                 }
             });
 
+
             console.log(`Transaction recorded for user ${userId}: ${verificationResult.transactionId}`);
+
+            // --- Meta CAPI Integration ---
+            const isRenewal = verificationResult.originalTransactionId &&
+                verificationResult.transactionId !== verificationResult.originalTransactionId;
+
+            // Assuming we can fetch user email for better matching
+            const user = await prisma.user.findUnique({ where: { userId }, select: { email: true } });
+            const userEmail = user?.email || undefined;
+
+            if (isRenewal) {
+                MetaConversionService.sendEvent(
+                    'subscription_renewed',
+                    { externalId: userId, email: userEmail, clientIp, clientUserAgent },
+                    {
+                        userId: userId,
+                        orderId: verificationResult.transactionId,
+                        currency: 'USD', // Assuming USD default for now
+                        value: planType === 'WEEKLY' ? 9.99 : 29.99, // Approximate values, adjust as needed
+                        status: 'renewed',
+                    },
+                    'payment/renewal'
+                ).catch(e => console.error('Meta renewal event failed', e));
+
+                // Also track as Purchase for ROAS calculation
+                MetaConversionService.sendEvent(
+                    'Purchase',
+                    { externalId: userId, email: userEmail },
+                    {
+                        orderId: verificationResult.transactionId,
+                        currency: 'USD',
+                        value: planType === 'WEEKLY' ? 9.99 : 29.99,
+                        clientIp,
+                        clientUserAgent
+                    },
+                    'payment/purchase'
+                ).catch(e => console.error('Meta purchase event failed', e));
+
+            } else {
+                // New transaction
+                // Check if it's a trial (heuristic: many subscriptions start with a trial)
+                // For now, we'll treat first time as StartTrial AND Subscribe if we can't distinguish perfectly,
+                // or just Subscribe. Let's assume standard Subscribe for new ones.
+
+                MetaConversionService.sendEvent(
+                    'Subscribe',
+                    { externalId: userId, email: userEmail, clientIp, clientUserAgent },
+                    {
+                        orderId: verificationResult.transactionId,
+                        currency: 'USD',
+                        value: planType === 'WEEKLY' ? 9.99 : 29.99,
+                        status: 'active',
+                        predictedLtv: planType === 'WEEKLY' ? 50 : 150,
+                    },
+                    'payment/subscribe'
+                ).catch(e => console.error('Meta subscribe event failed', e));
+
+                // If it's a trial (Apple receipts usually indicate this via `is_trial_period` in the full receipt,
+                // but we only trust connection-level boolean here if simplified. 
+                // We'll skip specific 'StartTrial' unless we parse that specifically in `verifyJWSTransaction`.
+                // However, we can track 'Purchase' for value optimization.
+
+                MetaConversionService.sendEvent(
+                    'Purchase',
+                    { externalId: userId, email: userEmail },
+                    {
+                        orderId: verificationResult.transactionId,
+                        currency: 'USD',
+                        value: planType === 'WEEKLY' ? 9.99 : 29.99,
+                        clientIp,
+                        clientUserAgent
+                    },
+                    'payment/purchase'
+                ).catch(e => console.error('Meta purchase event failed', e));
+            }
+            // -----------------------------
+
         } catch (error) {
             console.error('Failed to record transaction:', error);
         }

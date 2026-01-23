@@ -75,7 +75,7 @@ export async function processLandmarks(imageId: string): Promise<LandmarkProcess
 /**
  * process landmarks asynchronously for front face images only, skip other profile
  */
-export async function processLandmarksAsync(answerId: string, imageId: string): Promise<void> {
+export async function processLandmarksAsync(answerId: string, imageId: string, clientIp?: string, clientUserAgent?: string): Promise<void> {
   const { prisma } = await import('../lib/prisma');
 
   let answer: { userId: string | null; sessionId: string | null } | null = null;
@@ -114,7 +114,7 @@ export async function processLandmarksAsync(answerId: string, imageId: string): 
       });
 
       try {
-        const analysis = await analyzeSkin(answerId);
+        const analysis = await analyzeSkin(answerId, clientIp, clientUserAgent);
 
         await prisma.facialLandmarks.update({
           where: { answerId },
@@ -222,7 +222,7 @@ export async function processLandmarksAsync(answerId: string, imageId: string): 
  * process landmarks for a direct image URL (front face only)
  * and persist analysis for an answer
  */
-export async function processLandmarksForAnswerWithUrl(answerId: string, imageUrl: string): Promise<void> {
+export async function processLandmarksForAnswerWithUrl(answerId: string, imageUrl: string, clientIp?: string, clientUserAgent?: string): Promise<void> {
   const { prisma } = await import('../lib/prisma');
 
   let answer: { userId: string | null; sessionId: string | null } | null = null;
@@ -294,7 +294,7 @@ export async function processLandmarksForAnswerWithUrl(answerId: string, imageUr
 
     try {
       console.log(`[Landmarks] Starting skin analysis...`);
-      const analysisResult = await analyzeWithLandmarks(imageUrl, result, answerId);
+      const analysisResult = await analyzeWithLandmarks(imageUrl, result, answerId, undefined, undefined, clientIp, clientUserAgent);
       console.log(`[Landmarks] Skin analysis completed. Annotated image: ${!!(analysisResult as any).annotatedImageUrl}`);
       const { annotatedImageUrl, ...analysis } = analysisResult as any;
 

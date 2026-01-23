@@ -96,7 +96,9 @@ router.post('/verify-ios', authenticateUser, asyncHandler(async (req: Authentica
     }
 
     // Record the transaction
-    await PaymentService.recordTransaction(userId, verificationResult, jws_transaction);
+    const clientIp = (req.headers['x-forwarded-for'] as string) || req.ip;
+    const clientUserAgent = req.headers['user-agent'];
+    await PaymentService.recordTransaction(userId, verificationResult, jws_transaction, clientIp, clientUserAgent);
 
     const updatedUser = await PaymentService.updateUserPlan(
         userId,
@@ -201,7 +203,9 @@ router.post('/verify-transaction', authenticateUser, asyncHandler(async (req: Au
     }
 
     // Record the transaction
-    await PaymentService.recordTransaction(userId, verificationResult);
+    const clientIp = (req.headers['x-forwarded-for'] as string) || req.ip;
+    const clientUserAgent = req.headers['user-agent'];
+    await PaymentService.recordTransaction(userId, verificationResult, undefined, clientIp, clientUserAgent);
 
     // Update user plan
     const updatedUser = await PaymentService.updateUserPlan(
