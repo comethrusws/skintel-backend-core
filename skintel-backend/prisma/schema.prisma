@@ -24,29 +24,29 @@ model AnonymousSession {
 }
 
 model User {
-  id                      String                  @id @default(cuid())
-  userId                  String                  @unique @map("user_id")
-  email                   String?                 @unique
-  passwordHash            String?                 @map("password_hash")
-  ssoProvider             String?                 @map("sso_provider")
-  ssoId                   String?                 @map("sso_id")
-  createdAt               DateTime                @default(now()) @map("created_at")
-  updatedAt               DateTime                @updatedAt @map("updated_at")
-  dateOfBirth             DateTime?               @map("date_of_birth")
+  id                      String                   @id @default(cuid())
+  userId                  String                   @unique @map("user_id")
+  email                   String?                  @unique
+  passwordHash            String?                  @map("password_hash")
+  ssoProvider             String?                  @map("sso_provider")
+  ssoId                   String?                  @map("sso_id")
+  createdAt               DateTime                 @default(now()) @map("created_at")
+  updatedAt               DateTime                 @updatedAt @map("updated_at")
+  dateOfBirth             DateTime?                @map("date_of_birth")
   name                    String?
-  phoneNumber             String?                 @map("phone_number")
-  planType                PlanType                @default(MONTHLY) @map("plan_type")
-  latitude                Float?                  @map("latitude")
-  locationUpdatedAt       DateTime?               @map("location_updated_at")
-  longitude               Float?                  @map("longitude")
-  originalTransactionId   String?                 @map("original_transaction_id")
-  subscriptionExpiresAt   DateTime?               @map("subscription_expires_at")
-  isActive                Boolean                 @default(false) @map("is_active")
-  autoRenewEnabled        Boolean                 @default(true) @map("auto_renew_enabled")
-  cancellationDate        DateTime?               @map("cancellation_date")
-  lastAppleNotification   DateTime?               @map("last_apple_notification")
-  hasConsented            Boolean                 @default(false) @map("has_consented")
-  deletedAt               DateTime?               @map("deleted_at")
+  phoneNumber             String?                  @map("phone_number")
+  planType                PlanType                 @default(MONTHLY) @map("plan_type")
+  latitude                Float?                   @map("latitude")
+  locationUpdatedAt       DateTime?                @map("location_updated_at")
+  longitude               Float?                   @map("longitude")
+  originalTransactionId   String?                  @map("original_transaction_id")
+  subscriptionExpiresAt   DateTime?                @map("subscription_expires_at")
+  isActive                Boolean                  @default(false) @map("is_active")
+  autoRenewEnabled        Boolean                  @default(true) @map("auto_renew_enabled")
+  cancellationDate        DateTime?                @map("cancellation_date")
+  lastAppleNotification   DateTime?                @map("last_apple_notification")
+  hasConsented            Boolean                  @default(false) @map("has_consented")
+  deletedAt               DateTime?                @map("deleted_at")
   Task                    Task[]
   TaskCompletion          TaskCompletion[]
   deviceTokens            DeviceToken[]
@@ -60,6 +60,7 @@ model User {
   skinFeels               SkinFeel[]
   transactions            Transaction[]
   waterIntakeLogs         WaterIntakeLog[]
+  dailyRoutineCompletions DailyRoutineCompletion[]
 
   @@unique([ssoProvider, ssoId])
   @@map("users")
@@ -350,4 +351,21 @@ enum SkinFeelValue {
   feeling_good
   feeling_fresh
   glowing
+}
+
+model DailyRoutineCompletion {
+  id             String   @id @default(cuid())
+  userId         String   @map("user_id")
+  date           DateTime @db.Date
+  tasksCompleted Int      @map("tasks_completed")
+  totalTasks     Int      @map("total_tasks")
+  completionRate Float    @map("completion_rate")
+  sentToMeta     Boolean  @default(false) @map("sent_to_meta")
+  createdAt      DateTime @default(now()) @map("created_at")
+  user           User     @relation(fields: [userId], references: [userId], onDelete: Cascade)
+
+  @@unique([userId, date])
+  @@index([date])
+  @@index([userId, date])
+  @@map("daily_routine_completions")
 }
