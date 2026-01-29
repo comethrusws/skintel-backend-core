@@ -5,6 +5,7 @@ import { ProfileService } from './services/profile';
 import { RoutineMessageService } from './services/routineMessage';
 import { QuestionOfTheDayService } from './services/questionOfTheDay';
 import { CheckInService } from './services/checkIn';
+import { RoutineCompletionService } from './services/routineCompletion';
 
 export function initCronJobs() {
     console.log('Initializing cron jobs...');
@@ -97,5 +98,16 @@ export function initCronJobs() {
     cron.schedule('0 11 * * *', async () => {
         await NotificationService.sendQuestionOfTheDay();
     });
+
+    // Daily Routine Completion Tracking (11:59 PM)
+    cron.schedule('59 23 * * *', async () => {
+        console.log('Running daily routine completion tracking...');
+        try {
+            await RoutineCompletionService.trackDailyCompletionsForActiveUsers();
+        } catch (error) {
+            console.error('Error in daily routine completion tracking:', error);
+        }
+    });
+
     console.log('Cron jobs initialized.');
 }
