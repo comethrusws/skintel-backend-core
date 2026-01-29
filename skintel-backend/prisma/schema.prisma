@@ -42,6 +42,9 @@ model User {
   originalTransactionId   String?                 @map("original_transaction_id")
   subscriptionExpiresAt   DateTime?               @map("subscription_expires_at")
   isActive                Boolean                 @default(false) @map("is_active")
+  autoRenewEnabled        Boolean                 @default(true) @map("auto_renew_enabled")
+  cancellationDate        DateTime?               @map("cancellation_date")
+  lastAppleNotification   DateTime?               @map("last_apple_notification")
   hasConsented            Boolean                 @default(false) @map("has_consented")
   deletedAt               DateTime?               @map("deleted_at")
   Task                    Task[]

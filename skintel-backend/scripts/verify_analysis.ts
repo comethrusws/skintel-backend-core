@@ -1,4 +1,4 @@
-
+import 'dotenv/config';
 import { PrismaClient } from '@prisma/client';
 import { maybePresignUrl } from '../src/lib/s3';
 

@@ -43,6 +43,7 @@ import { paymentRouter } from './routes/payment';
 import { questionsRouter } from './routes/questions';
 import { CheckInService } from './services/checkIn';
 import { errorHandler, notFoundHandler } from './middleware/error';
+import { webhookRouter } from './routes/webhook';
 
 const app: Express = express();
 
@@ -88,6 +89,7 @@ app.use('/v1/report', reportRouter);
 app.use('/v1/notifications', notificationsRouter);
 app.use('/v1/payment', paymentRouter);
 app.use('/v1/questions', questionsRouter);
+app.use('/webhooks', webhookRouter);
 
 // Swagger documentation
 app.use('/docs', swaggerUi.serve, swaggerUi.setup(specs, {
