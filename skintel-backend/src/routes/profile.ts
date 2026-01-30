@@ -3,6 +3,7 @@ import { authenticateUser, AuthenticatedRequest } from '../middleware/auth';
 import { profileUpdateRequestSchema, profileQuestionsAnswerRequestSchema, profileLocationUpdateSchema, addProfileQuestionSchema, profileConsentUpdateSchema } from '../lib/validation';
 import { asyncHandler } from '../utils/asyncHandler';
 import { ProfileService } from '../services/profile';
+import { MetaConversionService } from '../services/meta';
 
 const router = Router();
 
@@ -676,6 +677,17 @@ router.get('/', authenticateUser, asyncHandler(async (req: AuthenticatedRequest,
 
 router.get('/analysis', authenticateUser, asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
   const response = await ProfileService.getAnalysis(req.userId!);
+
+  // Track Report Viewed Event
+  const clientIp = (req.headers['x-forwarded-for'] as string) || req.ip;
+  const clientUserAgent = req.headers['user-agent'];
+  MetaConversionService.sendEvent(
+    'report_viewed',
+    { externalId: req.userId!, clientIp, clientUserAgent },
+    { contentName: 'skin_analysis', analysisType: response.analysis?.[0]?.analysis_type || 'unknown' },
+    'profile/analysis'
+  ).catch(e => console.error('Meta event failed', e));
+
   res.json(response);
 }));
 

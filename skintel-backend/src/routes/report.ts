@@ -68,7 +68,7 @@ router.post('/email', authenticateUser, async (req: Request, res: Response) => {
         const clientIp = (req.headers['x-forwarded-for'] as string) || req.ip;
         const clientUserAgent = req.headers['user-agent'];
         MetaConversionService.sendEvent(
-            'report_viewed',
+            'email_report_sent',
             { email: userEmail, externalId: userId, clientIp, clientUserAgent },
             { contentName: 'email_report', status: 'sent', details: subject },
             'report/email'
